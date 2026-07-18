@@ -6,6 +6,7 @@ import { AppFrame } from "./AppFrame";
 import { Button } from "./Button";
 import { UndoSnackbar } from "./UndoSnackbar";
 import { ActionFooterLayout } from "./ActionFooterLayout";
+import { BottomNav } from "./BottomNav";
 
 const componentsCss = readFileSync(resolve(process.cwd(), "src/styles/components.css"), "utf8");
 
@@ -71,4 +72,12 @@ it("keeps undo offsets aligned with footer rows and the safe-area delta", () => 
 
 it("centers short content safely when it fits", () => {
   expect(componentsCss).toMatch(/justify-content:\s*safe center/);
+});
+
+it("hides feature-flagged navigation destinations that are unavailable in production", () => {
+  render(<BottomNav active="today-normal" onNavigate={vi.fn()} env={{ DEV: false }} />);
+
+  expect(screen.queryByRole("button", { name: "Календар" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Oracle" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Сьогодні" })).toBeInTheDocument();
 });

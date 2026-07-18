@@ -38,3 +38,11 @@
 - Callback session keys are removed in `finally`, including state mismatches and backend failures.
 - API client never forwards caller/user identity headers, refreshes only after a 401, and clears auth on refresh failure.
 - Production deep links to disabled Calendar, Telegram, Oracle, Stripe, Goal Focus, Pomodoro and Adaptation resolve to Today; dev/test QA links continue to work.
+
+## Review follow-up
+
+- Replaced the incompatible manual OAuth exchange with PocketBase 0.27's `authWithOAuth2Code("google", code, verifier, redirectUrl)` and covered its success path.
+- API requests now strip caller-provided `Authorization`, retain one request ID across the single 401 retry, and keep caller/user identity headers out.
+- Feature flags now protect both direct routes and internal navigation; unavailable Calendar and Oracle tabs are hidden in production navigation.
+- Google start and callback failures show stable Ukrainian messages. Technical causes are logged but never rendered to the user.
+- Follow-up verification: `npm --prefix prototype test` — 17 files / 55 tests passing; production build, Playwright CLI help and `git diff --check` passed.

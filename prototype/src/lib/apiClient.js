@@ -7,7 +7,7 @@ function requestId() {
 function withoutCallerIdentity(headers) {
   return Object.fromEntries(Object.entries(headers ?? {}).filter(([name]) => {
     const normalized = name.toLowerCase().replaceAll("_", "").replaceAll("-", "");
-    return !normalized.includes("userid") && !normalized.includes("callerid");
+    return normalized !== "authorization" && !normalized.includes("userid") && !normalized.includes("callerid");
   }));
 }
 
@@ -22,10 +22,10 @@ async function asApiError(response) {
 }
 
 export function createApiClient({ baseUrl, fetchImpl = globalThis.fetch, getToken, refreshToken, onAuthExpired, requestIdFactory = requestId }) {
-  async function send(path, options, token) {
+  async function send(path, options, token, id) {
     const headers = {
       ...withoutCallerIdentity(options.headers),
-      "X-Request-Id": requestIdFactory(),
+      "X-Request-Id": id,
     };
     if (token) headers.Authorization = `Bearer ${token}`;
     return fetchImpl(new URL(path, baseUrl).toString(), { ...options, headers });
@@ -33,14 +33,15 @@ export function createApiClient({ baseUrl, fetchImpl = globalThis.fetch, getToke
 
   return {
     async request(path, options = {}) {
-      let response = await send(path, options, getToken?.());
+      const id = requestIdFactory();
+      let response = await send(path, options, getToken?.(), id);
       if (response.status === 401) {
         const token = await refreshToken?.();
         if (!token) {
           onAuthExpired?.();
           throw await asApiError(response);
         }
-        response = await send(path, options, token);
+        response = await send(path, options, token, id);
         if (response.status === 401) onAuthExpired?.();
       }
       if (!response.ok) throw await asApiError(response);

@@ -5,7 +5,7 @@ import { ScreenRouter } from "./screens/ScreenRouter";
 import { PrototypeProvider, usePrototype } from "./state/prototypeState";
 import { createAuthStore, createPocketBaseClient, useAuthState } from "./auth/authStore";
 import { startGoogleLogin } from "./auth/pocketBaseOAuth";
-import { isQaEnvironment, resolveProductionRoute } from "./navigation/routeAccess";
+import { isQaEnvironment, resolveInternalRoute, resolveProductionRoute } from "./navigation/routeAccess";
 
 function PrototypeExperience({ initialCatalog = false }) {
   const { route, navigate } = usePrototype();
@@ -29,7 +29,7 @@ function ProductionExperience() {
   const resolvedRoute = resolveProductionRoute({ pathname: window.location.pathname, auth });
   const [route, setRoute] = React.useState(resolvedRoute);
   React.useEffect(() => setRoute(resolvedRoute), [resolvedRoute]);
-  const navigate = (nextRoute) => setRoute(nextRoute);
+  const navigate = (nextRoute) => setRoute(resolveInternalRoute({ route: nextRoute }));
   return <main className="mobile-prototype" data-testid="mobile-prototype">
     <ScreenRouter route={route} onNavigate={navigate} pocketBase={pocketBase} onGoogleLogin={() => startGoogleLogin()} />
   </main>;

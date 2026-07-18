@@ -1,4 +1,5 @@
 import { CalendarBlank, Graph, House, Microphone, Tray } from "@phosphor-icons/react";
+import { isInternalRouteAllowed } from "../navigation/routeAccess";
 
 const items = [
   ["today-normal", "Сьогодні", House],
@@ -8,10 +9,12 @@ const items = [
   ["oracle-balanced", "Oracle", Graph],
 ];
 
-export function BottomNav({ active, onNavigate }) {
+export function BottomNav({ active, onNavigate, env = import.meta.env }) {
   return (
     <nav className="bottom-nav" aria-label="Головна навігація">
-      {items.map(([id, label, Icon], index) => (
+      {items.filter(([id]) => isInternalRouteAllowed({ route: id, env })).map(([id, label, Icon]) => {
+        const index = items.findIndex(([itemId]) => itemId === id);
+        return (
         <button
           key={id}
           className={`bottom-nav__item ${id === active ? "is-active" : ""} ${index === 2 ? "is-capture" : ""}`}
@@ -22,7 +25,7 @@ export function BottomNav({ active, onNavigate }) {
           <Icon size={index === 2 ? 25 : 22} weight={id === active ? "fill" : "regular"} aria-hidden />
           {index === 2 ? null : <span>{label}</span>}
         </button>
-      ))}
+      );})}
     </nav>
   );
 }

@@ -17,6 +17,7 @@ import { SettingsScreens } from "../features/settings/SettingsScreens";
 import { SystemScreens } from "../features/system/SystemScreens";
 import { SCREEN_MAP } from "./screenRegistry";
 import { AuthCallback } from "../auth/AuthCallback";
+import { useEffect, useState } from "react";
 
 const ONBOARDING_NEXT = {
   "onboarding-welcome": "calendar-permission", "calendar-permission": "work-rhythm", "work-rhythm": "quiet-hours",
@@ -30,13 +31,24 @@ const ONBOARDING_BACK = {
 };
 
 export function ScreenRouter({ route, onNavigate, onGoogleLogin, pocketBase }) {
+  const [loginError, setLoginError] = useState(false);
+  useEffect(() => setLoginError(false), [route]);
+  const requestGoogleLogin = async () => {
+    if (!onGoogleLogin) return onNavigate("auth-loading");
+    try {
+      await onGoogleLogin();
+    } catch (error) {
+      console.error("Не вдалося почати вхід через Google", error);
+      setLoginError(true);
+    }
+  };
   if (route === "auth-callback") return <AuthCallback pb={pocketBase} onComplete={() => onNavigate("today-normal")} />;
   const screen = SCREEN_MAP[route] ?? SCREEN_MAP["entry-chaos"];
   const back = () => onNavigate(ONBOARDING_BACK[route] ?? "today-normal");
   if (screen.group === "Entry") {
     if (route === "auth-loading") return <AuthStateScreen state="loading" onContinue={() => onNavigate("onboarding-welcome")} />;
-    if (route === "auth-error") return <AuthStateScreen state="error" onRetry={() => onNavigate("auth-loading")} />;
-    return <EntryCarousel initialIndex={{ "entry-chaos": 0, "entry-voice": 1, "entry-path": 2 }[route]} onContinue={onGoogleLogin ?? (() => onNavigate("auth-loading"))} />;
+    if (route === "auth-error" || loginError) return <AuthStateScreen state="error" onRetry={requestGoogleLogin} />;
+    return <EntryCarousel initialIndex={{ "entry-chaos": 0, "entry-voice": 1, "entry-path": 2 }[route]} onContinue={requestGoogleLogin} />;
   }
   if (screen.group === "Onboarding") {
     if (route.startsWith("goal-")) return <GoalSetup screenId={route} onBack={back} onRoute={onNavigate} onNext={() => onNavigate("telegram-connect")} />;

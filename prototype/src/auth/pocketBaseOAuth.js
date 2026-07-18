@@ -52,12 +52,7 @@ export async function completeGoogleLogin({ pb, location = window.location, sess
     if (!code || !verifier || !expectedState || params.get("state") !== expectedState) {
       throw new Error("Стан входу не підтверджено. Спробуй увійти через Google ще раз.");
     }
-    return await pb.collection("users").authWithOAuth2({
-      provider: "google",
-      code,
-      codeVerifier: verifier,
-      redirectUrl: `${location.origin}/auth/callback`,
-    });
+    return await pb.collection("users").authWithOAuth2Code("google", code, verifier, `${location.origin}/auth/callback`);
   } finally {
     sessionStorage.removeItem(VERIFIER_KEY);
     sessionStorage.removeItem(STATE_KEY);

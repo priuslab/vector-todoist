@@ -24,4 +24,16 @@ describe("Google PKCE", () => {
     expect(removeItem).toHaveBeenCalledWith("google_oauth_state");
     expect(removeItem).toHaveBeenCalledWith("google_pkce_verifier");
   });
+
+  it("exchanges a verified callback code with PocketBase's manual OAuth method", async () => {
+    const authWithOAuth2Code = vi.fn().mockResolvedValue({ token: "pb-token" });
+    const sessionStorage = {
+      getItem: vi.fn((key) => key === "google_oauth_state" ? "expected" : "verifier"),
+      removeItem: vi.fn(),
+    };
+    const pb = { collection: vi.fn(() => ({ authWithOAuth2Code })) };
+
+    await expect(completeGoogleLogin({ pb, location: { origin: "https://vector.example", search: "?code=google-code&state=expected" }, sessionStorage })).resolves.toEqual({ token: "pb-token" });
+    expect(authWithOAuth2Code).toHaveBeenCalledWith("google", "google-code", "verifier", "https://vector.example/auth/callback");
+  });
 });

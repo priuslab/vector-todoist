@@ -31,6 +31,20 @@ describe("createApiClient", () => {
     expect(fetchImpl.mock.calls[0][1].headers["X-Caller-Id"]).toBeUndefined();
   });
 
+  it("discards caller-supplied Authorization when no trusted token is available", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(ok());
+    const client = createApiClient({
+      baseUrl: "https://api.example.test",
+      fetchImpl,
+      getToken: () => null,
+      requestIdFactory: () => "request-123",
+    });
+
+    await client.request("/tasks", { headers: { Authorization: "Bearer attacker" } });
+
+    expect(fetchImpl.mock.calls[0][1].headers.Authorization).toBeUndefined();
+  });
+
   it("turns non-success responses into an ApiError", async () => {
     const client = createApiClient({
       baseUrl: "https://api.example.test",
@@ -64,6 +78,7 @@ describe("createApiClient", () => {
     expect(refreshToken).toHaveBeenCalledTimes(1);
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     expect(fetchImpl.mock.calls[1][1].headers.Authorization).toBe("Bearer fresh-token");
+    expect(fetchImpl.mock.calls[1][1].headers["X-Request-Id"]).toBe(fetchImpl.mock.calls[0][1].headers["X-Request-Id"]);
   });
 
   it("expires auth after one failed refresh and does not retry other errors", async () => {

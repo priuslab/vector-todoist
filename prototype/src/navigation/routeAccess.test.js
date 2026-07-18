@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveProductionRoute } from "./routeAccess";
+import { resolveInternalRoute, resolveProductionRoute } from "./routeAccess";
 
 describe("resolveProductionRoute", () => {
   it("routes an authenticated person without onboarding to the welcome flow", () => {
@@ -16,5 +16,12 @@ describe("resolveProductionRoute", () => {
   it("keeps callback and anonymous entry routes outside protected screens", () => {
     expect(resolveProductionRoute({ pathname: "/auth/callback", auth: { status: "anonymous" } })).toBe("auth-callback");
     expect(resolveProductionRoute({ pathname: "/calendar", auth: { status: "anonymous" } })).toBe("entry-chaos");
+  });
+
+  it("blocks internal feature navigation when the relevant flag is disabled", () => {
+    expect(resolveInternalRoute({ route: "calendar-day", env: { DEV: false } })).toBe("today-normal");
+    expect(resolveInternalRoute({ route: "oracle-balanced", env: { DEV: false } })).toBe("today-normal");
+    expect(resolveInternalRoute({ route: "calendar-day", env: { DEV: false, VITE_FEATURE_CALENDAR: "true" } })).toBe("calendar-day");
+    expect(resolveInternalRoute({ route: "inbox-default", env: { DEV: false } })).toBe("inbox-default");
   });
 });
