@@ -26,7 +26,13 @@ describe('loadConfig', () => {
   });
 
   it.each(['development', 'test', 'production'] as const)('accepts %s as NODE_ENV', (nodeEnv) => {
-    expect(loadConfig(validEnv({ NODE_ENV: nodeEnv })).nodeEnv).toBe(nodeEnv);
+    const env = nodeEnv === 'production' ? { NODE_ENV: nodeEnv, GEMINI_API_KEY: 'server-only-test-key' } : { NODE_ENV: nodeEnv };
+    expect(loadConfig(validEnv(env)).nodeEnv).toBe(nodeEnv);
+  });
+
+  it('fails fast when production AI credentials are missing', () => {
+    expect(() => loadConfig(validEnv({ NODE_ENV: 'production' }))).toThrow('GEMINI_API_KEY');
+    expect(loadConfig(validEnv({ NODE_ENV: 'production', GEMINI_API_KEY: 'server-only-test-key' })).geminiApiKey).toBe('server-only-test-key');
   });
 
   it.each(['NODE_ENV', 'HOST', 'PORT', 'PUBLIC_WEB_ORIGIN', 'POCKETBASE_URL'])(

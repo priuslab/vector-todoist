@@ -71,6 +71,10 @@ const configSchema = z
       requireSecret(env.STRIPE_SECRET_KEY, 'STRIPE_SECRET_KEY', 'ENABLE_STRIPE_INTEGRATION');
       requireSecret(env.STRIPE_WEBHOOK_SECRET, 'STRIPE_WEBHOOK_SECRET', 'ENABLE_STRIPE_INTEGRATION');
     }
+
+    if (env.NODE_ENV === 'production') {
+      requireSecret(env.GEMINI_API_KEY, 'GEMINI_API_KEY', 'NODE_ENV=production');
+    }
   })
   .transform((env) => ({
     nodeEnv: env.NODE_ENV,
