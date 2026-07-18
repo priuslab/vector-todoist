@@ -23,8 +23,10 @@ export interface PlanService {
 
 const asDate = (value: string | undefined) => value ? new Date(value) : new Date();
 const priorityAlignment: Record<string, number> = { urgent: 1, high: .9, medium: .6, low: .3 };
-const publicTask = (task: TaskRecord): TaskResponse => taskResponseSchema.parse(Object.fromEntries(Object.entries(task).filter(([key]) => key !== 'user')));
-const publicIdea = <T extends Record<string, unknown>>(idea: T): IdeaResponse => ideaResponseShape.parse(Object.fromEntries(Object.entries(idea).filter(([key]) => key !== 'user')));
+const pick = (record: Record<string, unknown>, keys: string[]) => Object.fromEntries(keys.filter((key) => record[key] !== undefined).map((key) => [key, record[key]]));
+const publicTask = (task: TaskRecord): TaskResponse => taskResponseSchema.parse(pick(task, ['id', 'title', 'description', 'status', 'priority', 'deadline', 'plannedStart', 'plannedEnd', 'estimatedMinutes', 'actualMinutes', 'energy', 'flexible', 'locked', 'sourceDump', 'rescheduleCount']));
+const publicIdea = <T extends Record<string, unknown>>(idea: T): IdeaResponse => ideaResponseShape.parse(pick(idea, ['id', 'text', 'summary', 'status', 'sourceDump']));
+const publicChangeSet = (changeSet: ChangeSetRecord): ChangeSetResponse => ({ id: changeSet.id, status: String(changeSet.status ?? ''), ...(changeSet.kind ? { kind: changeSet.kind } : {}), ...(typeof changeSet.idempotencyKey === 'string' ? { idempotencyKey: changeSet.idempotencyKey } : {}), ...(changeSet.beforeJson !== undefined ? { beforeJson: changeSet.beforeJson } : {}), ...(changeSet.afterJson !== undefined ? { afterJson: changeSet.afterJson } : {}) });
 
 export function createPlanService(deps: {
   dumpRepository: BrainDumpRepository;
@@ -77,7 +79,7 @@ export function createPlanService(deps: {
     if (changeSet.status === 'applied') {
       const payload = (changeSet.afterJson && typeof changeSet.afterJson === 'object') ? changeSet.afterJson as { tasks?: Array<Record<string, unknown>>; ideas?: Array<Record<string, unknown>> } : {};
       const appliedTaskIds = new Set((payload as { appliedTaskIds?: string[] }).appliedTaskIds ?? []); const appliedIdeaIds = new Set((payload as { appliedIdeaIds?: string[] }).appliedIdeaIds ?? []);
-      return applyResponseSchema.parse({ changeSet, tasks: (await taskRepository.list(user)).filter((task) => appliedTaskIds.has(task.id)).map(publicTask), ideas: (await ideaRepository.list(user)).filter((idea) => appliedIdeaIds.has(idea.id)).map(publicIdea) });
+      return applyResponseSchema.parse({ changeSet: publicChangeSet(changeSet), tasks: (await taskRepository.list(user)).filter((task) => appliedTaskIds.has(task.id)).map(publicTask), ideas: (await ideaRepository.list(user)).filter((idea) => appliedIdeaIds.has(idea.id)).map(publicIdea) });
     }
     const payload = (changeSet.afterJson && typeof changeSet.afterJson === 'object') ? changeSet.afterJson as { tasks?: unknown[]; ideas?: unknown[] } : {};
     const proposedTasks = Array.isArray(payload.tasks) ? payload.tasks : [];
@@ -87,7 +89,7 @@ export function createPlanService(deps: {
       for (const proposed of proposedTasks) { const value = proposed as Record<string, unknown>; const { id: _id, ...input } = value; const existing = (await taskRepository.list(user)).find((task) => task.id === value.id || (task.sourceDump === value.sourceDump && task.title === value.title)); createdTasks.push(existing ?? await taskRepository.create(user, input as never)); }
       for (const proposed of proposedIdeas) { const value = proposed as Record<string, unknown>; const { id: _id, ...input } = value; const existing = (await ideaRepository.list(user)).find((idea) => idea.id === value.id || (idea.sourceDump === value.sourceDump && idea.text === value.text)); createdIdeas.push(existing ?? await ideaRepository.create(user, input as never)); }
       const updated = await changeSetRepository.update(user, changeSetId, { status: 'applied', afterJson: { ...payload, appliedTaskIds: createdTasks.map((task) => task.id), appliedIdeaIds: createdIdeas.map((idea) => idea.id) } });
-      return applyResponseSchema.parse({ changeSet: updated, tasks: createdTasks.map(publicTask), ideas: createdIdeas.map(publicIdea) });
+      return applyResponseSchema.parse({ changeSet: publicChangeSet(updated), tasks: createdTasks.map(publicTask), ideas: createdIdeas.map(publicIdea) });
     } catch (error) {
       for (const task of createdTasks) { try { if (task.id) await taskRepository.delete(user, task.id); } catch { try { if (task.id) await taskRepository.update(user, task.id, { status: 'cancelled' }); } catch { /* explicit failed change set remains retryable */ } } }
       for (const idea of createdIdeas) { try { if (idea.id) await ideaRepository.delete(user, idea.id); } catch { try { if (idea.id) await ideaRepository.update(user, idea.id, { status: 'archived' }); } catch { /* explicit failed change set remains retryable */ } } }
