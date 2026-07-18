@@ -13,15 +13,16 @@ const content = {
   "focus-settings": { icon: Timer, title: "Який темп зручний?", text: "Початкові значення адаптуються після виконаних і перенесених задач." },
 };
 
-export function OnboardingFlow({ screenId, onBack, onNext }) {
+export function OnboardingFlow({ screenId, onBack, onNext, onCalendarConnect = onNext, onCalendarSkip = onNext }) {
   const [days, setDays] = useState("Будні");
   const [energy, setEnergy] = useState("Ранок");
   const item = content[screenId] ?? content["onboarding-welcome"];
   const Icon = item.icon;
+  const calendar = screenId === "calendar-permission";
   const footer = (
     <>
-      <Button onClick={onNext}>{screenId === "calendar-permission" ? "Надати доступ" : "Продовжити"}</Button>
-      <button className="text-action" onClick={onNext}>Налаштувати пізніше</button>
+      <Button onClick={calendar ? onCalendarConnect : onNext}>{calendar ? "Надати доступ" : "Продовжити"}</Button>
+      <button className="text-action" onClick={calendar ? onCalendarSkip : onNext}>{calendar ? "Пропустити" : "Налаштувати пізніше"}</button>
     </>
   );
   const centered = ["onboarding-welcome", "calendar-permission"].includes(screenId);
@@ -42,6 +43,7 @@ export function OnboardingFlow({ screenId, onBack, onNext }) {
             <span><Icon size={34} weight="duotone" /></span>
             <h1>{item.title}</h1>
             <p>{item.text}</p>
+            {calendar ? <p className="onboarding-note">Без доступу Вектор не бачитиме зайняті слоти й може запропонувати час із конфліктом.</p> : null}
           </section>
           {screenId === "work-rhythm" ? (
             <div className="form-stack">

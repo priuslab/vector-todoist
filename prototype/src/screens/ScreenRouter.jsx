@@ -57,7 +57,18 @@ export function ScreenRouter({ route, onNavigate, onGoogleLogin, onAuthComplete,
   if (screen.group === "Onboarding") {
     if (route.startsWith("goal-")) return <GoalSetup screenId={route} onBack={back} onRoute={onNavigate} onNext={() => onNavigate("telegram-connect")} />;
     if (route.startsWith("telegram-") || route === "first-brain-dump") return <TelegramSetup screenId={route} onBack={back} onNext={() => onNavigate(route === "telegram-connect" ? "telegram-success" : route === "telegram-success" ? "first-brain-dump" : "capture-chooser")} />;
-    return <OnboardingFlow screenId={route} onBack={back} onNext={() => onNavigate(ONBOARDING_NEXT[route] ?? "goal-choice")} />;
+    const nextOnboarding = () => onNavigate(ONBOARDING_NEXT[route] ?? "goal-choice");
+    const connectCalendar = async () => {
+      if (!apiClient) return nextOnboarding();
+      try {
+        const result = await apiClient.request("/api/v1/integrations/google-calendar/start", { method: "POST" });
+        if (result?.redirectUrl) window.location.assign(result.redirectUrl);
+        else nextOnboarding();
+      } catch {
+        nextOnboarding();
+      }
+    };
+    return <OnboardingFlow screenId={route} onBack={back} onNext={nextOnboarding} onCalendarConnect={route === "calendar-permission" ? connectCalendar : nextOnboarding} onCalendarSkip={nextOnboarding} />;
   }
   if (screen.group === "Capture") return <CaptureFlow key={route} screenId={route} onBack={() => onNavigate("today-normal")} onNavigate={onNavigate} apiClient={apiClient} />;
   if (screen.group === "Today") return <TodayScreens screenId={route} onNavigate={onNavigate} apiClient={apiClient} />;

@@ -8,11 +8,17 @@ import { createGeminiClient } from './modules/ai/geminiClient.js';
 import { createTaskRepository } from './repositories/taskRepository.js';
 import { createIdeaRepository } from './repositories/ideaRepository.js';
 import { createChangeSetRepository } from './repositories/changeSetRepository.js';
+import { createCalendarConnectionRepository } from './repositories/calendarConnectionRepository.js';
+import { createGoogleOAuthService } from './integrations/google/googleOAuth.js';
 
 async function start(): Promise<void> {
   const config = loadConfig();
   const pocketBase = createPocketBaseClient({ baseUrl: config.pocketbaseUrl });
   const brainDumpRepository = createBrainDumpRepository(pocketBase);
+  const calendarConnectionRepository = createCalendarConnectionRepository(pocketBase);
+  const googleOAuthService = config.enableGoogleIntegration && config.googleClientId && config.googleClientSecret && config.googleOAuthRedirectUri && config.googleTokenEncryptionKey
+    ? createGoogleOAuthService({ clientId: config.googleClientId, clientSecret: config.googleClientSecret, redirectUri: config.googleOAuthRedirectUri, encryptionKey: config.googleTokenEncryptionKey, repository: calendarConnectionRepository })
+    : undefined;
   const app = await buildApp({ config, services: {
     pocketBase,
     brainDumpRepository,
@@ -22,6 +28,7 @@ async function start(): Promise<void> {
     taskRepository: createTaskRepository(pocketBase),
     ideaRepository: createIdeaRepository(pocketBase),
     changeSetRepository: createChangeSetRepository(pocketBase),
+    ...(googleOAuthService ? { googleOAuthService } : {}),
   } });
 
   await app.listen({ host: config.host, port: config.port });

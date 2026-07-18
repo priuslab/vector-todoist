@@ -120,6 +120,11 @@ describe('loadConfig', () => {
     expect(() => loadConfig(validEnv({ [flag]: 'true', [secret]: '   ' }))).toThrow(secret);
   });
 
+  it('fails closed for production Calendar OAuth secrets', () => {
+    expect(() => loadConfig(validEnv({ NODE_ENV: 'production', GEMINI_API_KEY: 'ai', ENABLE_GOOGLE_INTEGRATION: 'true', GOOGLE_CLIENT_ID: 'id', GOOGLE_CLIENT_SECRET: 'secret' }))).toThrow('GOOGLE_OAUTH_REDIRECT_URI');
+    expect(loadConfig(validEnv({ NODE_ENV: 'production', GEMINI_API_KEY: 'ai', ENABLE_GOOGLE_INTEGRATION: 'true', GOOGLE_CLIENT_ID: 'id', GOOGLE_CLIENT_SECRET: 'secret', GOOGLE_OAUTH_REDIRECT_URI: 'https://api.example.com/callback', GOOGLE_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString('base64') })).googleOAuthRedirectUri).toBe('https://api.example.com/callback');
+  });
+
   it.each([
     ['https://app.vector.test/', 'https://app.vector.test'],
     ['HTTPS://APP.VECTOR.TEST:443/plans/today', 'https://app.vector.test'],

@@ -24,6 +24,8 @@ import { taskRoutes } from './modules/tasks/taskRoutes.js';
 import { createTaskService } from './modules/tasks/taskService.js';
 import { changeSetRoutes } from './modules/changeSets/changeSetRoutes.js';
 import { createUndoService } from './modules/changeSets/undoService.js';
+import { googleRoutes } from './integrations/google/googleRoutes.js';
+import type { GoogleOAuthService } from './integrations/google/googleOAuth.js';
 
 export interface GatewayServices {
   readonly [name: string]: unknown;
@@ -102,6 +104,9 @@ export async function buildApp({
     await taskRoutes(app, createTaskService({ taskRepository, changeSetRepository }));
     await changeSetRoutes(app, createUndoService({ taskRepository, changeSetRepository }));
   }
+
+  const googleOAuthService = _services.googleOAuthService as GoogleOAuthService | undefined;
+  if (config.enableGoogleIntegration && googleOAuthService) await googleRoutes(app, googleOAuthService);
 
   return app;
 }

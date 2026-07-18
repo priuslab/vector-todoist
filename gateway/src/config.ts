@@ -26,6 +26,22 @@ const publicWebOrigin = requiredString.transform((value, context) => {
 
   return url.origin;
 });
+const optionalHttpUrl = optionalTrimmedString.transform((value, context) => {
+  if (value === undefined) return value;
+  try {
+    const url = new URL(value);
+    if ((url.protocol !== 'http:' && url.protocol !== 'https:') || url.username || url.password || url.hash) throw new Error();
+    return url.toString();
+  } catch {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'Must be a valid HTTP(S) URL' });
+    return z.NEVER;
+  }
+});
+const optionalEncryptionKey = optionalTrimmedString.refine((value) => {
+  if (value === undefined) return true;
+  const decoded = /^[0-9a-f]{64}$/i.test(value) ? Buffer.from(value, 'hex') : Buffer.from(value, 'base64');
+  return decoded.length === 32;
+}, { message: 'Must encode exactly 32 bytes' });
 
 const configSchema = z
   .object({
@@ -47,6 +63,8 @@ const configSchema = z
     ENABLE_STRIPE_INTEGRATION: envBoolean,
     GOOGLE_CLIENT_ID: optionalTrimmedString,
     GOOGLE_CLIENT_SECRET: optionalTrimmedString,
+    GOOGLE_OAUTH_REDIRECT_URI: optionalHttpUrl,
+    GOOGLE_TOKEN_ENCRYPTION_KEY: optionalEncryptionKey,
     TELEGRAM_BOT_TOKEN: optionalTrimmedString,
     STRIPE_SECRET_KEY: optionalTrimmedString,
     STRIPE_WEBHOOK_SECRET: optionalTrimmedString,
@@ -61,6 +79,10 @@ const configSchema = z
     if (env.ENABLE_GOOGLE_INTEGRATION) {
       requireSecret(env.GOOGLE_CLIENT_ID, 'GOOGLE_CLIENT_ID', 'ENABLE_GOOGLE_INTEGRATION');
       requireSecret(env.GOOGLE_CLIENT_SECRET, 'GOOGLE_CLIENT_SECRET', 'ENABLE_GOOGLE_INTEGRATION');
+      if (env.NODE_ENV === 'production') {
+        requireSecret(env.GOOGLE_OAUTH_REDIRECT_URI, 'GOOGLE_OAUTH_REDIRECT_URI', 'ENABLE_GOOGLE_INTEGRATION');
+        requireSecret(env.GOOGLE_TOKEN_ENCRYPTION_KEY, 'GOOGLE_TOKEN_ENCRYPTION_KEY', 'ENABLE_GOOGLE_INTEGRATION');
+      }
     }
 
     if (env.ENABLE_TELEGRAM_INTEGRATION) {
@@ -95,6 +117,8 @@ const configSchema = z
     enableStripeIntegration: env.ENABLE_STRIPE_INTEGRATION,
     googleClientId: env.GOOGLE_CLIENT_ID,
     googleClientSecret: env.GOOGLE_CLIENT_SECRET,
+    googleOAuthRedirectUri: env.GOOGLE_OAUTH_REDIRECT_URI,
+    googleTokenEncryptionKey: env.GOOGLE_TOKEN_ENCRYPTION_KEY,
     telegramBotToken: env.TELEGRAM_BOT_TOKEN,
     stripeSecretKey: env.STRIPE_SECRET_KEY,
     stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET,
