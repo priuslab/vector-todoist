@@ -10,6 +10,7 @@ export type CalendarConnection = {
   encryptedRefreshToken?: string;
   accountEmail?: string;
   scopes?: string[];
+  calendarIds?: string[];
   tokenExpiresAt?: string;
 };
 

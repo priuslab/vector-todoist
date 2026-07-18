@@ -15,6 +15,7 @@ migrate((app) => {
       { type: 'text', name: 'encryptedRefreshToken', required: true, max: 2_000 },
       { type: 'email', name: 'accountEmail', required: false },
       { type: 'json', name: 'scopes', required: false },
+      { type: 'json', name: 'calendarIds', required: false },
       { type: 'date', name: 'tokenExpiresAt', required: false },
     ],
   });

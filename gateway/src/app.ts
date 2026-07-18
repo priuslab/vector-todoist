@@ -26,6 +26,8 @@ import { changeSetRoutes } from './modules/changeSets/changeSetRoutes.js';
 import { createUndoService } from './modules/changeSets/undoService.js';
 import { googleRoutes } from './integrations/google/googleRoutes.js';
 import type { GoogleOAuthService } from './integrations/google/googleOAuth.js';
+import { calendarRoutes } from './modules/calendar/calendarRoutes.js';
+import type { BusySlotService } from './modules/calendar/busySlotService.js';
 
 export interface GatewayServices {
   readonly [name: string]: unknown;
@@ -95,6 +97,7 @@ export async function buildApp({
       taskRepository: _services.taskRepository as TaskRepository,
       ideaRepository: _services.ideaRepository as IdeaRepository,
       changeSetRepository: _services.changeSetRepository as ChangeSetRepository,
+      calendarService: _services.busySlotService as BusySlotService | undefined,
     }));
   }
 
@@ -107,6 +110,8 @@ export async function buildApp({
 
   const googleOAuthService = _services.googleOAuthService as GoogleOAuthService | undefined;
   if (config.enableGoogleIntegration && googleOAuthService) await googleRoutes(app, googleOAuthService);
+  const busySlotService = _services.busySlotService as BusySlotService | undefined;
+  if (busySlotService) await calendarRoutes(app, busySlotService);
 
   return app;
 }

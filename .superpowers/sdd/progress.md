@@ -28,6 +28,8 @@ Task 11: complete (`75d6712..d5832ce`, review clean). Task mutation/completion/U
 
 Task 12: complete (`d5832ce..74638ac`, review clean). P0-A deployment/acceptance artifacts: Vercel SPA configs, fixture-gated production smoke, deploy/core-demo runbooks, acceptance checklist, server-only Gemini Compose wiring and fail-fast production config. Local suites/builds/Compose/rules checks pass; external production URL/auth/VPS smoke remains a documented prerequisite.
 
+Task 13: complete (`74638ac..e83c46a`, review clean). Google Calendar OAuth connection: Gateway 111/111 tests, frontend 78/78 tests, typecheck/build pass. Includes AES-256-GCM encrypted refresh tokens, PKCE, bounded expiring single-use state, minimal `calendar.freebusy` scope, ownership routes, reversible connection migration, and Ukrainian onboarding/settings status/skip UX.
+
 Task 5: implementation complete pending review (`6d7978c..HEAD`). Gateway auth verification and ownership-scoped repositories: 58/58 tests, typecheck, build, and diff checks pass. Live PocketBase auth remains injectable/manual deployment coverage.
 
 Task 6: implementation complete pending review (`889c91c..HEAD`). Text Brain Dump draft capture: authenticated validated API, normalization, server-side source/owner, per-user idempotency, safe storage errors, and mobile text capture wiring. Gateway 66/66 tests, typecheck/build; frontend 64/64 tests and build; diff check pass.

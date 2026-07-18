@@ -17,8 +17,10 @@ export const planPreviewBodySchema = z.object({
   now: iso.optional(),
   timezone: z.string().min(1).max(80).optional(),
   idempotencyKey: z.string().min(8).max(255).optional(),
+  calendarDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  confirmCalendarConflicts: z.boolean().optional(),
 }).strict();
-export const applyBodySchema = z.object({ idempotencyKey: z.string().min(8).max(255).optional() }).strict().default({});
+export const applyBodySchema = z.object({ idempotencyKey: z.string().min(8).max(255).optional(), confirmCalendarConflicts: z.boolean().optional() }).strict().default({});
 export const todayQuerySchema = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), timezone: z.string().min(1).max(80).default('Europe/Warsaw') }).strict();
 
 export const proposalTaskSchema = z.object({

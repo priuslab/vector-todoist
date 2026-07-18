@@ -8,6 +8,7 @@ import type { AnalysisService } from '../ai/analyzeBrainDump.js';
 import { buildDailyPlan } from '../scheduler/buildDailyPlan.js';
 import type { SchedulerBusySlot, SchedulerTask, SchedulerProfile } from '../scheduler/types.js';
 import { applyBodySchema, applyResponseSchema, inboxResponseSchema, ideaResponseShape, planPreviewBodySchema, planPreviewSchema, taskResponseSchema, todayResponseSchema, type ChangeSetResponse, type PlanPreviewBody, type PlanPreview, type TaskResponse, type IdeaResponse } from './planSchemas.js';
+import type { BusySlotService } from '../calendar/busySlotService.js';
 
 export class PlanNotFoundError extends Error { readonly code = 'NOT_FOUND'; }
 export class PlanValidationError extends Error { readonly code = 'INVALID_PLAN'; }
@@ -34,8 +35,9 @@ export function createPlanService(deps: {
   taskRepository: TaskRepository;
   ideaRepository: IdeaRepository;
   changeSetRepository: ChangeSetRepository;
+  calendarService?: BusySlotService;
 }): PlanService {
-  const { dumpRepository, analysisService, taskRepository, ideaRepository, changeSetRepository } = deps;
+  const { dumpRepository, analysisService, taskRepository, ideaRepository, changeSetRepository, calendarService } = deps;
 
   async function preview(user: VerifiedUser, dumpId: string, input: unknown): Promise<PlanPreview> {
     const dump = await dumpRepository.get(user, dumpId);
@@ -48,7 +50,15 @@ export function createPlanService(deps: {
     const analysis = result.analysis;
     const profile: SchedulerProfile = { ...body.profile, timezone: body.timezone ?? body.profile.timezone };
     const tasks: SchedulerTask[] = analysis.tasks.map((task, index) => ({ id: `proposal-${result.id}-t-${index + 1}`, title: task.title, estimatedMinutes: task.estimatedMinutes, priority: task.priority, energy: task.energy, goalAlignment: priorityAlignment[task.priority] ?? .5, deadline: task.deadline, }));
-    const busySlots: SchedulerBusySlot[] = body.busySlots.map((slot) => ({ ...slot, locked: true }));
+    let calendarWarning: { code: string; message: string } | undefined;
+    let inputBusySlots = body.busySlots;
+    if (calendarService && body.calendarDate) {
+      const calendar = await calendarService.day(user, body.calendarDate);
+      const slots = Array.isArray(calendar.slots) ? calendar.slots : [];
+      if (slots.length) inputBusySlots = slots.map((slot: any, index) => ({ id: String(slot.id ?? `calendar-${index}`), title: 'Зайнято', start: String(slot.start), end: String(slot.end), locked: true as const }));
+      if (calendar.stale && !body.confirmCalendarConflicts) calendarWarning = { code: 'calendar-stale', message: 'Календар може бути застарілим. Підтвердьте план перед застосуванням.' };
+    }
+    const busySlots: SchedulerBusySlot[] = inputBusySlots.map((slot) => ({ ...slot, locked: true }));
     let plan;
     try { plan = buildDailyPlan({ tasks, busySlots, profile, now: asDate(body.now) }); } catch { throw new PlanValidationError(); }
     const scheduled = new Map<string, { start: string; end: string }>();
@@ -65,10 +75,10 @@ export function createPlanService(deps: {
     if (!changeSet) {
       const currentTasks = (await taskRepository.list(user)).filter((task) => task.sourceDump === dumpId);
       const currentIdeas = (await ideaRepository.list(user)).filter((idea) => idea.sourceDump === dumpId);
-      try { changeSet = await changeSetRepository.create(user, { kind: 'ai_classification', status: 'pending', beforeJson: { tasks: currentTasks, ideas: currentIdeas }, afterJson: { tasks: proposedTasks, ideas }, idempotencyKey }); }
+      try { changeSet = await changeSetRepository.create(user, { kind: 'ai_classification', status: 'pending', beforeJson: { tasks: currentTasks, ideas: currentIdeas }, afterJson: { tasks: proposedTasks, ideas, ...(calendarWarning ? { calendarStale: true } : {}) }, idempotencyKey }); }
       catch { changeSet = (await changeSetRepository.list(user)).find((record) => record.idempotencyKey === idempotencyKey); if (!changeSet) throw new RepositoryError('UNAVAILABLE'); }
     }
-    return planPreviewSchema.parse({ changeSetId: changeSet.id, tasks: proposedTasks, ideas, blocks: plan.blocks, unscheduledTaskIds: plan.unscheduledTaskIds, warnings: plan.warnings, reasons: plan.reasons });
+    return planPreviewSchema.parse({ changeSetId: changeSet.id, tasks: proposedTasks, ideas, blocks: plan.blocks, unscheduledTaskIds: plan.unscheduledTaskIds, warnings: calendarWarning ? [...plan.warnings, calendarWarning] : plan.warnings, reasons: plan.reasons });
   }
 
   async function apply(user: VerifiedUser, changeSetId: string, input: unknown) {
@@ -81,7 +91,8 @@ export function createPlanService(deps: {
       const appliedTaskIds = new Set((payload as { appliedTaskIds?: string[] }).appliedTaskIds ?? []); const appliedIdeaIds = new Set((payload as { appliedIdeaIds?: string[] }).appliedIdeaIds ?? []);
       return applyResponseSchema.parse({ changeSet: publicChangeSet(changeSet), tasks: (await taskRepository.list(user)).filter((task) => appliedTaskIds.has(task.id)).map(publicTask), ideas: (await ideaRepository.list(user)).filter((idea) => appliedIdeaIds.has(idea.id)).map(publicIdea) });
     }
-    const payload = (changeSet.afterJson && typeof changeSet.afterJson === 'object') ? changeSet.afterJson as { tasks?: unknown[]; ideas?: unknown[] } : {};
+    const payload = (changeSet.afterJson && typeof changeSet.afterJson === 'object') ? changeSet.afterJson as { tasks?: unknown[]; ideas?: unknown[]; calendarStale?: boolean } : {};
+    if (payload.calendarStale === true && applyInput.data.confirmCalendarConflicts !== true) throw new PlanValidationError();
     const proposedTasks = Array.isArray(payload.tasks) ? payload.tasks : [];
     const proposedIdeas = Array.isArray(payload.ideas) ? payload.ideas : [];
     const createdTasks: TaskRecord[] = []; const createdIdeas: Awaited<ReturnType<IdeaRepository['list']>> = [];

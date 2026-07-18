@@ -10,12 +10,16 @@ import { createIdeaRepository } from './repositories/ideaRepository.js';
 import { createChangeSetRepository } from './repositories/changeSetRepository.js';
 import { createCalendarConnectionRepository } from './repositories/calendarConnectionRepository.js';
 import { createGoogleOAuthService } from './integrations/google/googleOAuth.js';
+import { createGoogleCalendarClient } from './integrations/google/calendarClient.js';
+import { createCalendarBusySlotRepository } from './repositories/calendarBusySlotRepository.js';
+import { createBusySlotService } from './modules/calendar/busySlotService.js';
 
 async function start(): Promise<void> {
   const config = loadConfig();
   const pocketBase = createPocketBaseClient({ baseUrl: config.pocketbaseUrl });
   const brainDumpRepository = createBrainDumpRepository(pocketBase);
   const calendarConnectionRepository = createCalendarConnectionRepository(pocketBase);
+  const calendarBusySlotRepository = createCalendarBusySlotRepository(pocketBase);
   const googleOAuthService = config.enableGoogleIntegration && config.googleClientId && config.googleClientSecret && config.googleOAuthRedirectUri && config.googleTokenEncryptionKey
     ? createGoogleOAuthService({ clientId: config.googleClientId, clientSecret: config.googleClientSecret, redirectUri: config.googleOAuthRedirectUri, encryptionKey: config.googleTokenEncryptionKey, repository: calendarConnectionRepository })
     : undefined;
@@ -29,6 +33,13 @@ async function start(): Promise<void> {
     ideaRepository: createIdeaRepository(pocketBase),
     changeSetRepository: createChangeSetRepository(pocketBase),
     ...(googleOAuthService ? { googleOAuthService } : {}),
+    ...(googleOAuthService && config.googleClientId && config.googleClientSecret && config.googleTokenEncryptionKey ? {
+      busySlotService: createBusySlotService({
+        connectionRepository: calendarConnectionRepository,
+        busySlotRepository: calendarBusySlotRepository,
+        googleCalendarClient: createGoogleCalendarClient({ clientId: config.googleClientId, clientSecret: config.googleClientSecret, encryptionKey: config.googleTokenEncryptionKey }),
+      }),
+    } : {}),
   } });
 
   await app.listen({ host: config.host, port: config.port });
