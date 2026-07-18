@@ -30,7 +30,7 @@ const ONBOARDING_BACK = {
   "telegram-connect": "goal-choice", "telegram-success": "telegram-connect", "first-brain-dump": "telegram-success",
 };
 
-export function ScreenRouter({ route, onNavigate, onGoogleLogin, onAuthComplete, pocketBase }) {
+export function ScreenRouter({ route, onNavigate, onGoogleLogin, onAuthComplete, pocketBase, apiClient }) {
   const [loginError, setLoginError] = useState(false);
   useEffect(() => setLoginError(false), [route]);
   const requestGoogleLogin = async () => {
@@ -59,7 +59,7 @@ export function ScreenRouter({ route, onNavigate, onGoogleLogin, onAuthComplete,
     if (route.startsWith("telegram-") || route === "first-brain-dump") return <TelegramSetup screenId={route} onBack={back} onNext={() => onNavigate(route === "telegram-connect" ? "telegram-success" : route === "telegram-success" ? "first-brain-dump" : "capture-chooser")} />;
     return <OnboardingFlow screenId={route} onBack={back} onNext={() => onNavigate(ONBOARDING_NEXT[route] ?? "goal-choice")} />;
   }
-  if (screen.group === "Capture") return <CaptureFlow key={route} screenId={route} onBack={() => onNavigate("today-normal")} onNavigate={onNavigate} />;
+  if (screen.group === "Capture") return <CaptureFlow key={route} screenId={route} onBack={() => onNavigate("today-normal")} onNavigate={onNavigate} apiClient={apiClient} />;
   if (screen.group === "Today") return <TodayScreens screenId={route} onNavigate={onNavigate} />;
   if (screen.group === "Inbox") return ["idea-detail", "idea-decomposition", "project-detail"].includes(route) ? <IdeaProjectScreens screenId={route} onNavigate={onNavigate} /> : <InboxScreens screenId={route} onNavigate={onNavigate} />;
   if (screen.group === "Task") return route.startsWith("focus-") ? <FocusScreens screenId={route} onNavigate={onNavigate} /> : <TaskScreens screenId={route} onNavigate={onNavigate} />;

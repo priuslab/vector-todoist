@@ -7,6 +7,7 @@ import { createAuthStore, createPocketBaseClient, useAuthState } from "./auth/au
 import { startGoogleLogin } from "./auth/pocketBaseOAuth";
 import { isQaEnvironment, resolveInternalRoute, resolveProductionRoute } from "./navigation/routeAccess";
 import { AuthStateScreen } from "./features/entry/AuthStateScreen";
+import { createApiClient } from "./lib/apiClient";
 
 function PrototypeExperience({ initialCatalog = false }) {
   const { route, navigate } = usePrototype();
@@ -35,6 +36,12 @@ export function ProductionExperience({ env = import.meta.env, pocketBase: provid
   if (connection.error) return <main className="mobile-prototype" data-testid="mobile-prototype"><AuthStateScreen state="configuration" /></main>;
   const { pocketBase, authStore } = connection;
   const auth = useAuthState(authStore);
+  const apiClient = React.useMemo(() => createApiClient({
+    baseUrl: env.VITE_GATEWAY_URL ?? window.location.origin,
+    getToken: () => authStore.getToken(),
+    refreshToken: () => authStore.refreshToken(),
+    onAuthExpired: () => authStore.markExpired(),
+  }), [authStore, env.VITE_GATEWAY_URL]);
   const [pathname, setPathname] = React.useState(() => window.location.pathname);
   const resolvedRoute = resolveProductionRoute({ pathname, auth, env });
   const [route, setRoute] = React.useState(resolvedRoute);
@@ -45,7 +52,7 @@ export function ProductionExperience({ env = import.meta.env, pocketBase: provid
     setPathname("/");
   }, []);
   return <main className="mobile-prototype" data-testid="mobile-prototype">
-    <ScreenRouter route={route} onNavigate={navigate} onAuthComplete={completeAuth} pocketBase={pocketBase} onGoogleLogin={() => startGoogleLogin({ clientId: env.VITE_GOOGLE_CLIENT_ID })} />
+    <ScreenRouter route={route} onNavigate={navigate} onAuthComplete={completeAuth} pocketBase={pocketBase} apiClient={apiClient} onGoogleLogin={() => startGoogleLogin({ clientId: env.VITE_GOOGLE_CLIENT_ID })} />
   </main>;
 }
 
