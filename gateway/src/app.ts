@@ -8,6 +8,10 @@ import { createPocketBaseTokenVerifier, type PocketBaseTokenVerifier } from './a
 import { createCaptureService } from './modules/capture/captureService.js';
 import { captureRoutes } from './modules/capture/captureRoutes.js';
 import type { BrainDumpRepository } from './repositories/brainDumpRepository.js';
+import { analysisRoutes } from './modules/ai/analysisRoutes.js';
+import { createAnalysisService, type AnalysisService } from './modules/ai/analyzeBrainDump.js';
+import type { AnalysisSessionRepository } from './modules/ai/analyzeBrainDump.js';
+import type { AnalysisAiClient } from './modules/ai/geminiClient.js';
 
 export interface GatewayServices {
   readonly [name: string]: unknown;
@@ -48,6 +52,11 @@ export async function buildApp({
   const captureService = _services.captureService as ReturnType<typeof createCaptureService> | undefined;
   if (captureService || brainDumpRepository) {
     await captureRoutes(app, captureService ?? createCaptureService(brainDumpRepository!, { maxTextLength: Number(_services.captureMaxTextLength) || 20_000 }));
+  }
+  const analysisService = _services.analysisService as AnalysisService | undefined;
+  if (analysisService) await analysisRoutes(app, analysisService);
+  else if (brainDumpRepository && _services.analysisSessionRepository && _services.aiClient) {
+    await analysisRoutes(app, createAnalysisService(brainDumpRepository, _services.analysisSessionRepository as AnalysisSessionRepository, _services.aiClient as AnalysisAiClient));
   }
 
   return app;
