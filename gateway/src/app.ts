@@ -17,6 +17,9 @@ import { createPlanService, type PlanService } from './modules/planning/planServ
 import type { TaskRepository } from './repositories/taskRepository.js';
 import type { IdeaRepository } from './repositories/ideaRepository.js';
 import type { ChangeSetRepository } from './repositories/changeSetRepository.js';
+import { transcriptionRoutes } from './modules/transcription/transcriptionRoutes.js';
+import { createGeminiTranscriptionAdapter, createTranscriptionService } from './modules/transcription/transcriptionService.js';
+import { createAudioStorage } from './modules/transcription/audioStorage.js';
 
 export interface GatewayServices {
   readonly [name: string]: unknown;
@@ -40,6 +43,7 @@ export async function buildApp({
     requestIdHeader: 'x-request-id',
     trustProxy: config.trustProxy,
   });
+  app.addContentTypeParser(/^(audio\/.+|multipart\/form-data)(?:;.*)?$/, { parseAs: 'buffer' }, (_request, body, done) => done(null, body));
 
   await app.register(cors, {
     origin(origin, callback) {
@@ -58,6 +62,13 @@ export async function buildApp({
   if (captureService || brainDumpRepository) {
     await captureRoutes(app, captureService ?? createCaptureService(brainDumpRepository!, { maxTextLength: Number(_services.captureMaxTextLength) || 20_000 }));
   }
+  const transcriptionService = _services.transcriptionService as ReturnType<typeof createTranscriptionService> | undefined
+    ?? (_services.transcriptionAdapter
+      ? createTranscriptionService(_services.transcriptionAdapter as Parameters<typeof createTranscriptionService>[0], createAudioStorage())
+      : config.geminiApiKey
+        ? createTranscriptionService(createGeminiTranscriptionAdapter({ apiKey: config.geminiApiKey, model: config.geminiModel, timeoutMs: config.aiTimeoutMs }), createAudioStorage())
+        : undefined);
+  if (transcriptionService) await transcriptionRoutes(app, transcriptionService);
   const analysisService = (_services.analysisService as AnalysisService | undefined) ?? (brainDumpRepository && _services.analysisSessionRepository && _services.aiClient
     ? createAnalysisService(brainDumpRepository, _services.analysisSessionRepository as AnalysisSessionRepository, _services.aiClient as AnalysisAiClient)
     : undefined);
