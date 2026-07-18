@@ -12,7 +12,7 @@ export function makeRequireUser(verifier: PocketBaseTokenVerifier) {
       const user = await verifier.verify(request.headers.authorization);
       const authorization = request.headers.authorization;
       const token = authorization?.startsWith('Bearer ') ? authorization.slice(7).trim() : undefined;
-      request.user = user;
+      request.user = { ...user };
       if (token) Object.defineProperty(request.user, 'token', { value: token, enumerable: false, configurable: true });
     } catch (error) {
       if (!(error instanceof AuthError)) request.log.warn('Authentication failed');
