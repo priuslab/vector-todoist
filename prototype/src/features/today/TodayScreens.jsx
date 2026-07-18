@@ -11,6 +11,12 @@ import { DEMO_EVENTS, DEMO_TASKS, DEMO_USER } from "../../data/demoData";
 import { EveningReview } from "./EveningReview";
 import { getToday } from "./todayApi";
 
+function localDate(timezone) {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 function DayPlan({ active = false, onNavigate, completed = false, tasks = DEMO_TASKS }) {
   const current = tasks[0] ?? DEMO_TASKS[0];
   return (
@@ -29,7 +35,7 @@ export function TodayScreens({ screenId = "today-normal", onNavigate = () => {},
   const [showUndo, setShowUndo] = useState(screenId === "today-rescheduled");
   const [remote, setRemote] = useState(null);
   const [remoteError, setRemoteError] = useState("");
-  useEffect(() => { if (!apiClient || !["today-normal", "today-active", "today-overload"].includes(screenId)) return; let alive = true; getToday({ apiClient, date: new Date().toISOString().slice(0, 10), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" }).then((value) => alive && setRemote(value)).catch(() => alive && setRemoteError("Не вдалося завантажити план. Спробуй оновити сторінку.")); return () => { alive = false; }; }, [apiClient, screenId]);
+  useEffect(() => { if (!apiClient || !["today-normal", "today-active", "today-overload"].includes(screenId)) return; let alive = true; const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; getToday({ apiClient, date: localDate(timezone), timezone }).then((value) => alive && setRemote(value)).catch(() => alive && setRemoteError("Не вдалося завантажити план. Спробуй оновити сторінку.")); return () => { alive = false; }; }, [apiClient, screenId]);
   const common = { title: "Сьогодні", eyebrow: "П'ятниця, 18 липня", activeRoute: "today-normal", onNavigate, avatar: true };
 
   if (apiClient && !remote && !remoteError && ["today-normal", "today-active", "today-overload"].includes(screenId)) return <AppFrame {...common}><StateView state="loading" title="Завантажую план" message="Вектор дістає твої задачі та вільні слоти." /></AppFrame>;
