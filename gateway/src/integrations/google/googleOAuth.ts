@@ -73,6 +73,7 @@ export function createGoogleOAuthService(options: {
       const existing = await options.repository.get(user);
       const verifier = base64Url(random(32));
       const state = base64Url(random(24));
+      if (states.size >= 1_000) states.delete(states.keys().next().value as string);
       states.set(state, { user: { ...user }, verifier, createdAt: now(), existing: Boolean(existing) });
       const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
       url.search = new URLSearchParams({ client_id: options.clientId, response_type: 'code', redirect_uri: options.redirectUri, scope: CALENDAR_SCOPE, code_challenge: challenge(verifier), code_challenge_method: 'S256', state, access_type: 'offline', ...(existing ? {} : { prompt: 'consent' }) }).toString();
