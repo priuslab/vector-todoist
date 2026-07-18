@@ -1,0 +1,60 @@
+name: vector
+
+services:
+  pocketbase:
+    build:
+      context: ../pocketbase
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${POCKETBASE_HOST_PORT:-8090}:8090"
+    volumes:
+      - vector_pocketbase_data:/pb/pb_data
+    networks:
+      - vector_internal
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8090/api/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  gateway:
+    build:
+      context: ../gateway
+    restart: unless-stopped
+    depends_on:
+      pocketbase:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      HOST: 0.0.0.0
+      PORT: 8787
+      PUBLIC_WEB_ORIGIN: ${PUBLIC_WEB_ORIGIN:-http://localhost:3000}
+      POCKETBASE_URL: http://pocketbase:8090
+      TRUST_PROXY: "true"
+      ENABLE_GOOGLE_INTEGRATION: ${ENABLE_GOOGLE_INTEGRATION:-false}
+      ENABLE_TELEGRAM_INTEGRATION: ${ENABLE_TELEGRAM_INTEGRATION:-false}
+      ENABLE_STRIPE_INTEGRATION: ${ENABLE_STRIPE_INTEGRATION:-false}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+    ports:
+      - "127.0.0.1:${GATEWAY_HOST_PORT:-8787}:8787"
+    networks:
+      - vector_internal
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+networks:
+  vector_internal:
+    name: vector_internal
+
+volumes:
+  vector_pocketbase_data:
+    name: vector_pocketbase_data

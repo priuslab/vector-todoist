@@ -1,0 +1,17 @@
+# Add this fragment inside the existing site block. Do not run another Caddy
+# instance: the Compose services are published only to the loopback interface.
+# Export these values to the system Caddy service before reloading it:
+# VECTOR_GATEWAY_UPSTREAM=127.0.0.1:8787
+# VECTOR_POCKETBASE_UPSTREAM=127.0.0.1:8090
+
+@vector_gateway path /api/* /webhooks/*
+reverse_proxy @vector_gateway {$VECTOR_GATEWAY_UPSTREAM}
+
+# Keep PocketBase's admin UI (`/_/`) unavailable from the public `/pb` prefix.
+@vector_pocketbase_admin path /pb/_/*
+respond @vector_pocketbase_admin 404
+
+# `handle_path` removes `/pb`, so `/pb/api/...` reaches PocketBase as `/api/...`.
+handle_path /pb/* {
+  reverse_proxy {$VECTOR_POCKETBASE_UPSTREAM}
+}
