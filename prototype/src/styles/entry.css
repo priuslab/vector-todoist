@@ -112,3 +112,8 @@
 .onboarding-main--form {
   padding-bottom: 12px;
 }
+
+.onboarding-main--form .onboarding-hero {
+  align-items: flex-start;
+  text-align: left;
+}
