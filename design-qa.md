@@ -114,4 +114,11 @@ All four representative routes returned `overlap: 0`, `footerVisible: true`, and
 - Clean in-app browser pass across the complete route set: 0 console errors, 0 warnings.
 - No P0, P1, or P2 issue remains.
 
+### Final-review regression evidence
+
+- Safe-area-aware Undo placement now preserves the 92 px and 154 px base offsets and adds only the inset amount above the footer's existing 14 px baseline padding. The 390×844 zero-inset layout remains visually unchanged.
+- Centered goal result: `prototype/screenshots/bottom-action-footer-2026-07-18/goal-test-result-390x844.jpg`.
+- Computed result at 390×844: heading `text-align: center`, result card `text-align: left`, footer/content overlap 0, footer fully visible, and no horizontal overflow.
+- Post-fix automated suite: 11 test files, 33 tests passed; production build passed.
+
 final result: passed
