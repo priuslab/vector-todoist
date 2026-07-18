@@ -1,8 +1,15 @@
 import { useSyncExternalStore } from "react";
 import PocketBase from "pocketbase";
 
-export function createPocketBaseClient(url = import.meta.env.VITE_POCKETBASE_URL) {
-  return new PocketBase(url || "http://127.0.0.1:8090");
+function mayUseLocalPocketBase(env) {
+  return Boolean(env?.DEV || env?.MODE === "test");
+}
+
+export function createPocketBaseClient({ url, env = import.meta.env } = {}) {
+  const configuredUrl = url ?? env?.VITE_POCKETBASE_URL;
+  if (configuredUrl) return new PocketBase(configuredUrl);
+  if (mayUseLocalPocketBase(env)) return new PocketBase("http://127.0.0.1:8090");
+  throw new Error("PocketBase configuration is missing");
 }
 
 export function createAuthStore(pb) {

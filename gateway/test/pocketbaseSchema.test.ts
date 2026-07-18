@@ -79,6 +79,13 @@ describe('PocketBase core schema contract', () => {
     expect(source.match(/onlyInt: true/g)).toHaveLength(5);
   });
 
+  it('stores onboarding completion on the PocketBase auth record with a false default', async () => {
+    const source = await readFile(coreMigrationPath, 'utf8');
+    const users = collectionSource(source, 'users');
+
+    expect(users).toMatch(/type: 'bool', name: 'onboardingCompleted', default: false/);
+  });
+
   it('accepts only canonical ownership rules for every user-owned collection', async () => {
     const { validateMigrationSource } = await import(pathToFileURL(validatorPath).href) as {
       validateMigrationSource(source: string): string[];

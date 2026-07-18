@@ -4,11 +4,17 @@ function requestId() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
 }
 
-function withoutCallerIdentity(headers) {
-  return Object.fromEntries(Object.entries(headers ?? {}).filter(([name]) => {
+function trustedHeaders(headers, token, id) {
+  const normalizedHeaders = new Headers(headers);
+  for (const name of [...normalizedHeaders.keys()]) {
     const normalized = name.toLowerCase().replaceAll("_", "").replaceAll("-", "");
-    return normalized !== "authorization" && !normalized.includes("userid") && !normalized.includes("callerid");
-  }));
+    if (normalized === "authorization" || normalized.includes("userid") || normalized.includes("callerid")) {
+      normalizedHeaders.delete(name);
+    }
+  }
+  normalizedHeaders.set("X-Request-Id", id);
+  if (token) normalizedHeaders.set("Authorization", `Bearer ${token}`);
+  return normalizedHeaders;
 }
 
 async function asApiError(response) {
@@ -23,11 +29,7 @@ async function asApiError(response) {
 
 export function createApiClient({ baseUrl, fetchImpl = globalThis.fetch, getToken, refreshToken, onAuthExpired, requestIdFactory = requestId }) {
   async function send(path, options, token, id) {
-    const headers = {
-      ...withoutCallerIdentity(options.headers),
-      "X-Request-Id": id,
-    };
-    if (token) headers.Authorization = `Bearer ${token}`;
+    const headers = trustedHeaders(options.headers, token, id);
     return fetchImpl(new URL(path, baseUrl).toString(), { ...options, headers });
   }
 

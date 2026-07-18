@@ -30,7 +30,7 @@ const ONBOARDING_BACK = {
   "telegram-connect": "goal-choice", "telegram-success": "telegram-connect", "first-brain-dump": "telegram-success",
 };
 
-export function ScreenRouter({ route, onNavigate, onGoogleLogin, pocketBase }) {
+export function ScreenRouter({ route, onNavigate, onGoogleLogin, onAuthComplete, pocketBase }) {
   const [loginError, setLoginError] = useState(false);
   useEffect(() => setLoginError(false), [route]);
   const requestGoogleLogin = async () => {
@@ -42,7 +42,10 @@ export function ScreenRouter({ route, onNavigate, onGoogleLogin, pocketBase }) {
       setLoginError(true);
     }
   };
-  const completeAuthCallback = useCallback(() => onNavigate("today-normal"), [onNavigate]);
+  const completeAuthCallback = useCallback(() => {
+    if (onAuthComplete) return onAuthComplete();
+    return onNavigate("today-normal");
+  }, [onAuthComplete, onNavigate]);
   if (route === "auth-callback") return <AuthCallback pb={pocketBase} onComplete={completeAuthCallback} />;
   const screen = SCREEN_MAP[route] ?? SCREEN_MAP["entry-chaos"];
   const back = () => onNavigate(ONBOARDING_BACK[route] ?? "today-normal");

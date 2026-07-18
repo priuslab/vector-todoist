@@ -53,3 +53,12 @@
 - **GREEN:** `ScreenRouter` now supplies a memoized completion callback and `AuthCallback` keeps the latest completion handler in a ref while its exchange effect depends only on the PocketBase client.
 - Regression test confirms one exchange during a parent rerender while the first exchange is still pending.
 - Verification: `npm --prefix prototype test` — 17 files / 56 tests passing; production build, Playwright CLI help and `git diff --check` passed.
+
+## Phase 0 integration follow-up
+
+- **RED:** users schema had no `onboardingCompleted` field; production App ignored injected production configuration, OAuth success stayed on the callback path, and API headers lost `HeadersInit` values through object spreading.
+- **GREEN:** PocketBase `users` now stores `onboardingCompleted` as a boolean with a `false` default; the schema contract protects the exact SDK record name.
+- OAuth success replaces `/auth/callback` with `/`, then resolves the route from the persisted PocketBase record. Production-flow tests cover both new-user onboarding and completed-user Today routes, plus a remount/refresh that must not replay OAuth.
+- Production no longer falls back to localhost without `VITE_POCKETBASE_URL`; it displays a stable Ukrainian configuration error. Dev/test retains the local fallback.
+- API client normalizes every `HeadersInit` with `Headers`, removes caller identity/authorization headers, and preserves trusted headers from both `Headers` and tuple arrays.
+- Verification: frontend 18 files / 62 tests; gateway 4 files / 52 tests; frontend and gateway builds/typecheck, Playwright CLI help, PocketBase validator, rendered compose config and `git diff --check` all pass.

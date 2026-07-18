@@ -7,6 +7,9 @@ migrate((app) => {
     createRule: '',
     updateRule: '@request.auth.id != "" && id = @request.auth.id',
     deleteRule: '@request.auth.id != "" && id = @request.auth.id',
+    fields: [
+      { type: 'bool', name: 'onboardingCompleted', default: false },
+    ],
   });
   app.save(users);
 

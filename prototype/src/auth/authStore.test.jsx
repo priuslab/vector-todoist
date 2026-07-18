@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { createAuthStore, useAuthState } from "./authStore";
+import { createAuthStore, createPocketBaseClient, useAuthState } from "./authStore";
 
 function pocketBaseWith(record = null, token = "") {
   const listeners = new Set();
@@ -16,6 +16,11 @@ function pocketBaseWith(record = null, token = "") {
 }
 
 describe("auth store", () => {
+  it("allows a localhost PocketBase fallback only in development or test", () => {
+    expect(createPocketBaseClient({ env: { DEV: true } }).baseUrl).toBe("http://127.0.0.1:8090");
+    expect(() => createPocketBaseClient({ env: { DEV: false, MODE: "production" } })).toThrow("PocketBase");
+  });
+
   it("subscribes to PocketBase persistence and exposes authenticated, anonymous, and expired states", () => {
     const pb = pocketBaseWith();
     const store = createAuthStore(pb);

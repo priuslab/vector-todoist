@@ -16,19 +16,14 @@ describe("createApiClient", () => {
 
     await client.request("/tasks", { headers: { "X-User-Id": "attacker", "UserId": "attacker", "X-Caller-Id": "attacker", "X-Trace": "trace" } });
 
-    expect(fetchImpl).toHaveBeenCalledWith(
-      "https://api.example.test/tasks",
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: "Bearer pb-token",
-          "X-Request-Id": "request-123",
-          "X-Trace": "trace",
-        }),
-      }),
-    );
-    expect(fetchImpl.mock.calls[0][1].headers["X-User-Id"]).toBeUndefined();
-    expect(fetchImpl.mock.calls[0][1].headers.UserId).toBeUndefined();
-    expect(fetchImpl.mock.calls[0][1].headers["X-Caller-Id"]).toBeUndefined();
+    expect(fetchImpl.mock.calls[0][0]).toBe("https://api.example.test/tasks");
+    const headers = fetchImpl.mock.calls[0][1].headers;
+    expect(headers.get("Authorization")).toBe("Bearer pb-token");
+    expect(headers.get("X-Request-Id")).toBe("request-123");
+    expect(headers.get("X-Trace")).toBe("trace");
+    expect(headers.get("X-User-Id")).toBeNull();
+    expect(headers.get("UserId")).toBeNull();
+    expect(headers.get("X-Caller-Id")).toBeNull();
   });
 
   it("discards caller-supplied Authorization when no trusted token is available", async () => {
@@ -42,7 +37,32 @@ describe("createApiClient", () => {
 
     await client.request("/tasks", { headers: { Authorization: "Bearer attacker" } });
 
-    expect(fetchImpl.mock.calls[0][1].headers.Authorization).toBeUndefined();
+    expect(fetchImpl.mock.calls[0][1].headers.get("Authorization")).toBeNull();
+  });
+
+  it("normalizes Headers and keeps only trusted request headers", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(ok());
+    const client = createApiClient({ baseUrl: "https://api.example.test", fetchImpl, getToken: () => "pb-token", requestIdFactory: () => "request-123" });
+
+    await client.request("/tasks", { headers: new Headers([["X-Trace", "trace"], ["Authorization", "Bearer attacker"], ["X-User-Id", "attacker"]]) });
+
+    const headers = fetchImpl.mock.calls[0][1].headers;
+    expect(headers).toBeInstanceOf(Headers);
+    expect(headers.get("X-Trace")).toBe("trace");
+    expect(headers.get("Authorization")).toBe("Bearer pb-token");
+    expect(headers.get("X-User-Id")).toBeNull();
+  });
+
+  it("preserves tuple-array headers after normalizing HeadersInit", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(ok());
+    const client = createApiClient({ baseUrl: "https://api.example.test", fetchImpl, getToken: () => null, requestIdFactory: () => "request-123" });
+
+    await client.request("/tasks", { headers: [["X-Trace", "trace"], ["X-Caller-Id", "attacker"]] });
+
+    const headers = fetchImpl.mock.calls[0][1].headers;
+    expect(headers).toBeInstanceOf(Headers);
+    expect(headers.get("X-Trace")).toBe("trace");
+    expect(headers.get("X-Caller-Id")).toBeNull();
   });
 
   it("turns non-success responses into an ApiError", async () => {
@@ -77,8 +97,8 @@ describe("createApiClient", () => {
     await expect(client.request("/tasks")).resolves.toEqual({ task: "ok" });
     expect(refreshToken).toHaveBeenCalledTimes(1);
     expect(fetchImpl).toHaveBeenCalledTimes(2);
-    expect(fetchImpl.mock.calls[1][1].headers.Authorization).toBe("Bearer fresh-token");
-    expect(fetchImpl.mock.calls[1][1].headers["X-Request-Id"]).toBe(fetchImpl.mock.calls[0][1].headers["X-Request-Id"]);
+    expect(fetchImpl.mock.calls[1][1].headers.get("Authorization")).toBe("Bearer fresh-token");
+    expect(fetchImpl.mock.calls[1][1].headers.get("X-Request-Id")).toBe(fetchImpl.mock.calls[0][1].headers.get("X-Request-Id"));
   });
 
   it("expires auth after one failed refresh and does not retry other errors", async () => {
