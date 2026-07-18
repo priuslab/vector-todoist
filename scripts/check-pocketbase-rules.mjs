@@ -11,10 +11,64 @@ export const USER_OWNED_COLLECTIONS = [
   'change_sets',
 ];
 
-const recordOwnerRuleFields = ['listRule', 'viewRule', 'deleteRule'];
-const authId = '@request.auth.id';
-const recordOwner = 'user = @request.auth.id';
-const bodyOwner = '@request.body.user = @request.auth.id';
+export const CANONICAL_OWNERSHIP_RULES = Object.freeze({
+  listRule: '@request.auth.id != "" && user = @request.auth.id',
+  viewRule: '@request.auth.id != "" && user = @request.auth.id',
+  createRule: '@request.auth.id != "" && @request.body.user = @request.auth.id',
+  updateRule: '@request.auth.id != "" && user = @request.auth.id && (@request.body.user:isset = false || @request.body.user = @request.auth.id)',
+  deleteRule: '@request.auth.id != "" && user = @request.auth.id',
+});
+
+function hasRedundantOuterParentheses(expression) {
+  if (!expression.startsWith('(') || !expression.endsWith(')')) {
+    return false;
+  }
+
+  let depth = 0;
+  let quote = '';
+  let escaped = false;
+
+  for (let index = 0; index < expression.length; index += 1) {
+    const character = expression[index];
+
+    if (quote) {
+      if (escaped) {
+        escaped = false;
+      } else if (character === '\\') {
+        escaped = true;
+      } else if (character === quote) {
+        quote = '';
+      }
+      continue;
+    }
+
+    if (character === '"' || character === "'") {
+      quote = character;
+    } else if (character === '(') {
+      depth += 1;
+    } else if (character === ')') {
+      depth -= 1;
+      if (depth === 0 && index < expression.length - 1) {
+        return false;
+      }
+    }
+  }
+
+  return depth === 0 && quote === '';
+}
+
+export function normalizeRuleExpression(expression) {
+  let normalized = expression.trim().replace(/''/g, '""');
+
+  while (hasRedundantOuterParentheses(normalized)) {
+    normalized = normalized.slice(1, -1).trim();
+  }
+
+  return normalized
+    .replace(/\s+/g, ' ')
+    .replace(/\(\s+/g, '(')
+    .replace(/\s+\)/g, ')');
+}
 
 function collectionSource(source, collectionName) {
   const starts = [...source.matchAll(/new Collection\(\{/g)].map((match) => match.index);
@@ -45,33 +99,11 @@ export function validateMigrationSource(source) {
       continue;
     }
 
-    for (const field of recordOwnerRuleFields) {
-      const value = ruleValue(collection, field);
-      if (!value.includes(authId)) {
-        errors.push(`${collectionName}.${field} must reference @request.auth.id`);
+    for (const [field, expected] of Object.entries(CANONICAL_OWNERSHIP_RULES)) {
+      const actual = normalizeRuleExpression(ruleValue(collection, field));
+      if (actual !== normalizeRuleExpression(expected)) {
+        errors.push(`${collectionName}.${field} must exactly match the canonical ownership rule`);
       }
-      if (!value.includes(recordOwner)) {
-        errors.push(`${collectionName}.${field} must restrict records to @request.auth.id`);
-      }
-    }
-
-    const createRule = ruleValue(collection, 'createRule');
-    if (!createRule.includes(authId)) {
-      errors.push(`${collectionName}.createRule must reference @request.auth.id`);
-    }
-    if (!createRule.includes(bodyOwner)) {
-      errors.push(`${collectionName}.createRule must bind @request.body.user to @request.auth.id`);
-    }
-
-    const updateRule = ruleValue(collection, 'updateRule');
-    if (!updateRule.includes(authId)) {
-      errors.push(`${collectionName}.updateRule must reference @request.auth.id`);
-    }
-    if (!updateRule.includes(recordOwner)) {
-      errors.push(`${collectionName}.updateRule must restrict records to @request.auth.id`);
-    }
-    if (!updateRule.includes('@request.body.user:isset = false') || !updateRule.includes(bodyOwner)) {
-      errors.push(`${collectionName}.updateRule must prevent ownership changes`);
     }
   }
 

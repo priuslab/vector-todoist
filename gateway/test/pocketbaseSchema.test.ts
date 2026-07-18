@@ -79,7 +79,7 @@ describe('PocketBase core schema contract', () => {
     expect(source.match(/onlyInt: true/g)).toHaveLength(5);
   });
 
-  it('accepts the real migration and rejects broad or mutable ownership rules', async () => {
+  it('accepts only canonical ownership rules for every user-owned collection', async () => {
     const { validateMigrationSource } = await import(pathToFileURL(validatorPath).href) as {
       validateMigrationSource(source: string): string[];
     };
@@ -87,15 +87,24 @@ describe('PocketBase core schema contract', () => {
 
     expect(validateMigrationSource(source)).toEqual([]);
 
-    expect(validateMigrationSource(replaceRule(source, 'tasks', 'listRule', '@request.auth.id != ""')))
-      .toContain('tasks.listRule must restrict records to @request.auth.id');
-    expect(validateMigrationSource(replaceRule(source, 'tasks', 'viewRule', '@request.auth.id != ""')))
-      .toContain('tasks.viewRule must restrict records to @request.auth.id');
-    expect(validateMigrationSource(replaceRule(source, 'tasks', 'deleteRule', '@request.auth.id != ""')))
-      .toContain('tasks.deleteRule must restrict records to @request.auth.id');
-    expect(validateMigrationSource(replaceRule(source, 'tasks', 'createRule', '@request.auth.id != "" && user = @request.auth.id')))
-      .toContain('tasks.createRule must bind @request.body.user to @request.auth.id');
-    expect(validateMigrationSource(replaceRule(source, 'tasks', 'updateRule', '@request.auth.id != "" && user = @request.auth.id')))
-      .toContain('tasks.updateRule must prevent ownership changes');
+    for (const collection of userOwnedCollections) {
+      for (const rule of ['listRule', 'viewRule', 'createRule', 'updateRule', 'deleteRule']) {
+        expect(validateMigrationSource(replaceRule(source, collection, rule, '@request.auth.id != ""')))
+          .toContain(`${collection}.${rule} must exactly match the canonical ownership rule`);
+      }
+    }
+
+    expect(validateMigrationSource(replaceRule(
+      source,
+      'tasks',
+      'listRule',
+      '@request.auth.id != "" && (user = @request.auth.id || @request.auth.id != "")',
+    ))).toContain('tasks.listRule must exactly match the canonical ownership rule');
+    expect(validateMigrationSource(replaceRule(
+      source,
+      'tasks',
+      'createRule',
+      '@request.auth.id != "" && @request.body.user = @request.auth.id /* ownership decoy */',
+    ))).toContain('tasks.createRule must exactly match the canonical ownership rule');
   });
 });
