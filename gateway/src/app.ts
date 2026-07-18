@@ -3,6 +3,8 @@ import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { type GatewayConfig } from './config.js';
 import { requestContext } from './plugins/requestContext.js';
+import { makeRequireUser } from './auth/requireUser.js';
+import { createPocketBaseTokenVerifier, type PocketBaseTokenVerifier } from './auth/verifyPocketBaseToken.js';
 
 export interface GatewayServices {
   readonly [name: string]: unknown;
@@ -34,6 +36,8 @@ export async function buildApp({
   });
   await app.register(rateLimit, rateLimitOptions ?? { max: 120, timeWindow: '1 minute' });
   await requestContext(app);
+  const verifier = (_services.authVerifier as PocketBaseTokenVerifier | undefined) ?? createPocketBaseTokenVerifier({ baseUrl: config.pocketbaseUrl });
+  app.decorate('requireUser', makeRequireUser(verifier));
 
   app.get('/health', { config: { rateLimit: false } }, async () => ({ status: 'ok', service: 'vector-gateway' }));
 
