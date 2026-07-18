@@ -59,7 +59,7 @@ describe('POST /api/v1/brain-dumps', () => {
     const response = await app.inject({ method: 'POST', url: '/api/v1/brain-dumps', headers: { authorization: 'Bearer token', 'idempotency-key': 'k1' }, payload: { kind: 'text', text: '  Привіт\r\n  світ   \n\n  ще думка  ', timezone: 'Europe/Warsaw', source: 'telegram', user: 'attacker' } });
     expect(response.statusCode).toBe(201);
     expect(response.json()).toEqual({ id: 'dump-1', status: 'draft', rawText: 'Привіт\nсвіт\n\nще думка' });
-    expect(dumpRepository.create).toHaveBeenCalledWith(alice, { kind: 'text', rawText: 'Привіт\nсвіт\n\nще думка', timezone: 'Europe/Warsaw', idempotencyKey: 'k1', source: 'web', status: 'received' });
+    expect(dumpRepository.create).toHaveBeenCalledWith(expect.objectContaining(alice), { kind: 'text', rawText: 'Привіт\nсвіт\n\nще думка', timezone: 'Europe/Warsaw', idempotencyKey: 'k1', source: 'web', status: 'received' });
     await app.close();
   });
 

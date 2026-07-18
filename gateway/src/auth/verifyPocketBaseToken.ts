@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-export type VerifiedUser = { userId: string; email: string };
+export type VerifiedUser = { userId: string; email: string; token?: string };
 export type PocketBaseFetch = typeof fetch;
 export type TokenLogger = { warn?: (...args: unknown[]) => void; error?: (...args: unknown[]) => void };
 

@@ -44,6 +44,14 @@ describe('PocketBase repositories', () => {
     expect(fetcher).toHaveBeenCalledWith(expect.stringContaining('/api/collections/tasks/records?'), expect.objectContaining({ signal: expect.any(AbortSignal) }));
   });
 
+  it('propagates the verified bearer token only to the request-scoped PocketBase client', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ id: 'created' }), { status: 200 }));
+    const pb = createPocketBaseClient({ baseUrl: 'http://pb.test', fetcher });
+    const dump = createBrainDumpRepository(pb);
+    await dump.create({ ...identity, token: 'request-token' }, { rawText: 'Dump' });
+    expect(fetcher).toHaveBeenCalledWith(expect.stringContaining('/api/collections/brain_dumps/records'), expect.objectContaining({ headers: expect.objectContaining({ authorization: 'Bearer request-token' }) }));
+  });
+
   it('converts a hanging PocketBase request into a safe unavailable error', async () => {
     const fetcher = vi.fn<typeof fetch>().mockImplementation((_url, init) => new Promise((_resolve, reject) => {
       init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));

@@ -8,34 +8,35 @@ export class RepositoryError extends Error {
 const quote = (value: string) => value.replaceAll('\\', '\\\\').replaceAll("'", "\\'");
 export const ownerFilter = (userId: string) => `user = '${quote(userId)}'`;
 export type RepoInput = Record<string, unknown>;
+const forUser = (client: PocketBaseClient, user: VerifiedUser) => user.token && client.withToken ? client.withToken(user.token) : client;
 
 export async function owned<T extends PocketBaseRecord>(client: PocketBaseClient, collection: string, user: VerifiedUser, id: string): Promise<T | null> {
   try {
-    const records = await client.list<T>(collection, `${ownerFilter(user.userId)} && id = '${quote(id)}'`);
+    const records = await forUser(client, user).list<T>(collection, `${ownerFilter(user.userId)} && id = '${quote(id)}'`);
     const record = records.find((item) => item.id === id && item.user === user.userId);
     return record ?? null;
   } catch { throw new RepositoryError('UNAVAILABLE'); }
 }
 
 export async function createOwned<T extends PocketBaseRecord>(client: PocketBaseClient, collection: string, user: VerifiedUser, data: RepoInput): Promise<T> {
-  try { return await client.create<T>(collection, { ...data, user: user.userId }); } catch { throw new RepositoryError('UNAVAILABLE'); }
+  try { return await forUser(client, user).create<T>(collection, { ...data, user: user.userId }); } catch { throw new RepositoryError('UNAVAILABLE'); }
 }
 
 export async function listOwned<T extends PocketBaseRecord>(client: PocketBaseClient, collection: string, user: VerifiedUser): Promise<T[]> {
   try {
-    const records = await client.list<T>(collection, ownerFilter(user.userId));
+    const records = await forUser(client, user).list<T>(collection, ownerFilter(user.userId));
     return records.filter((record) => record.user === user.userId);
   } catch { throw new RepositoryError('UNAVAILABLE'); }
 }
 
 export async function updateOwned<T extends PocketBaseRecord>(client: PocketBaseClient, collection: string, user: VerifiedUser, id: string, data: RepoInput): Promise<T> {
   await requireOwned(client, collection, user, id);
-  try { return await client.update<T>(collection, id, { ...data, user: user.userId }); } catch { throw new RepositoryError('UNAVAILABLE'); }
+  try { return await forUser(client, user).update<T>(collection, id, { ...data, user: user.userId }); } catch { throw new RepositoryError('UNAVAILABLE'); }
 }
 
 export async function deleteOwned(client: PocketBaseClient, collection: string, user: VerifiedUser, id: string): Promise<void> {
   await requireOwned(client, collection, user, id);
-  try { await client.delete(collection, id); } catch { throw new RepositoryError('UNAVAILABLE'); }
+  try { await forUser(client, user).delete(collection, id); } catch { throw new RepositoryError('UNAVAILABLE'); }
 }
 
 export async function requireOwned<T extends PocketBaseRecord>(client: PocketBaseClient, collection: string, user: VerifiedUser, id: string): Promise<T> {

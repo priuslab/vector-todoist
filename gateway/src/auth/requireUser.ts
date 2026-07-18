@@ -9,7 +9,11 @@ declare module 'fastify' {
 export function makeRequireUser(verifier: PocketBaseTokenVerifier) {
   return async function requireUser(request: FastifyRequest, reply: FastifyReply): Promise<void | FastifyReply> {
     try {
-      request.user = await verifier.verify(request.headers.authorization);
+      const user = await verifier.verify(request.headers.authorization);
+      const authorization = request.headers.authorization;
+      const token = authorization?.startsWith('Bearer ') ? authorization.slice(7).trim() : undefined;
+      request.user = user;
+      if (token) Object.defineProperty(request.user, 'token', { value: token, enumerable: false, configurable: true });
     } catch (error) {
       if (!(error instanceof AuthError)) request.log.warn('Authentication failed');
       return reply.code(401).send({ error: 'UNAUTHORIZED' });

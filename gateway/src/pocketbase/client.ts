@@ -5,6 +5,7 @@ export class PocketBaseClientError extends Error {
 }
 
 export interface PocketBaseClient {
+  withToken?(token: string): PocketBaseClient;
   list<T extends PocketBaseRecord = PocketBaseRecord>(collection: string, filter: string): Promise<T[]>;
   create<T extends PocketBaseRecord = PocketBaseRecord>(collection: string, data: Record<string, unknown>): Promise<T>;
   update<T extends PocketBaseRecord = PocketBaseRecord>(collection: string, id: string, data: Record<string, unknown>): Promise<T>;
@@ -28,7 +29,8 @@ export function createPocketBaseClient(options: { baseUrl: string; token?: strin
       try { return await response.json() as T; } catch { throw new PocketBaseClientError(); }
     } catch { throw new PocketBaseClientError(); } finally { clearTimeout(timer); }
   }
-  return {
+  const client: PocketBaseClient = {
+    withToken: (token) => createPocketBaseClient({ ...options, token }),
     async list<T extends PocketBaseRecord = PocketBaseRecord>(collection: string, filter: string): Promise<T[]> {
       const params = new URLSearchParams({ filter });
       const body: unknown = await request(`/api/collections/${encodeURIComponent(collection)}/records?${params}`);
@@ -47,4 +49,5 @@ export function createPocketBaseClient(options: { baseUrl: string; token?: strin
     },
     delete: async (collection, id) => { await request(`/api/collections/${encodeURIComponent(collection)}/records/${encodeURIComponent(id)}`, { method: 'DELETE' }); },
   };
+  return client;
 }
