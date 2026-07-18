@@ -29,8 +29,9 @@ export async function transcriptionRoutes(app: FastifyInstance, service: Transcr
     const multipart = rawBody && contentType === 'multipart/form-data' ? multipartAudio(rawBody, rawContentType) : undefined;
     const bytes = multipart?.bytes ?? rawBody;
     const uploadMimeType = multipart?.mimeType ?? contentType;
-    const durationHeader = request.headers['x-audio-duration'];
-    const durationSeconds = typeof durationHeader === 'string' && Number.isFinite(Number(durationHeader)) ? Number(durationHeader) : undefined;
+    // Client duration is advisory only; service enforces bounded bytes and a
+    // server-side timeout. It is intentionally not used for authorization.
+    const durationSeconds = undefined;
     if (!bytes || !uploadMimeType.startsWith('audio/')) return reply.code(400).send({ error: 'INVALID_AUDIO' });
     try {
       return reply.code(200).send(await service.transcribe(request.user, { bytes, mimeType: uploadMimeType, durationSeconds }));

@@ -41,18 +41,24 @@ export interface TranscriptionService {
   transcribe(user: VerifiedUser, input: unknown): Promise<{ transcript: string; locale: 'uk-UA' }>;
 }
 
-export function createTranscriptionService(adapter: TranscriptionAdapter, storage: AudioStorage, options: { maxBytes?: number; maxDurationSeconds?: number; maxTextLength?: number } = {}): TranscriptionService {
+export function createTranscriptionService(adapter: TranscriptionAdapter, storage: AudioStorage, options: { maxBytes?: number; maxDurationSeconds?: number; maxTextLength?: number; timeoutMs?: number; minBytesPerSecond?: number } = {}): TranscriptionService {
   const maxBytes = Math.min(Math.max(Math.floor(options.maxBytes ?? 15_000_000), 1), 25_000_000);
   const maxDurationSeconds = Math.min(Math.max(Math.floor(options.maxDurationSeconds ?? 180), 1), 600);
   const maxTextLength = Math.min(Math.max(Math.floor(options.maxTextLength ?? 20_000), 1), 20_000);
+  const timeoutMs = Math.min(Math.max(Math.floor(options.timeoutMs ?? 20_000), 100), 60_000);
+  // A conservative lower bound prevents a forged client duration from making
+  // an arbitrarily long recording appear short. Decoding remains provider-side.
+  const minBytesPerSecond = Math.max(Math.floor(options.minBytesPerSecond ?? 1_000), 1);
   return {
     async transcribe(_user, input) {
       const parsed = transcriptionInputSchema.safeParse(input);
-      if (!parsed.success || parsed.data.bytes.length > maxBytes || !supportedAudioMimeTypes.includes(parsed.data.mimeType as typeof supportedAudioMimeTypes[number]) || (parsed.data.durationSeconds !== undefined && parsed.data.durationSeconds > maxDurationSeconds)) throw new TranscriptionValidationError();
+      if (!parsed.success || parsed.data.bytes.length > maxBytes || !supportedAudioMimeTypes.includes(parsed.data.mimeType as typeof supportedAudioMimeTypes[number]) || (parsed.data.durationSeconds !== undefined && parsed.data.durationSeconds > maxDurationSeconds) || parsed.data.bytes.length > maxDurationSeconds * minBytesPerSecond) throw new TranscriptionValidationError();
       let temporary: { path: string } | undefined;
       try {
         temporary = await storage.save(parsed.data.bytes, parsed.data.mimeType);
-        const transcript = normalizeTranscript(await adapter.transcribe({ bytes: parsed.data.bytes, mimeType: parsed.data.mimeType, locale: 'uk-UA' }), maxTextLength);
+        const transcription = adapter.transcribe({ bytes: parsed.data.bytes, mimeType: parsed.data.mimeType, locale: 'uk-UA' });
+        const timeout = new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error('transcription timeout')), timeoutMs));
+        const transcript = normalizeTranscript(await Promise.race([transcription, timeout]), maxTextLength);
         if (!transcript) throw new TranscriptionUnavailableError();
         return { transcript, locale: 'uk-UA' as const };
       } catch (error) {

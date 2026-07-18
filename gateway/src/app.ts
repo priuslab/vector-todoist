@@ -39,9 +39,12 @@ export async function buildApp({
   services: _services,
   rateLimit: rateLimitOptions,
 }: GatewayAppOptions): Promise<FastifyInstance> {
+  const voiceMaxBytes = config.voiceMaxBytes ?? 15_000_000;
   const app = Fastify({
     requestIdHeader: 'x-request-id',
     trustProxy: config.trustProxy,
+    // Leave room for multipart headers while remaining bounded by config.
+    bodyLimit: Math.min(Math.max(voiceMaxBytes + 1_048_576, 1_048_576), 26_000_000),
   });
   app.addContentTypeParser(/^(audio\/.+|multipart\/form-data)(?:;.*)?$/, { parseAs: 'buffer' }, (_request, body, done) => done(null, body));
 
@@ -66,7 +69,11 @@ export async function buildApp({
     ?? (_services.transcriptionAdapter
       ? createTranscriptionService(_services.transcriptionAdapter as Parameters<typeof createTranscriptionService>[0], createAudioStorage())
       : config.geminiApiKey
-        ? createTranscriptionService(createGeminiTranscriptionAdapter({ apiKey: config.geminiApiKey, model: config.geminiModel, timeoutMs: config.aiTimeoutMs }), createAudioStorage())
+        ? createTranscriptionService(createGeminiTranscriptionAdapter({ apiKey: config.geminiApiKey, model: config.geminiModel, timeoutMs: config.aiTimeoutMs }), createAudioStorage(), {
+          maxBytes: config.voiceMaxBytes,
+          maxDurationSeconds: config.voiceMaxDurationSeconds,
+          timeoutMs: config.voiceTranscriptionTimeoutMs,
+        })
         : undefined);
   if (transcriptionService) await transcriptionRoutes(app, transcriptionService);
   const analysisService = (_services.analysisService as AnalysisService | undefined) ?? (brainDumpRepository && _services.analysisSessionRepository && _services.aiClient

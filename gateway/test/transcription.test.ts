@@ -44,6 +44,21 @@ describe('transcription service safety', () => {
     await expect(service.transcribe(alice, { bytes: Buffer.from('audio'), mimeType: 'audio/webm', durationSeconds: 1 })).rejects.toMatchObject({ code: 'TRANSCRIPTION_UNAVAILABLE' });
     expect(await storage.count()).toBe(0);
   });
+
+  it('does not let a forged short duration bypass the conservative server duration bound', async () => {
+    const storage = createAudioStorage({ directory: '/tmp/vector-transcription-test-spoof' });
+    const adapterInstance = adapter();
+    const service = createTranscriptionService(adapterInstance, storage, { maxBytes: 10_000, maxDurationSeconds: 2, minBytesPerSecond: 1_000 });
+    await expect(service.transcribe(alice, { bytes: Buffer.alloc(2_001), mimeType: 'audio/webm', durationSeconds: 0.1 })).rejects.toMatchObject({ code: 'INVALID_AUDIO' });
+    expect(adapterInstance.transcribe).not.toHaveBeenCalled();
+  });
+
+  it('times out a hanging provider and still cleans temporary audio', async () => {
+    const storage = createAudioStorage({ directory: '/tmp/vector-transcription-test-timeout' });
+    const service = createTranscriptionService({ transcribe: vi.fn(() => new Promise<string>(() => undefined)) }, storage, { timeoutMs: 10 });
+    await expect(service.transcribe(alice, { bytes: Buffer.from('audio'), mimeType: 'audio/webm' })).rejects.toMatchObject({ code: 'TRANSCRIPTION_UNAVAILABLE' });
+    expect(await storage.count()).toBe(0);
+  });
 });
 
 describe('POST /api/v1/brain-dumps/voice', () => {
