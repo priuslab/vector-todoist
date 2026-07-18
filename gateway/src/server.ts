@@ -5,6 +5,9 @@ import { createBrainDumpRepository } from './repositories/brainDumpRepository.js
 import { createCaptureService } from './modules/capture/captureService.js';
 import { createAnalysisSessionRepository, createAnalysisService } from './modules/ai/analyzeBrainDump.js';
 import { createGeminiClient } from './modules/ai/geminiClient.js';
+import { createTaskRepository } from './repositories/taskRepository.js';
+import { createIdeaRepository } from './repositories/ideaRepository.js';
+import { createChangeSetRepository } from './repositories/changeSetRepository.js';
 
 async function start(): Promise<void> {
   const config = loadConfig();
@@ -16,6 +19,9 @@ async function start(): Promise<void> {
     captureService: createCaptureService(brainDumpRepository, { maxTextLength: config.brainDumpMaxTextLength }),
     analysisSessionRepository: createAnalysisSessionRepository(pocketBase),
     aiClient: createGeminiClient({ apiKey: config.geminiApiKey, model: config.geminiModel, timeoutMs: config.aiTimeoutMs }),
+    taskRepository: createTaskRepository(pocketBase),
+    ideaRepository: createIdeaRepository(pocketBase),
+    changeSetRepository: createChangeSetRepository(pocketBase),
   } });
 
   await app.listen({ host: config.host, port: config.port });
