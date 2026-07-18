@@ -17,6 +17,7 @@ describe('buildDailyPlan', () => {
   it('preserves locked busy slots and places urgent work first', () => {
     const result = buildDailyPlan({ tasks: [task('normal'), task('urgent', { priority: 'urgent', estimatedMinutes: 45 })], busySlots: busy, profile, now });
     expect(result.blocks.find((block) => block.id === 'meeting')).toMatchObject({ kind: 'busy', locked: true, start: busy[0].start, end: busy[0].end });
+    expect(result.reasons.meeting.some((reason) => reason.code === 'busy-conflict')).toBe(true);
     expect(result.blocks.find((block) => block.kind === 'task')?.taskId).toBe('urgent');
   });
 
@@ -48,5 +49,17 @@ describe('buildDailyPlan', () => {
   it('rejects malformed intervals and profiles', () => {
     expect(() => buildDailyPlan({ tasks: [task('bad')], busySlots: [{ ...busy[0], end: busy[0].start }], profile, now })).toThrowError(/interval/i);
     expect(() => buildDailyPlan({ tasks: [], busySlots: [], profile: { ...profile, workHours: { start: '18:00', end: '09:00' } }, now })).toThrowError(/workHours/i);
+    expect(() => buildDailyPlan({ tasks: [], busySlots: [busy[0], { ...busy[0], id: 'overlap', start: '2026-07-18T11:30:00+02:00', end: '2026-07-18T12:00:00+02:00' }], profile, now })).toThrowError(/overlap/i);
+  });
+
+  it('does not schedule in the past when planning starts midday', () => {
+    const result = buildDailyPlan({ tasks: [task('later')], busySlots: [], profile, now: new Date('2026-07-18T14:07:00+02:00') });
+    expect(result.blocks.find((block) => block.kind === 'task')?.start).toBe('2026-07-18T14:15:00+02:00');
+  });
+
+  it('requires configured breaks between split chunks', () => {
+    const result = buildDailyPlan({ tasks: [task('tight', { estimatedMinutes: 90 })], busySlots: [], profile: { ...profile, workHours: { start: '09:00', end: '10:30' } }, now });
+    expect(result.unscheduledTaskIds).toEqual(['tight']);
+    expect(result.reasons.tight.some((reason) => reason.code === 'no-viable-slot')).toBe(true);
   });
 });
