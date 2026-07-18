@@ -5,6 +5,9 @@ import { type GatewayConfig } from './config.js';
 import { requestContext } from './plugins/requestContext.js';
 import { makeRequireUser } from './auth/requireUser.js';
 import { createPocketBaseTokenVerifier, type PocketBaseTokenVerifier } from './auth/verifyPocketBaseToken.js';
+import { createCaptureService } from './modules/capture/captureService.js';
+import { captureRoutes } from './modules/capture/captureRoutes.js';
+import type { BrainDumpRepository } from './repositories/brainDumpRepository.js';
 
 export interface GatewayServices {
   readonly [name: string]: unknown;
@@ -40,6 +43,12 @@ export async function buildApp({
   app.decorate('requireUser', makeRequireUser(verifier));
 
   app.get('/health', { config: { rateLimit: false } }, async () => ({ status: 'ok', service: 'vector-gateway' }));
+
+  const brainDumpRepository = _services.brainDumpRepository as BrainDumpRepository | undefined;
+  const captureService = _services.captureService as ReturnType<typeof createCaptureService> | undefined;
+  if (captureService || brainDumpRepository) {
+    await captureRoutes(app, captureService ?? createCaptureService(brainDumpRepository!, { maxTextLength: Number(_services.captureMaxTextLength) || 20_000 }));
+  }
 
   return app;
 }
