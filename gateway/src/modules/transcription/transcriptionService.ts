@@ -57,8 +57,10 @@ export function createTranscriptionService(adapter: TranscriptionAdapter, storag
       try {
         temporary = await storage.save(parsed.data.bytes, parsed.data.mimeType);
         const transcription = adapter.transcribe({ bytes: parsed.data.bytes, mimeType: parsed.data.mimeType, locale: 'uk-UA' });
-        const timeout = new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error('transcription timeout')), timeoutMs));
+        let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+        const timeout = new Promise<never>((_resolve, reject) => { timeoutHandle = setTimeout(() => reject(new Error('transcription timeout')), timeoutMs); });
         const transcript = normalizeTranscript(await Promise.race([transcription, timeout]), maxTextLength);
+        if (timeoutHandle) clearTimeout(timeoutHandle);
         if (!transcript) throw new TranscriptionUnavailableError();
         return { transcript, locale: 'uk-UA' as const };
       } catch (error) {
