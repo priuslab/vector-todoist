@@ -4,12 +4,19 @@
 # VECTOR_GATEWAY_UPSTREAM=127.0.0.1:8787
 # VECTOR_POCKETBASE_UPSTREAM=127.0.0.1:8090
 
-@vector_gateway path /api/* /webhooks/*
-reverse_proxy @vector_gateway {$VECTOR_GATEWAY_UPSTREAM}
+handle /api/* {
+  reverse_proxy {$VECTOR_GATEWAY_UPSTREAM}
+}
 
-# Keep PocketBase's admin UI (`/_/`) unavailable from the public `/pb` prefix.
-@vector_pocketbase_admin path /pb/_/*
-respond @vector_pocketbase_admin 404
+handle /webhooks/* {
+  reverse_proxy {$VECTOR_GATEWAY_UPSTREAM}
+}
+
+# `handle` blocks are mutually exclusive. This more-specific handler must stay
+# before the `/pb/*` proxy so PocketBase's admin UI (`/_/`) is never public.
+handle /pb/_* {
+  respond 404
+}
 
 # `handle_path` removes `/pb`, so `/pb/api/...` reaches PocketBase as `/api/...`.
 handle_path /pb/* {

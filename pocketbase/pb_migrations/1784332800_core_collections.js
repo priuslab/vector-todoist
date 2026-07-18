@@ -1,20 +1,14 @@
 migrate((app) => {
-  let users;
-
-  try {
-    users = app.findCollectionByNameOrId('users');
-  } catch {
-    users = new Collection({
-      type: 'auth',
-      name: 'users',
-      listRule: '@request.auth.id != "" && id = @request.auth.id',
-      viewRule: '@request.auth.id != "" && id = @request.auth.id',
-      createRule: '',
-      updateRule: '@request.auth.id != "" && id = @request.auth.id',
-      deleteRule: '@request.auth.id != "" && id = @request.auth.id',
-    });
-    app.save(users);
-  }
+  const users = new Collection({
+    type: 'auth',
+    name: 'users',
+    listRule: '@request.auth.id != "" && id = @request.auth.id',
+    viewRule: '@request.auth.id != "" && id = @request.auth.id',
+    createRule: '',
+    updateRule: '@request.auth.id != "" && id = @request.auth.id',
+    deleteRule: '@request.auth.id != "" && id = @request.auth.id',
+  });
+  app.save(users);
 
   const workProfiles = new Collection({
     type: 'base',
@@ -22,7 +16,7 @@ migrate((app) => {
     listRule: '@request.auth.id != "" && user = @request.auth.id',
     viewRule: '@request.auth.id != "" && user = @request.auth.id',
     createRule: '@request.auth.id != "" && @request.body.user = @request.auth.id',
-    updateRule: '@request.auth.id != "" && user = @request.auth.id',
+    updateRule: '@request.auth.id != "" && user = @request.auth.id && (@request.body.user:isset = false || @request.body.user = @request.auth.id)',
     deleteRule: '@request.auth.id != "" && user = @request.auth.id',
     fields: [
       { type: 'relation', name: 'user', required: true, collectionId: users.id, maxSelect: 1, cascadeDelete: true },
@@ -33,8 +27,8 @@ migrate((app) => {
       { type: 'text', name: 'quietStart', required: false, max: 5 },
       { type: 'text', name: 'quietEnd', required: false, max: 5 },
       { type: 'json', name: 'energyPeak', required: true },
-      { type: 'number', name: 'focusBlockMinutes', required: true, min: 5, max: 480 },
-      { type: 'number', name: 'dailyLimitMinutes', required: true, min: 0, max: 1_440 },
+      { type: 'number', name: 'focusBlockMinutes', required: true, min: 5, max: 480, onlyInt: true },
+      { type: 'number', name: 'dailyLimitMinutes', required: true, min: 0, max: 1_440, onlyInt: true },
     ],
   });
   app.save(workProfiles);
@@ -45,7 +39,7 @@ migrate((app) => {
     listRule: '@request.auth.id != "" && user = @request.auth.id',
     viewRule: '@request.auth.id != "" && user = @request.auth.id',
     createRule: '@request.auth.id != "" && @request.body.user = @request.auth.id',
-    updateRule: '@request.auth.id != "" && user = @request.auth.id',
+    updateRule: '@request.auth.id != "" && user = @request.auth.id && (@request.body.user:isset = false || @request.body.user = @request.auth.id)',
     deleteRule: '@request.auth.id != "" && user = @request.auth.id',
     fields: [
       { type: 'relation', name: 'user', required: true, collectionId: users.id, maxSelect: 1, cascadeDelete: true },
@@ -65,7 +59,7 @@ migrate((app) => {
     listRule: '@request.auth.id != "" && user = @request.auth.id',
     viewRule: '@request.auth.id != "" && user = @request.auth.id',
     createRule: '@request.auth.id != "" && @request.body.user = @request.auth.id',
-    updateRule: '@request.auth.id != "" && user = @request.auth.id',
+    updateRule: '@request.auth.id != "" && user = @request.auth.id && (@request.body.user:isset = false || @request.body.user = @request.auth.id)',
     deleteRule: '@request.auth.id != "" && user = @request.auth.id',
     fields: [
       { type: 'relation', name: 'user', required: true, collectionId: users.id, maxSelect: 1, cascadeDelete: true },
@@ -76,13 +70,13 @@ migrate((app) => {
       { type: 'date', name: 'deadline', required: false },
       { type: 'date', name: 'plannedStart', required: false },
       { type: 'date', name: 'plannedEnd', required: false },
-      { type: 'number', name: 'estimatedMinutes', required: false, min: 1, max: 1_440 },
-      { type: 'number', name: 'actualMinutes', required: false, min: 0, max: 1_440 },
+      { type: 'number', name: 'estimatedMinutes', required: false, min: 1, max: 1_440, onlyInt: true },
+      { type: 'number', name: 'actualMinutes', required: false, min: 0, max: 1_440, onlyInt: true },
       { type: 'select', name: 'energy', required: false, maxSelect: 1, values: ['low', 'medium', 'high'] },
-      { type: 'bool', name: 'flexible', required: true },
-      { type: 'bool', name: 'locked', required: true },
+      { type: 'bool', name: 'flexible' },
+      { type: 'bool', name: 'locked' },
       { type: 'relation', name: 'sourceDump', required: false, collectionId: brainDumps.id, maxSelect: 1, cascadeDelete: false },
-      { type: 'number', name: 'rescheduleCount', required: true, min: 0 },
+      { type: 'number', name: 'rescheduleCount', min: 0, onlyInt: true },
     ],
   });
   app.save(tasks);
@@ -93,7 +87,7 @@ migrate((app) => {
     listRule: '@request.auth.id != "" && user = @request.auth.id',
     viewRule: '@request.auth.id != "" && user = @request.auth.id',
     createRule: '@request.auth.id != "" && @request.body.user = @request.auth.id',
-    updateRule: '@request.auth.id != "" && user = @request.auth.id',
+    updateRule: '@request.auth.id != "" && user = @request.auth.id && (@request.body.user:isset = false || @request.body.user = @request.auth.id)',
     deleteRule: '@request.auth.id != "" && user = @request.auth.id',
     fields: [
       { type: 'relation', name: 'user', required: true, collectionId: users.id, maxSelect: 1, cascadeDelete: true },
@@ -111,7 +105,7 @@ migrate((app) => {
     listRule: '@request.auth.id != "" && user = @request.auth.id',
     viewRule: '@request.auth.id != "" && user = @request.auth.id',
     createRule: '@request.auth.id != "" && @request.body.user = @request.auth.id',
-    updateRule: '@request.auth.id != "" && user = @request.auth.id',
+    updateRule: '@request.auth.id != "" && user = @request.auth.id && (@request.body.user:isset = false || @request.body.user = @request.auth.id)',
     deleteRule: '@request.auth.id != "" && user = @request.auth.id',
     fields: [
       { type: 'relation', name: 'user', required: true, collectionId: users.id, maxSelect: 1, cascadeDelete: true },
@@ -132,7 +126,7 @@ migrate((app) => {
     listRule: '@request.auth.id != "" && user = @request.auth.id',
     viewRule: '@request.auth.id != "" && user = @request.auth.id',
     createRule: '@request.auth.id != "" && @request.body.user = @request.auth.id',
-    updateRule: '@request.auth.id != "" && user = @request.auth.id',
+    updateRule: '@request.auth.id != "" && user = @request.auth.id && (@request.body.user:isset = false || @request.body.user = @request.auth.id)',
     deleteRule: '@request.auth.id != "" && user = @request.auth.id',
     fields: [
       { type: 'relation', name: 'user', required: true, collectionId: users.id, maxSelect: 1, cascadeDelete: true },
@@ -146,7 +140,7 @@ migrate((app) => {
   });
   app.save(changeSets);
 }, (app) => {
-  for (const name of ['change_sets', 'ai_sessions', 'ideas', 'tasks', 'brain_dumps', 'work_profiles']) {
+  for (const name of ['change_sets', 'ai_sessions', 'ideas', 'tasks', 'brain_dumps', 'work_profiles', 'users']) {
     app.delete(app.findCollectionByNameOrId(name));
   }
 });

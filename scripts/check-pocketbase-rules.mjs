@@ -11,7 +11,10 @@ export const USER_OWNED_COLLECTIONS = [
   'change_sets',
 ];
 
-const ownerRuleFields = ['listRule', 'viewRule', 'updateRule', 'deleteRule'];
+const recordOwnerRuleFields = ['listRule', 'viewRule', 'deleteRule'];
+const authId = '@request.auth.id';
+const recordOwner = 'user = @request.auth.id';
+const bodyOwner = '@request.body.user = @request.auth.id';
 
 function collectionSource(source, collectionName) {
   const starts = [...source.matchAll(/new Collection\(\{/g)].map((match) => match.index);
@@ -42,16 +45,33 @@ export function validateMigrationSource(source) {
       continue;
     }
 
-    for (const field of ownerRuleFields) {
+    for (const field of recordOwnerRuleFields) {
       const value = ruleValue(collection, field);
-      if (!value.includes('@request.auth.id')) {
+      if (!value.includes(authId)) {
         errors.push(`${collectionName}.${field} must reference @request.auth.id`);
+      }
+      if (!value.includes(recordOwner)) {
+        errors.push(`${collectionName}.${field} must restrict records to @request.auth.id`);
       }
     }
 
     const createRule = ruleValue(collection, 'createRule');
-    if (!createRule.includes('@request.auth.id')) {
+    if (!createRule.includes(authId)) {
       errors.push(`${collectionName}.createRule must reference @request.auth.id`);
+    }
+    if (!createRule.includes(bodyOwner)) {
+      errors.push(`${collectionName}.createRule must bind @request.body.user to @request.auth.id`);
+    }
+
+    const updateRule = ruleValue(collection, 'updateRule');
+    if (!updateRule.includes(authId)) {
+      errors.push(`${collectionName}.updateRule must reference @request.auth.id`);
+    }
+    if (!updateRule.includes(recordOwner)) {
+      errors.push(`${collectionName}.updateRule must restrict records to @request.auth.id`);
+    }
+    if (!updateRule.includes('@request.body.user:isset = false') || !updateRule.includes(bodyOwner)) {
+      errors.push(`${collectionName}.updateRule must prevent ownership changes`);
     }
   }
 
