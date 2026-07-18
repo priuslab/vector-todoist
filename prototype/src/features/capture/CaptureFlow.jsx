@@ -10,6 +10,7 @@ import { Clarification } from "./Clarification";
 import { Transcript } from "./Transcript";
 import { VoiceRecorder } from "./VoiceRecorder";
 import { analyzeBrainDump, answerBrainDump, createTextBrainDump, getBrainDumpResult } from "./captureApi";
+import { previewBrainDumpPlan, applyChangeSet } from "../today/todayApi";
 
 export function CaptureFlow({ screenId = "capture-chooser", onBack, onNavigate = () => {}, processingDelayMs = 1400, apiClient, createBrainDump = createTextBrainDump, analyze = analyzeBrainDump, answer = answerBrainDump, fetchResult = getBrainDumpResult }) {
   const initial = screenId.replace("capture-", "");
@@ -20,6 +21,9 @@ export function CaptureFlow({ screenId = "capture-chooser", onBack, onNavigate =
   const [analysis, setAnalysis] = useState(null);
   const [analysisError, setAnalysisError] = useState("");
   const [draftId, setDraftId] = useState("");
+  const [preview, setPreview] = useState(null);
+  const [applying, setApplying] = useState(false);
+  const [planError, setPlanError] = useState("");
   const [idempotencyKey] = useState(() => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-brain-dump`);
 
   useEffect(() => {
@@ -67,6 +71,22 @@ export function CaptureFlow({ screenId = "capture-chooser", onBack, onNavigate =
     } catch { setAnalysisError("Не вдалося завершити аналіз. Чернетку збережено — спробуй ще раз."); }
   };
 
+  const openPlanPreview = async () => {
+    if (!apiClient || !draftId) return onNavigate("today-normal");
+    setPlanError("");
+    try {
+      const result = await previewBrainDumpPlan({ apiClient, id: draftId, idempotencyKey });
+      setPreview(result);
+    } catch { setPlanError("Не вдалося підготувати план. Дані збережено — спробуй ще раз."); }
+  };
+  const applyPlan = async () => {
+    if (!apiClient || !preview?.changeSetId) return onNavigate("today-normal");
+    setApplying(true); setPlanError("");
+    try { await applyChangeSet({ apiClient, id: preview.changeSetId, idempotencyKey }); onNavigate("today-normal"); }
+    catch { setPlanError("План не застосовано. Жодна задача не загубилась — спробуй ще раз."); }
+    finally { setApplying(false); }
+  };
+
   const body = stage === "chooser" ? <section className="capture-chooser"><span className="capture-orb"><Microphone size={38} weight="duotone" /></span><h1>Що зараз у голові?</h1><p>Говори хаотично — не треба формулювати задачі чи оцінювати час.</p><div className="capture-options"><Button icon={Microphone} onClick={() => setStage("recording")}>Диктувати</Button><Button variant="secondary" icon={Keyboard} onClick={() => setStage("transcript")}>Написати текстом</Button></div></section>
     : stage === "recording" ? <VoiceRecorder transcript="Мені треба підготувати перший випуск…" onCancel={() => setStage("chooser")} onFinish={() => setStage("processing")} />
     : stage === "transcript" ? <section className="capture-transcript"><h1>Твої думки</h1><Transcript editable value={draftText} onChange={setDraftText} />{saveError ? <p role="alert" className="soft-copy">Не вдалося зберегти. Перевір з’єднання й спробуй ще раз.</p> : null}<Button loading={saving} onClick={saveDraft}>Зберегти чернетку</Button></section>
@@ -75,7 +95,7 @@ export function CaptureFlow({ screenId = "capture-chooser", onBack, onNavigate =
     : stage === "question-1" ? <Clarification number={1} onAnswer={() => setStage("question-2")} />
     : stage === "question-2" ? <Clarification number={2} onAnswer={() => setStage("result")} />
     : stage === "clarification" ? <Clarification questions={analysis?.questions} deferSubmit onAnswer={submitAnswer} />
-    : stage === "result" ? <AIResult analysis={analysis} onViewDay={() => onNavigate("today-normal")} onUndo={() => setStage("chooser")} />
+    : stage === "result" ? <AIResult analysis={analysis} preview={preview} applying={applying} error={planError} onViewDay={openPlanPreview} onApply={applyPlan} onUndo={() => setStage("chooser")} />
     : stage === "review" ? <section className="capture-transcript"><h1>Перевір транскрипт</h1><p className="soft-copy">Аудіо було тихим у кількох місцях. Відредагуй текст або запиши ще раз.</p><Transcript editable /><Button onClick={() => setStage("processing")}>Повторити обробку</Button></section>
     : <StateView state="error" title="Не вдалося опрацювати" message={`Brain Dump збережено в Inbox: «${DEMO_BRAIN_DUMP.slice(0, 58)}…»`} action={<Button onClick={() => setStage("processing")}>Спробувати ще раз</Button>} />;
 

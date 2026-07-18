@@ -12,6 +12,11 @@ import { analysisRoutes } from './modules/ai/analysisRoutes.js';
 import { createAnalysisService, type AnalysisService } from './modules/ai/analyzeBrainDump.js';
 import type { AnalysisSessionRepository } from './modules/ai/analyzeBrainDump.js';
 import type { AnalysisAiClient } from './modules/ai/geminiClient.js';
+import { planRoutes } from './modules/planning/planRoutes.js';
+import { createPlanService, type PlanService } from './modules/planning/planService.js';
+import type { TaskRepository } from './repositories/taskRepository.js';
+import type { IdeaRepository } from './repositories/ideaRepository.js';
+import type { ChangeSetRepository } from './repositories/changeSetRepository.js';
 
 export interface GatewayServices {
   readonly [name: string]: unknown;
@@ -53,10 +58,20 @@ export async function buildApp({
   if (captureService || brainDumpRepository) {
     await captureRoutes(app, captureService ?? createCaptureService(brainDumpRepository!, { maxTextLength: Number(_services.captureMaxTextLength) || 20_000 }));
   }
-  const analysisService = _services.analysisService as AnalysisService | undefined;
+  const analysisService = (_services.analysisService as AnalysisService | undefined) ?? (brainDumpRepository && _services.analysisSessionRepository && _services.aiClient
+    ? createAnalysisService(brainDumpRepository, _services.analysisSessionRepository as AnalysisSessionRepository, _services.aiClient as AnalysisAiClient)
+    : undefined);
   if (analysisService) await analysisRoutes(app, analysisService);
-  else if (brainDumpRepository && _services.analysisSessionRepository && _services.aiClient) {
-    await analysisRoutes(app, createAnalysisService(brainDumpRepository, _services.analysisSessionRepository as AnalysisSessionRepository, _services.aiClient as AnalysisAiClient));
+  const planService = _services.planService as PlanService | undefined;
+  if (planService) await planRoutes(app, planService);
+  else if (brainDumpRepository && analysisService && _services.taskRepository && _services.ideaRepository && _services.changeSetRepository) {
+    await planRoutes(app, createPlanService({
+      dumpRepository: brainDumpRepository,
+      analysisService,
+      taskRepository: _services.taskRepository as TaskRepository,
+      ideaRepository: _services.ideaRepository as IdeaRepository,
+      changeSetRepository: _services.changeSetRepository as ChangeSetRepository,
+    }));
   }
 
   return app;
