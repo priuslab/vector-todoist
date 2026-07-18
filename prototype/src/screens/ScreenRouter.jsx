@@ -17,7 +17,7 @@ import { SettingsScreens } from "../features/settings/SettingsScreens";
 import { SystemScreens } from "../features/system/SystemScreens";
 import { SCREEN_MAP } from "./screenRegistry";
 import { AuthCallback } from "../auth/AuthCallback";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 const ONBOARDING_NEXT = {
   "onboarding-welcome": "calendar-permission", "calendar-permission": "work-rhythm", "work-rhythm": "quiet-hours",
@@ -42,7 +42,8 @@ export function ScreenRouter({ route, onNavigate, onGoogleLogin, pocketBase }) {
       setLoginError(true);
     }
   };
-  if (route === "auth-callback") return <AuthCallback pb={pocketBase} onComplete={() => onNavigate("today-normal")} />;
+  const completeAuthCallback = useCallback(() => onNavigate("today-normal"), [onNavigate]);
+  if (route === "auth-callback") return <AuthCallback pb={pocketBase} onComplete={completeAuthCallback} />;
   const screen = SCREEN_MAP[route] ?? SCREEN_MAP["entry-chaos"];
   const back = () => onNavigate(ONBOARDING_BACK[route] ?? "today-normal");
   if (screen.group === "Entry") {

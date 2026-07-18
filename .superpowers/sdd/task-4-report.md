@@ -46,3 +46,10 @@
 - Feature flags now protect both direct routes and internal navigation; unavailable Calendar and Oracle tabs are hidden in production navigation.
 - Google start and callback failures show stable Ukrainian messages. Technical causes are logged but never rendered to the user.
 - Follow-up verification: `npm --prefix prototype test` — 17 files / 55 tests passing; production build, Playwright CLI help and `git diff --check` passed.
+
+## OAuth rerender follow-up
+
+- **RED:** a pending OAuth callback started two PocketBase code exchanges when `ScreenRouter` rerendered.
+- **GREEN:** `ScreenRouter` now supplies a memoized completion callback and `AuthCallback` keeps the latest completion handler in a ref while its exchange effect depends only on the PocketBase client.
+- Regression test confirms one exchange during a parent rerender while the first exchange is still pending.
+- Verification: `npm --prefix prototype test` — 17 files / 56 tests passing; production build, Playwright CLI help and `git diff --check` passed.
