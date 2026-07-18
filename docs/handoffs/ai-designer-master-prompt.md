@@ -52,16 +52,17 @@
 
 Створи semantic color styles із такими базовими значеннями:
 
-- `bg/base` — #F7F7FA;
+- `bg/base` — #F6F8F6;
 - `bg/surface` — #FFFFFF;
-- `bg/subtle` — #F0F1F6;
-- `text/primary` — #202330;
-- `text/secondary` — #667085;
-- `text/tertiary` — #8B91A1;
-- `border/default` — #E2E5EC;
-- `brand/primary` — #6750D8;
-- `brand/pressed` — #5540BC;
-- `brand/soft` — #EEEAFE;
+- `bg/subtle` — #EDF2EF;
+- `text/primary` — #1F2926;
+- `text/secondary` — #63716C;
+- `text/tertiary` — #87938E;
+- `border/default` — #DCE5E1;
+- `brand/primary` — #246B5E;
+- `brand/pressed` — #1B5148;
+- `brand/soft` — #E5F1ED;
+- `accent/sand` — #D19A52;
 - `accent/teal` — #178F83;
 - `success` — #2E8B57;
 - `success/soft` — #E8F5ED;
@@ -70,19 +71,19 @@
 - `danger` — #C54848;
 - `danger/soft` — #FCEBEC;
 - `info` — #2F6FD0;
-- `focus/ring` — #8D79E8.
+- `focus/ring` — #3F8C7C.
 
 Кольори Oracle-вузлів:
 
-- Goal — #7157E6;
+- Goal — #246B5E;
 - Project — #3B74D8;
 - Idea — #D88916;
 - Task — #168F83;
 - Completed — #9AA0AE;
-- Recommended edge — #6750D8;
+- Recommended edge — #246B5E;
 - Regular edge — #CDD1DB.
 
-Кольори вузлів не використовуй як дрібний текст на білому. Забезпеч WCAG AA для основного тексту, кнопок і станів. Значення не передавай лише кольором: додавай icon, label або форму.
+Кольори вузлів не використовуй як дрібний текст на білому. `accent/sand` використовуй для ідей, хаотичних думок і допоміжної графіки, але не для дрібного тексту чи primary CTA. Забезпеч WCAG AA для основного тексту, кнопок і станів. Значення не передавай лише кольором: додавай icon, label або форму. Не використовуй фіолетовий або violet як основний бренд-колір і уникай шаблонної «purple AI» естетики.
 
 ### Типографіка
 
@@ -106,9 +107,9 @@
 - Основні відступи: 8, 12, 16, 20, 24, 32, 40.
 - Горизонтальний padding екрана: 20 px; для вузького 360 px допускається 16 px.
 - Radius: 12 px для малих control, 16 px для карток, 20 px для великих карток, 24 px для bottom sheet, capsule 999 px для chips.
-- Border: 1 px #E2E5EC.
+- Border: 1 px #DCE5E1.
 - Shadow card: 0 4 16 rgba(32,35,48,0.06).
-- Shadow floating action: 0 8 24 rgba(103,80,216,0.22).
+- Shadow floating action: 0 8 24 rgba(36,107,94,0.20).
 - Не використовуй більше двох рівнів elevation на одному екрані.
 
 ### Іконографіка й ілюстрації
@@ -170,7 +171,11 @@
 
 ### A. Entry та авторизація
 
-1. Mobile landing: ціннісна пропозиція, коротка демонстрація «хаос → план», CTA «Продовжити з Google».
+1. Mobile landing carousel — три окремі high-fidelity стани одного pre-auth flow:
+   - `Chaos to Plan` — стартовий і головний слайд: ціннісна пропозиція та демонстрація «хаос → реалістичний план»;
+   - `Voice to Plan` — голосова думка перетворюється на структуровані задачі;
+   - `Path to Goal` — короткий preview маршруту «думки → проєкт → наступна задача → мета».
+   На всіх трьох слайдах CTA `Продовжити з Google` залишається у фіксованій нижній action-зоні. Додай свайп ліворуч/праворуч і зрозумілий індикатор `1/3`, `2/3`, `3/3`. Автоперехід — раз на 6 секунд лише до першої взаємодії; після дотику, focus або ручного свайпу він зупиняється. За `prefers-reduced-motion` автоперехід вимкнений. Карусель ніколи не запускає Google-вхід автоматично.
 2. Google authorization loading.
 3. Помилка входу з retry.
 

@@ -1,0 +1,34 @@
+:root {
+  --bg-base: #f6f8f6;
+  --bg-surface: #ffffff;
+  --bg-subtle: #edf2ef;
+  --text-primary: #1f2926;
+  --text-secondary: #63716c;
+  --text-tertiary: #87938e;
+  --border-default: #dce5e1;
+  --brand-primary: #246b5e;
+  --brand-pressed: #1b5148;
+  --brand-soft: #e5f1ed;
+  --accent-sand: #d19a52;
+  --accent-teal: #178f83;
+  --success: #2e8b57;
+  --success-soft: #e8f5ed;
+  --warning: #b86e00;
+  --warning-soft: #fff3d6;
+  --danger: #c54848;
+  --danger-soft: #fcebec;
+  --info: #2f6fd0;
+  --focus-ring: #3f8c7c;
+  --oracle-goal: #246b5e;
+  --oracle-project: #3b74d8;
+  --oracle-idea: #d88916;
+  --oracle-task: #168f83;
+  --oracle-completed: #9aa0ae;
+  --radius-control: 12px;
+  --radius-card: 16px;
+  --radius-large: 20px;
+  --radius-sheet: 24px;
+  --screen-pad: 20px;
+  --shadow-card: 0 4px 16px rgb(31 41 38 / 6%);
+  --shadow-floating: 0 8px 24px rgb(36 107 94 / 20%);
+}

@@ -1,0 +1,67 @@
+@import "@fontsource/manrope/400.css";
+@import "@fontsource/manrope/500.css";
+@import "@fontsource/manrope/600.css";
+@import "@fontsource/manrope/700.css";
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: #e9eeeb;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  color: var(--text-primary);
+  background: #e9eeeb;
+  font-family: "Manrope", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--focus-ring) 68%, transparent);
+  outline-offset: 2px;
+}
+
+.mobile-prototype {
+  position: relative;
+  width: min(100vw, 390px);
+  height: min(100dvh, 844px);
+  min-height: 640px;
+  margin-inline: auto;
+  overflow: hidden;
+  background: var(--bg-base);
+}
+
+@media (min-width: 431px) {
+  .mobile-prototype {
+    margin-block: 16px;
+    border-radius: 28px;
+    box-shadow: 0 24px 70px rgb(31 41 38 / 15%);
+  }
+}
+
+@media (max-width: 370px) {
+  :root {
+    --screen-pad: 16px;
+  }
+}
