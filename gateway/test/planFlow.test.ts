@@ -20,7 +20,9 @@ describe('Brain Dump → Today vertical slice', () => {
   it('previews without writes, applies tasks and ideas once, and lists Today', async () => {
     const r = repos(); const service = createPlanService(r);
     const preview = await service.preview(user, 'dump-1', { now: '2026-07-18T08:00:00+02:00', idempotencyKey: 'plan-12345678' });
+    const repeatedPreview = await service.preview(user, 'dump-1', { now: '2026-07-18T08:00:00+02:00', idempotencyKey: 'plan-12345678' });
     expect(preview.tasks[0].priority).toBe('high'); expect(preview.ideas).toHaveLength(1); expect(r.tasks).toHaveLength(0); expect(r.ideas).toHaveLength(0);
+    expect(repeatedPreview.changeSetId).toBe(preview.changeSetId); expect(r.changes).toHaveLength(1);
     const applied = await service.apply(user, preview.changeSetId, {});
     expect(applied.changeSet.status).toBe('applied'); expect(applied.tasks).toHaveLength(1); expect(applied.ideas).toHaveLength(1);
     const repeated = await service.apply(user, preview.changeSetId, {}); expect(repeated.changeSet.id).toBe(preview.changeSetId); expect(r.tasks).toHaveLength(1); expect(r.ideas).toHaveLength(1);
