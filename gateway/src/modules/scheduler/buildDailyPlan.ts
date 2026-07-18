@@ -48,8 +48,18 @@ export function buildDailyPlan(input: DailyPlanInput): DailyPlan {
   const planningStart = Math.max(workStart, Math.ceil(now.getTime() / (15 * minute)) * 15 * minute);
   const blocks: PlannedBlock[] = []; const occupied: Array<[number, number]> = []; const reasons: Record<string, ScheduleReason[]> = {}; const unscheduledTaskIds: string[] = []; const warnings: DailyPlan['warnings'] = [];
   for (const slot of busySlots) { const [start, end] = parseInterval(slot.start, slot.end, slot.id); if (overlaps(start, end, occupied)) throw new SchedulerValidationError(`Overlapping busy interval: ${slot.id}`); blocks.push({ id: slot.id, kind: 'busy', title: slot.title, start: slot.start, end: slot.end, locked: true }); occupied.push([start, end]); reasons[slot.id] = [{ code: 'busy-conflict', message: 'Зайнятий слот збережено без змін' }]; }
-  for (const task of tasks) if (task.locked) { if (!task.start || !task.end) throw new SchedulerValidationError(`Locked task ${task.id} needs start and end`); const [start, end] = parseInterval(task.start, task.end, task.id); if (overlaps(start, end, occupied)) throw new SchedulerValidationError(`Locked task overlaps another interval: ${task.id}`); blocks.push({ id: task.id, kind: 'task', taskId: task.id, title: task.title, start: task.start, end: task.end, locked: true }); occupied.push([start, end]); reasons[task.id] = [{ code: 'busy-conflict', message: 'Заблокована задача збережена без змін' }]; }
-  const flexible = tasks.filter((task) => !task.locked).slice().sort((a, b) => compareTasks(a, b, now)); let usedMinutes = 0;
+  for (const task of tasks) {
+    const startTime = task.start ? Date.parse(task.start) : NaN;
+    const endTime = task.end ? Date.parse(task.end) : NaN;
+    const past = Number.isFinite(endTime) && endTime <= now.getTime();
+    const active = Number.isFinite(startTime) && Number.isFinite(endTime) && startTime < now.getTime() && endTime > now.getTime();
+    const immutable = task.locked || task.flexible === false || task.status === 'completed' || task.calendarSource === 'google' || (task.calendarEventId && task.calendarSource !== 'app') || past || active;
+    if (!immutable) continue;
+    // Completed items may have no remaining interval; preserve them without putting them back into Today.
+    if (!task.start || !task.end) { reasons[task.id] = [{ code: 'busy-conflict', message: task.status === 'completed' ? 'Завершена задача збережена без змін' : 'Блок збережено без змін' }]; continue; }
+    const [start, end] = parseInterval(task.start, task.end, task.id); if (overlaps(start, end, occupied)) throw new SchedulerValidationError(`Immutable task overlaps another interval: ${task.id}`); blocks.push({ id: task.id, kind: 'task', taskId: task.id, title: task.title, start: task.start, end: task.end, locked: true }); occupied.push([start, end]); reasons[task.id] = [{ code: 'busy-conflict', message: task.status === 'completed' ? 'Завершена задача збережена без змін' : active ? 'Активний блок збережено без змін' : past ? 'Минулий блок збережено без змін' : 'Заблокована задача збережена без змін' }];
+  }
+  const flexible = tasks.filter((task) => !(task.locked || task.flexible === false || task.status === 'completed' || task.calendarSource === 'google' || (task.calendarEventId && task.calendarSource !== 'app') || Boolean(task.end && Date.parse(task.end) <= now.getTime()) || Boolean(task.start && task.end && Date.parse(task.start) < now.getTime() && Date.parse(task.end) > now.getTime()))).slice().sort((a, b) => compareTasks(a, b, now)); let usedMinutes = 0;
   for (const task of flexible) {
     if (!Number.isInteger(task.estimatedMinutes) || task.estimatedMinutes <= 0 || !Number.isFinite(task.goalAlignment) || task.goalAlignment < 0 || task.goalAlignment > 1) throw new SchedulerValidationError(`Invalid task: ${task.id}`);
     if (task.deadline !== null && (!Number.isFinite(Date.parse(task.deadline)))) throw new SchedulerValidationError(`Invalid deadline for task ${task.id}`);

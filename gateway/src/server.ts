@@ -22,6 +22,7 @@ async function start(): Promise<void> {
   const brainDumpRepository = createBrainDumpRepository(pocketBase);
   const calendarConnectionRepository = createCalendarConnectionRepository(pocketBase);
   const calendarBusySlotRepository = createCalendarBusySlotRepository(pocketBase);
+  const jobRepository = config.pocketbaseServerToken ? createJobRepository(pocketBase, { serverToken: config.pocketbaseServerToken }) : undefined;
   const googleOAuthService = config.enableGoogleIntegration && config.googleClientId && config.googleClientSecret && config.googleOAuthRedirectUri && config.googleTokenEncryptionKey
     ? createGoogleOAuthService({ clientId: config.googleClientId, clientSecret: config.googleClientSecret, redirectUri: config.googleOAuthRedirectUri, encryptionKey: config.googleTokenEncryptionKey, repository: calendarConnectionRepository })
     : undefined;
@@ -34,6 +35,7 @@ async function start(): Promise<void> {
     taskRepository: createTaskRepository(pocketBase),
     ideaRepository: createIdeaRepository(pocketBase),
     changeSetRepository: createChangeSetRepository(pocketBase),
+    ...(jobRepository ? { jobRepository } : {}),
     ...(googleOAuthService ? { googleOAuthService } : {}),
     ...(googleOAuthService && config.googleClientId && config.googleClientSecret && config.googleTokenEncryptionKey ? {
       busySlotService: createBusySlotService({
@@ -41,9 +43,9 @@ async function start(): Promise<void> {
         busySlotRepository: calendarBusySlotRepository,
         googleCalendarClient: createGoogleCalendarClient({ clientId: config.googleClientId, clientSecret: config.googleClientSecret, encryptionKey: config.googleTokenEncryptionKey }),
       }),
-      calendarEventService: config.pocketbaseServerToken ? createCalendarEventService({
+      calendarEventService: config.pocketbaseServerToken && jobRepository ? createCalendarEventService({
         linkRepository: createCalendarEventLinkRepository(pocketBase),
-        jobRepository: createJobRepository(pocketBase, { serverToken: config.pocketbaseServerToken }),
+        jobRepository,
         taskRepository: createTaskRepository(pocketBase),
         provider: createGoogleCalendarEventProvider({ connectionRepository: calendarConnectionRepository, googleCalendarClient: createGoogleCalendarClient({ clientId: config.googleClientId, clientSecret: config.googleClientSecret, encryptionKey: config.googleTokenEncryptionKey }) }),
         calendarId: 'primary',

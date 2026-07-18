@@ -11,6 +11,10 @@ export interface SchedulerTask {
   goalAlignment: number;
   deadline: string | null;
   locked?: boolean;
+  flexible?: boolean;
+  status?: string;
+  calendarEventId?: string;
+  calendarSource?: 'google' | 'app';
   start?: string;
   end?: string;
 }

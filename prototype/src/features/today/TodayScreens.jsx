@@ -9,7 +9,7 @@ import { TaskCard } from "../../components/TaskCard";
 import { UndoSnackbar } from "../../components/UndoSnackbar";
 import { DEMO_EVENTS, DEMO_TASKS, DEMO_USER } from "../../data/demoData";
 import { EveningReview } from "./EveningReview";
-import { completeTask, getToday, undoChangeSet } from "./todayApi";
+import { applyReschedule, completeTask, getToday, previewReschedule, undoChangeSet } from "./todayApi";
 
 function localDate(timezone) {
   const parts = new Intl.DateTimeFormat("en-GB", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
@@ -38,6 +38,10 @@ export function TodayScreens({ screenId = "today-normal", onNavigate = () => {},
   const [localTasks, setLocalTasks] = useState(null);
   const [undoChange, setUndoChange] = useState(null);
   const [mutationError, setMutationError] = useState("");
+  const [reschedulePreview, setReschedulePreview] = useState(null);
+  const [rescheduleLoading, setRescheduleLoading] = useState(false);
+  const [rescheduleError, setRescheduleError] = useState("");
+  const [rescheduleApplied, setRescheduleApplied] = useState(false);
   useEffect(() => { if (!apiClient || !["today-normal", "today-active", "today-overload"].includes(screenId)) return; let alive = true; const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; getToday({ apiClient, date: localDate(timezone), timezone }).then((value) => alive && setRemote(value)).catch(() => alive && setRemoteError("Не вдалося завантажити план. Спробуй оновити сторінку.")); return () => { alive = false; }; }, [apiClient, screenId]);
   const common = { title: "Сьогодні", eyebrow: "П'ятниця, 18 липня", activeRoute: "today-normal", onNavigate, avatar: true };
 
@@ -49,7 +53,7 @@ export function TodayScreens({ screenId = "today-normal", onNavigate = () => {},
   if (screenId === "today-empty") return <AppFrame {...common}><StateView state="empty" title="День ще порожній" message="Вислови все, що в голові, — Вектор складе перший реалістичний план." action={<Button onClick={() => onNavigate("capture-chooser")}>Зробити Brain Dump</Button>} /></AppFrame>;
   if (screenId === "today-complete") return <AppFrame {...common}><StateView state="success" title="На сьогодні достатньо" message="Усі заплановані задачі виконано. Решта може зачекати до завтра." action={<Button onClick={() => onNavigate("evening-review")}>Короткий підсумок</Button>} /></AppFrame>;
 
-  const visibleTasks = localTasks ?? (remote?.tasks?.length ? remote.tasks : DEMO_TASKS);
+  const visibleTasks = localTasks ?? (apiClient ? (remote?.tasks ?? []) : (remote?.tasks?.length ? remote.tasks : DEMO_TASKS));
   const complete = async (id) => {
     const previous = visibleTasks;
     setLocalTasks(previous.map((task) => task.id === id ? { ...task, status: "completed" } : task));
@@ -62,21 +66,39 @@ export function TodayScreens({ screenId = "today-normal", onNavigate = () => {},
     const current = undoChange;
     setUndoChange(null); setMutationError("");
     if (!current) return;
-    if (apiClient && current.id) { try { const result = await undoChangeSet({ apiClient, id: current.id }); setLocalTasks((tasks) => tasks?.map((task) => task.id === result.task?.id ? result.task : task)); } catch { setMutationError("Не вдалося скасувати зміни. Онови план."); } }
+    if (apiClient && current.id) { try { const result = await undoChangeSet({ apiClient, id: current.id }); setLocalTasks((tasks) => result.tasks?.length ? tasks?.map((task) => result.tasks.find((restored) => restored.id === task.id) ?? task) : tasks?.map((task) => task.id === result.task?.id ? result.task : task)); setRescheduleApplied(false); const fresh = await getToday({ apiClient, date: rescheduleInput().date, timezone: rescheduleInput().timezone }); setRemote(fresh); setLocalTasks(fresh.tasks ?? []); } catch { setMutationError("Не вдалося скасувати зміни. Онови план."); } }
     else setLocalTasks(current.previous);
+  };
+  const rescheduleInput = () => ({ date: localDate(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", now: new Date().toISOString(), profile: { timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", workHours: { start: "09:00", end: "18:00" }, energyPeak: { start: "09:30", end: "12:30" }, focusBlockMinutes: 50, breakMinutes: 10, dailyLimitMinutes: 360 }, idempotencyKey: `reschedule-${localDate(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC")}` });
+  const previewReschedulePlan = async () => {
+    if (!apiClient) { onNavigate("today-rescheduled"); return; }
+    setRescheduleLoading(true); setRescheduleError("");
+    try { setReschedulePreview(await previewReschedule({ apiClient, ...rescheduleInput() })); }
+    catch { setRescheduleError("Не вдалося підготувати перепланування. Перевір з'єднання та спробуй ще раз."); }
+    finally { setRescheduleLoading(false); }
+  };
+  const applyReschedulePlan = async () => {
+    if (!apiClient || !reschedulePreview) return;
+    setRescheduleLoading(true); setRescheduleError("");
+    try { const result = await applyReschedule({ apiClient, ...rescheduleInput() }); const fresh = await getToday({ apiClient, date: rescheduleInput().date, timezone: rescheduleInput().timezone }); setRemote(fresh); setLocalTasks(fresh.tasks ?? []); setRescheduleApplied(true); setReschedulePreview(null); setUndoChange({ id: result.undoId ?? result.changeSet?.id, previous: visibleTasks, reschedule: true }); }
+    catch { setRescheduleError("План не змінився. Одна із задач могла оновитися в іншій вкладці."); }
+    finally { setRescheduleLoading(false); }
   };
   return (
     <AppFrame {...common}>
       <section className="today-header"><div><p>Привіт, {DEMO_USER.name}</p><h1>{screenId === "today-active" ? "Тримай один фокус" : "Спокійний план на день"}</h1><span>4 год 20 хв заплановано · 3 вільні слоти</span></div><ProgressRing value={screenId === "today-active" ? 38 : 25} /></section>
       {screenId === "today-overload" ? <InlineInsight tone="warning" title="День перевантажений">На сьогодні заплановано на 1 год 20 хв більше твого ліміту. Я можу перенести дві гнучкі задачі.</InlineInsight> : null}
+      {rescheduleError ? <InlineInsight tone="warning" title="Перепланування не виконано">{rescheduleError}</InlineInsight> : null}
+      {reschedulePreview ? <section className="reschedule-preview" aria-label="Попередній перегляд перепланування"><h2>Що зміниться</h2><p>{reschedulePreview.changes?.filter((change) => change.changed).length ?? 0} задач отримають новий час.</p><ul>{(reschedulePreview.changes ?? []).filter((change) => change.changed).slice(0, 3).map((change) => <li key={change.taskId}>{change.title}: {change.after?.plannedStart?.slice(11, 16) ?? "без слоту"}</li>)}</ul><Button onClick={applyReschedulePlan} disabled={rescheduleLoading}>{rescheduleLoading ? "Застосовую…" : "Застосувати перепланування"}</Button></section> : null}
       {remoteError ? <InlineInsight tone="warning" title="План тимчасово недоступний">{remoteError}</InlineInsight> : null}
       {screenId === "today-rescheduled" && showUndo ? <InlineInsight title="План змінився — я знайшов новий час.">Командний синк змістився. Лист Марії перенесено з 12:00 на 12:30.</InlineInsight> : null}
+      {rescheduleApplied ? <InlineInsight title="План змінився — я знайшов новий час.">Гнучкі задачі отримали нові слоти. Якщо це не підходить, зміни можна скасувати.</InlineInsight> : null}
       {mutationError ? <InlineInsight tone="warning" title="План не змінився">{mutationError}</InlineInsight> : null}
       <DayPlan active={screenId === "today-active"} onNavigate={onNavigate} tasks={visibleTasks} onComplete={complete} />
       <div className="break-card"><Coffee size={20} /><span><strong>10:30 · Перерва</strong><small>10 хв без задач</small></span><Clock size={17} /></div>
-      {screenId === "today-overload" ? <Button variant="secondary" onClick={() => onNavigate("today-rescheduled")}>Полегшити день</Button> : <Button variant="tertiary" icon={ArrowRight} onClick={() => onNavigate("calendar-day")}>Відкрити календар</Button>}
-      {showUndo ? <UndoSnackbar message="Зміни скасовано" onUndo={() => setShowUndo(false)} /> : null}
-      {undoChange ? <UndoSnackbar message="Задачу виконано" onUndo={undo} /> : null}
+      {screenId === "today-overload" ? <Button variant="secondary" onClick={previewReschedulePlan} disabled={rescheduleLoading}>{rescheduleLoading ? "Готую новий план…" : "Переглянути новий план"}</Button> : <Button variant="tertiary" icon={ArrowRight} onClick={() => onNavigate("calendar-day")}>Відкрити календар</Button>}
+      {showUndo ? <UndoSnackbar message="Зміни застосовано — можна скасувати." onUndo={() => setShowUndo(false)} /> : null}
+      {undoChange ? <UndoSnackbar message={undoChange.reschedule ? "Перепланування застосовано" : "Задачу виконано"} onUndo={undo} /> : null}
     </AppFrame>
   );
 }

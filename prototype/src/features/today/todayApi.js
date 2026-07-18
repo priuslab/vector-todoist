@@ -16,3 +16,9 @@ export function completeTask({ apiClient, id, idempotencyKey }) {
 export function undoChangeSet({ apiClient, id }) {
   return apiClient.request(`/api/v1/change-sets/${encodeURIComponent(id)}/undo`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
 }
+export function previewReschedule({ apiClient, date, timezone, now, profile, busySlots = [], idempotencyKey }) {
+  return apiClient.request('/api/v1/plans/reschedule-preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date, timezone, now, profile, busySlots, idempotencyKey }) });
+}
+export function applyReschedule({ apiClient, date, timezone, now, profile, busySlots = [], idempotencyKey }) {
+  return apiClient.request('/api/v1/plans/reschedule', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date, timezone, now, profile, busySlots, idempotencyKey }) });
+}

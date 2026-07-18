@@ -29,6 +29,9 @@ import type { GoogleOAuthService } from './integrations/google/googleOAuth.js';
 import { calendarRoutes } from './modules/calendar/calendarRoutes.js';
 import type { BusySlotService } from './modules/calendar/busySlotService.js';
 import type { CalendarEventService } from './modules/calendar/calendarEventService.js';
+import { rescheduleRoutes } from './modules/rescheduling/rescheduleRoutes.js';
+import { createRescheduleService, type RescheduleService } from './modules/rescheduling/rescheduleService.js';
+import type { JobRepository } from './modules/jobs/jobRepository.js';
 
 export interface GatewayServices {
   readonly [name: string]: unknown;
@@ -107,7 +110,13 @@ export async function buildApp({
   const changeSetRepository = _services.changeSetRepository as ChangeSetRepository | undefined;
   if (taskRepository && changeSetRepository) {
     await taskRoutes(app, createTaskService({ taskRepository, changeSetRepository }));
-    await changeSetRoutes(app, createUndoService({ taskRepository, changeSetRepository }));
+    await changeSetRoutes(app, createUndoService({ taskRepository, changeSetRepository, jobRepository: _services.jobRepository as Pick<JobRepository, 'getByIdempotencyKey' | 'create'> | undefined }));
+    const rescheduleService = (_services.rescheduleService as RescheduleService | undefined) ?? createRescheduleService({
+      taskRepository,
+      changeSetRepository,
+      jobRepository: _services.jobRepository as Pick<JobRepository, 'getByIdempotencyKey' | 'create'> | undefined,
+    });
+    await rescheduleRoutes(app, rescheduleService);
   }
 
   const googleOAuthService = _services.googleOAuthService as GoogleOAuthService | undefined;
