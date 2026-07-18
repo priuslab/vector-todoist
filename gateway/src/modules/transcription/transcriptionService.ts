@@ -54,19 +54,19 @@ export function createTranscriptionService(adapter: TranscriptionAdapter, storag
       const parsed = transcriptionInputSchema.safeParse(input);
       if (!parsed.success || parsed.data.bytes.length > maxBytes || !supportedAudioMimeTypes.includes(parsed.data.mimeType as typeof supportedAudioMimeTypes[number]) || (parsed.data.durationSeconds !== undefined && parsed.data.durationSeconds > maxDurationSeconds) || parsed.data.bytes.length > maxDurationSeconds * minBytesPerSecond) throw new TranscriptionValidationError();
       let temporary: { path: string } | undefined;
+      let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
       try {
         temporary = await storage.save(parsed.data.bytes, parsed.data.mimeType);
         const transcription = adapter.transcribe({ bytes: parsed.data.bytes, mimeType: parsed.data.mimeType, locale: 'uk-UA' });
-        let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
         const timeout = new Promise<never>((_resolve, reject) => { timeoutHandle = setTimeout(() => reject(new Error('transcription timeout')), timeoutMs); });
         const transcript = normalizeTranscript(await Promise.race([transcription, timeout]), maxTextLength);
-        if (timeoutHandle) clearTimeout(timeoutHandle);
         if (!transcript) throw new TranscriptionUnavailableError();
         return { transcript, locale: 'uk-UA' as const };
       } catch (error) {
         if (error instanceof TranscriptionValidationError || error instanceof TranscriptionUnavailableError) throw error;
         throw new TranscriptionUnavailableError();
       } finally {
+        if (timeoutHandle) clearTimeout(timeoutHandle);
         if (temporary) await storage.cleanup(temporary).catch(() => undefined);
       }
     },
