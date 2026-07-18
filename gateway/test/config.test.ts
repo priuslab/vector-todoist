@@ -52,6 +52,11 @@ describe('loadConfig', () => {
     expect(loadConfig(validEnv({ TRUST_PROXY: 'false' })).trustProxy).toBe(false);
   });
 
+  it('parses and bounds the configured Brain Dump text limit', () => {
+    expect(loadConfig(validEnv({ BRAIN_DUMP_MAX_TEXT_LENGTH: '1234' })).brainDumpMaxTextLength).toBe(1234);
+    expect(() => loadConfig(validEnv({ BRAIN_DUMP_MAX_TEXT_LENGTH: '20001' }))).toThrow('BRAIN_DUMP_MAX_TEXT_LENGTH');
+  });
+
   it('rejects an ambiguous TRUST_PROXY value', () => {
     expect(() => loadConfig(validEnv({ TRUST_PROXY: '1' }))).toThrow('TRUST_PROXY');
   });
