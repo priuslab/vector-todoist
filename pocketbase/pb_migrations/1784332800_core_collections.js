@@ -46,6 +46,8 @@ migrate((app) => {
     deleteRule: '@request.auth.id != "" && user = @request.auth.id',
     fields: [
       { type: 'relation', name: 'user', required: true, collectionId: users.id, maxSelect: 1, cascadeDelete: true },
+      { type: 'text', name: 'idempotencyKey', required: false, max: 256 },
+      { type: 'text', name: 'timezone', required: false, max: 100 },
       { type: 'select', name: 'source', required: true, maxSelect: 1, values: ['web', 'telegram'] },
       { type: 'select', name: 'kind', required: true, maxSelect: 1, values: ['text', 'voice'] },
       { type: 'text', name: 'rawText', required: false, max: 20_000 },

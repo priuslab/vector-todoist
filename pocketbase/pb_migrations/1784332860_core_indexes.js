@@ -5,6 +5,7 @@ migrate((app) => {
     ],
     brain_dumps: [
       'CREATE INDEX idx_brain_dumps_user_status ON brain_dumps (user, status)',
+      'CREATE UNIQUE INDEX idx_brain_dumps_user_idempotency_key ON brain_dumps (user, idempotencyKey)',
     ],
     tasks: [
       'CREATE INDEX idx_tasks_user_status ON tasks (user, status)',
@@ -32,6 +33,7 @@ migrate((app) => {
   const names = [
     'idx_work_profiles_user',
     'idx_brain_dumps_user_status',
+    'idx_brain_dumps_user_idempotency_key',
     'idx_tasks_user_status',
     'idx_tasks_user_deadline',
     'idx_tasks_user_planned_start',

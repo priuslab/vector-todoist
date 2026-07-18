@@ -14,10 +14,15 @@ const bob: VerifiedUser = { userId: 'bob', email: 'bob@example.test' };
 
 function repository() {
   let next = 0;
+  const records: Array<Record<string, unknown>> = [];
+  const create = vi.fn(async (user: VerifiedUser, input: Record<string, unknown>) => {
+    const record = { id: `dump-${++next}`, user: user.userId, ...input };
+    records.push(record);
+    return record;
+  });
   return {
-    create: vi.fn(async (user: VerifiedUser, input: Record<string, unknown>) => ({
-      id: `dump-${++next}`, user: user.userId, ...input,
-    })),
+    create,
+    findByIdempotencyKey: vi.fn(async (user: VerifiedUser, key: string) => records.find((item) => item.user === user.userId && item.idempotencyKey === key) ?? null),
   } as unknown as BrainDumpRepository;
 }
 
@@ -54,7 +59,7 @@ describe('POST /api/v1/brain-dumps', () => {
     const response = await app.inject({ method: 'POST', url: '/api/v1/brain-dumps', headers: { authorization: 'Bearer token', 'idempotency-key': 'k1' }, payload: { kind: 'text', text: '  Привіт\r\n  світ   \n\n  ще думка  ', timezone: 'Europe/Warsaw', source: 'telegram', user: 'attacker' } });
     expect(response.statusCode).toBe(201);
     expect(response.json()).toEqual({ id: 'dump-1', status: 'draft', rawText: 'Привіт\nсвіт\n\nще думка' });
-    expect(dumpRepository.create).toHaveBeenCalledWith(alice, { kind: 'text', rawText: 'Привіт\nсвіт\n\nще думка', source: 'web', status: 'received' });
+    expect(dumpRepository.create).toHaveBeenCalledWith(alice, { kind: 'text', rawText: 'Привіт\nсвіт\n\nще думка', timezone: 'Europe/Warsaw', idempotencyKey: 'k1', source: 'web', status: 'received' });
     await app.close();
   });
 
@@ -86,6 +91,19 @@ describe('POST /api/v1/brain-dumps', () => {
     const failed = await app.inject({ ...base, headers: { ...base.headers, 'idempotency-key': 'new' } });
     expect(failed.statusCode).toBe(503);
     expect(failed.body).not.toContain('PocketBase');
+    await app.close();
+  });
+
+  it('recovers a concurrent unique-key winner by rereading the durable record', async () => {
+    const winner = { id: 'winner', user: alice.userId, kind: 'text', rawText: 'одночасно', timezone: 'Europe/Warsaw', idempotencyKey: 'race' };
+    const dumpRepository = {
+      create: vi.fn(async () => { throw new Error('unique index'); }),
+      findByIdempotencyKey: vi.fn(async () => winner),
+    } as unknown as BrainDumpRepository;
+    const { app } = await appFor(alice, dumpRepository);
+    const response = await app.inject({ method: 'POST', url: '/api/v1/brain-dumps', headers: { authorization: 'Bearer token', 'idempotency-key': 'race' }, payload: { kind: 'text', text: 'одночасно', timezone: 'Europe/Warsaw' } });
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toEqual({ id: 'winner', status: 'draft', rawText: 'одночасно' });
     await app.close();
   });
 });
