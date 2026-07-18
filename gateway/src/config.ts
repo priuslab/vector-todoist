@@ -1,36 +1,68 @@
 import { z } from 'zod';
 
 const requiredString = z.string().trim().min(1);
+const optionalTrimmedString = z.string().trim().optional();
 const envBoolean = z.enum(['true', 'false']).default('false').transform((value) => value === 'true');
+const publicWebOrigin = requiredString.transform((value, context) => {
+  let url: URL;
+
+  try {
+    url = new URL(value);
+  } catch {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'Must be a valid HTTP(S) origin' });
+    return z.NEVER;
+  }
+
+  if (
+    (url.protocol !== 'http:' && url.protocol !== 'https:') ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
+  ) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'Must be a canonical HTTP(S) origin' });
+    return z.NEVER;
+  }
+
+  return url.origin;
+});
 
 const configSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']),
     HOST: requiredString,
     PORT: z.coerce.number().int().min(1).max(65_535),
-    PUBLIC_WEB_ORIGIN: requiredString.url(),
+    PUBLIC_WEB_ORIGIN: publicWebOrigin,
     POCKETBASE_URL: requiredString.url(),
     TRUST_PROXY: envBoolean,
     ENABLE_GOOGLE_INTEGRATION: envBoolean,
     ENABLE_TELEGRAM_INTEGRATION: envBoolean,
     ENABLE_STRIPE_INTEGRATION: envBoolean,
-    GOOGLE_CLIENT_ID: z.string().min(1).optional(),
-    GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
-    TELEGRAM_BOT_TOKEN: z.string().min(1).optional(),
-    STRIPE_SECRET_KEY: z.string().min(1).optional(),
-    STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
+    GOOGLE_CLIENT_ID: optionalTrimmedString,
+    GOOGLE_CLIENT_SECRET: optionalTrimmedString,
+    TELEGRAM_BOT_TOKEN: optionalTrimmedString,
+    STRIPE_SECRET_KEY: optionalTrimmedString,
+    STRIPE_WEBHOOK_SECRET: optionalTrimmedString,
   })
   .superRefine((env, context) => {
-    if (env.ENABLE_GOOGLE_INTEGRATION && (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET)) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ['GOOGLE_CLIENT_ID'], message: 'Required when ENABLE_GOOGLE_INTEGRATION=true' });
+    const requireSecret = (value: string | undefined, field: string, flag: string) => {
+      if (!value) {
+        context.addIssue({ code: z.ZodIssueCode.custom, path: [field], message: `Required when ${flag}=true` });
+      }
+    };
+
+    if (env.ENABLE_GOOGLE_INTEGRATION) {
+      requireSecret(env.GOOGLE_CLIENT_ID, 'GOOGLE_CLIENT_ID', 'ENABLE_GOOGLE_INTEGRATION');
+      requireSecret(env.GOOGLE_CLIENT_SECRET, 'GOOGLE_CLIENT_SECRET', 'ENABLE_GOOGLE_INTEGRATION');
     }
 
-    if (env.ENABLE_TELEGRAM_INTEGRATION && !env.TELEGRAM_BOT_TOKEN) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ['TELEGRAM_BOT_TOKEN'], message: 'Required when ENABLE_TELEGRAM_INTEGRATION=true' });
+    if (env.ENABLE_TELEGRAM_INTEGRATION) {
+      requireSecret(env.TELEGRAM_BOT_TOKEN, 'TELEGRAM_BOT_TOKEN', 'ENABLE_TELEGRAM_INTEGRATION');
     }
 
-    if (env.ENABLE_STRIPE_INTEGRATION && (!env.STRIPE_SECRET_KEY || !env.STRIPE_WEBHOOK_SECRET)) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ['STRIPE_SECRET_KEY'], message: 'Required when ENABLE_STRIPE_INTEGRATION=true' });
+    if (env.ENABLE_STRIPE_INTEGRATION) {
+      requireSecret(env.STRIPE_SECRET_KEY, 'STRIPE_SECRET_KEY', 'ENABLE_STRIPE_INTEGRATION');
+      requireSecret(env.STRIPE_WEBHOOK_SECRET, 'STRIPE_WEBHOOK_SECRET', 'ENABLE_STRIPE_INTEGRATION');
     }
   })
   .transform((env) => ({

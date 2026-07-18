@@ -76,4 +76,52 @@ describe('loadConfig', () => {
       enableStripeIntegration: false,
     });
   });
+
+  it.each([
+    ['Google', 'ENABLE_GOOGLE_INTEGRATION', { GOOGLE_CLIENT_ID: 'client-id', GOOGLE_CLIENT_SECRET: 'client-secret' }],
+    ['Telegram', 'ENABLE_TELEGRAM_INTEGRATION', { TELEGRAM_BOT_TOKEN: 'bot-token' }],
+    ['Stripe', 'ENABLE_STRIPE_INTEGRATION', { STRIPE_SECRET_KEY: 'stripe-secret', STRIPE_WEBHOOK_SECRET: 'webhook-secret' }],
+  ] as const)('accepts non-empty %s integration secrets when enabled', (_integration, flag, secrets) => {
+    expect(loadConfig(validEnv({ [flag]: 'true', ...secrets }))[flag === 'ENABLE_GOOGLE_INTEGRATION'
+      ? 'enableGoogleIntegration'
+      : flag === 'ENABLE_TELEGRAM_INTEGRATION'
+        ? 'enableTelegramIntegration'
+        : 'enableStripeIntegration']).toBe(true);
+  });
+
+  it.each([
+    ['GOOGLE_CLIENT_ID', 'ENABLE_GOOGLE_INTEGRATION'],
+    ['GOOGLE_CLIENT_SECRET', 'ENABLE_GOOGLE_INTEGRATION'],
+    ['TELEGRAM_BOT_TOKEN', 'ENABLE_TELEGRAM_INTEGRATION'],
+    ['STRIPE_SECRET_KEY', 'ENABLE_STRIPE_INTEGRATION'],
+    ['STRIPE_WEBHOOK_SECRET', 'ENABLE_STRIPE_INTEGRATION'],
+  ])('rejects missing %s when %s is enabled', (secret, flag) => {
+    expect(() => loadConfig(validEnv({ [flag]: 'true', [secret]: undefined }))).toThrow(secret);
+  });
+
+  it.each([
+    ['GOOGLE_CLIENT_ID', 'ENABLE_GOOGLE_INTEGRATION'],
+    ['GOOGLE_CLIENT_SECRET', 'ENABLE_GOOGLE_INTEGRATION'],
+    ['TELEGRAM_BOT_TOKEN', 'ENABLE_TELEGRAM_INTEGRATION'],
+    ['STRIPE_SECRET_KEY', 'ENABLE_STRIPE_INTEGRATION'],
+    ['STRIPE_WEBHOOK_SECRET', 'ENABLE_STRIPE_INTEGRATION'],
+  ])('rejects blank %s when %s is enabled', (secret, flag) => {
+    expect(() => loadConfig(validEnv({ [flag]: 'true', [secret]: '   ' }))).toThrow(secret);
+  });
+
+  it.each([
+    ['https://app.vector.test/', 'https://app.vector.test'],
+    ['HTTPS://APP.VECTOR.TEST:443/plans/today', 'https://app.vector.test'],
+  ])('normalizes PUBLIC_WEB_ORIGIN %s to %s', (input, expected) => {
+    expect(loadConfig(validEnv({ PUBLIC_WEB_ORIGIN: input })).publicWebOrigin).toBe(expected);
+  });
+
+  it.each([
+    'ftp://app.vector.test',
+    'https://user:password@app.vector.test',
+    'https://app.vector.test/?preview=true',
+    'https://app.vector.test/#details',
+  ])('rejects non-origin PUBLIC_WEB_ORIGIN input %s', (origin) => {
+    expect(() => loadConfig(validEnv({ PUBLIC_WEB_ORIGIN: origin }))).toThrow('PUBLIC_WEB_ORIGIN');
+  });
 });
