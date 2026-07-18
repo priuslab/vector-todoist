@@ -31,4 +31,9 @@ describe('Brain Dump → Today vertical slice', () => {
     const preview = await service.preview(user, 'dump-1', { now: '2026-07-18T08:00:00+02:00', idempotencyKey: 'plan-87654321' });
     await expect(service.apply(user, preview.changeSetId, {})).rejects.toBeDefined(); expect(r.tasks).toHaveLength(0); expect(r.changes[0].status).toBe('failed');
   });
+  it('stores the actual affected pre-state in the Change Set snapshot', async () => {
+    const r = repos(); r.tasks.push({ id: 'old-task', user: 'alice', sourceDump: 'dump-1', title: 'Стара задача', status: 'inbox' }); r.ideas.push({ id: 'old-idea', user: 'alice', sourceDump: 'dump-1', text: 'Стара ідея', status: 'backlog' });
+    const service = createPlanService(r); const preview = await service.preview(user, 'dump-1', { idempotencyKey: 'plan-snapshot-1' });
+    expect(r.changes[0].beforeJson.tasks).toEqual([expect.objectContaining({ id: 'old-task' })]); expect(r.changes[0].beforeJson.ideas).toEqual([expect.objectContaining({ id: 'old-idea' })]); expect(preview.changeSetId).toBe(r.changes[0].id);
+  });
 });

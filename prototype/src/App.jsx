@@ -36,12 +36,12 @@ export function ProductionExperience({ env = import.meta.env, pocketBase: provid
   if (connection.error) return <main className="mobile-prototype" data-testid="mobile-prototype"><AuthStateScreen state="configuration" /></main>;
   const { pocketBase, authStore } = connection;
   const auth = useAuthState(authStore);
-  const apiClient = React.useMemo(() => createApiClient({
-    baseUrl: env.VITE_GATEWAY_URL ?? window.location.origin,
+  const apiClient = React.useMemo(() => env.VITE_GATEWAY_URL ? createApiClient({
+    baseUrl: env.VITE_GATEWAY_URL,
     getToken: () => authStore.getToken(),
     refreshToken: () => authStore.refreshToken(),
     onAuthExpired: () => authStore.markExpired(),
-  }), [authStore, env.VITE_GATEWAY_URL]);
+  }) : null, [authStore, env.VITE_GATEWAY_URL]);
   const [pathname, setPathname] = React.useState(() => window.location.pathname);
   const resolvedRoute = resolveProductionRoute({ pathname, auth, env });
   const [route, setRoute] = React.useState(resolvedRoute);

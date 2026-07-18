@@ -14,7 +14,7 @@ export class PlanValidationError extends Error { readonly code = 'INVALID_PLAN';
 export class PlanConflictError extends Error { readonly code = 'CONFLICT'; }
 
 export interface PlanService {
-  preview(user: VerifiedUser, dumpId: string, input: unknown, requestId?: string): Promise<PlanPreview>;
+  preview(user: VerifiedUser, dumpId: string, input: unknown): Promise<PlanPreview>;
   apply(user: VerifiedUser, changeSetId: string, input: unknown): Promise<{ changeSet: ChangeSetRecord; tasks: TaskRecord[]; ideas: Awaited<ReturnType<IdeaRepository['list']>> }>;
   today(user: VerifiedUser, date: string, timezone: string): Promise<{ date: string; timezone: string; tasks: TaskRecord[]; blocks: TaskRecord[]; warnings: unknown[] }>;
   inbox(user: VerifiedUser): Promise<{ ideas: Awaited<ReturnType<IdeaRepository['list']>>; tasks: TaskRecord[] }>;
@@ -35,7 +35,7 @@ export function createPlanService(deps: {
 }): PlanService {
   const { dumpRepository, analysisService, taskRepository, ideaRepository, changeSetRepository } = deps;
 
-  async function preview(user: VerifiedUser, dumpId: string, input: unknown, requestId?: string): Promise<PlanPreview> {
+  async function preview(user: VerifiedUser, dumpId: string, input: unknown): Promise<PlanPreview> {
     const dump = await dumpRepository.get(user, dumpId);
     if (!dump || dump.user !== user.userId) throw new PlanNotFoundError();
     const parsed = planPreviewBodySchema.safeParse(input ?? {});
@@ -49,7 +49,6 @@ export function createPlanService(deps: {
     const busySlots: SchedulerBusySlot[] = body.busySlots.map((slot) => ({ ...slot, locked: true }));
     let plan;
     try { plan = buildDailyPlan({ tasks, busySlots, profile, now: asDate(body.now) }); } catch { throw new PlanValidationError(); }
-    const taskById = new Map(tasks.map((task) => [task.id, task]));
     const scheduled = new Map<string, { start: string; end: string }>();
     for (const block of plan.blocks) if (block.taskId && !scheduled.has(block.taskId)) scheduled.set(block.taskId, { start: block.start, end: block.end });
     const proposedTasks = analysis.tasks.map((task, index) => {
@@ -57,12 +56,14 @@ export function createPlanService(deps: {
       return { id, title: task.title, description: task.description, status: 'scheduled' as const, priority: task.priority, deadline: task.deadline, plannedStart: slot?.start ?? null, plannedEnd: slot?.end ?? null, estimatedMinutes: task.estimatedMinutes, energy: task.energy, flexible: true, locked: false, sourceDump: dumpId };
     });
     const ideas = analysis.ideas.map((idea, index) => ({ id: `proposal-${result.id}-i-${index + 1}`, text: idea.text, summary: idea.summary, status: 'backlog' as const, sourceDump: dumpId }));
-    const idempotencyKey = body.idempotencyKey ?? requestId ?? `plan:${user.userId}:${dumpId}:${result.id}`;
+    const idempotencyKey = body.idempotencyKey ?? `plan:${user.userId}:${dumpId}:${result.id}`;
     const existing = (await changeSetRepository.list(user)).find((record) => record.idempotencyKey === idempotencyKey);
     if (existing?.status === 'applied') return { changeSetId: existing.id, tasks: proposedTasks, ideas, blocks: plan.blocks, unscheduledTaskIds: plan.unscheduledTaskIds, warnings: plan.warnings, reasons: plan.reasons };
     let changeSet = existing;
     if (!changeSet) {
-      try { changeSet = await changeSetRepository.create(user, { kind: 'ai_classification', status: 'pending', beforeJson: { tasks: [], ideas: [] }, afterJson: { tasks: proposedTasks, ideas }, idempotencyKey }); }
+      const currentTasks = (await taskRepository.list(user)).filter((task) => task.sourceDump === dumpId);
+      const currentIdeas = (await ideaRepository.list(user)).filter((idea) => idea.sourceDump === dumpId);
+      try { changeSet = await changeSetRepository.create(user, { kind: 'ai_classification', status: 'pending', beforeJson: { tasks: currentTasks, ideas: currentIdeas }, afterJson: { tasks: proposedTasks, ideas }, idempotencyKey }); }
       catch { changeSet = (await changeSetRepository.list(user)).find((record) => record.idempotencyKey === idempotencyKey); if (!changeSet) throw new RepositoryError('UNAVAILABLE'); }
     }
     return planPreviewSchema.parse({ changeSetId: changeSet.id, tasks: proposedTasks, ideas, blocks: plan.blocks, unscheduledTaskIds: plan.unscheduledTaskIds, warnings: plan.warnings, reasons: plan.reasons });
@@ -71,7 +72,11 @@ export function createPlanService(deps: {
   async function apply(user: VerifiedUser, changeSetId: string, input: unknown) {
     const changeSet = await changeSetRepository.get(user, changeSetId);
     if (!changeSet || changeSet.user !== user.userId) throw new PlanNotFoundError();
-    if (changeSet.status === 'applied') return { changeSet, tasks: (await taskRepository.list(user)).filter((task) => task.sourceDump && JSON.stringify(changeSet.afterJson ?? '').includes(String(task.sourceDump))).map(publicTask), ideas: (await ideaRepository.list(user)).map(publicIdea) };
+    if (changeSet.status === 'applied') {
+      const payload = (changeSet.afterJson && typeof changeSet.afterJson === 'object') ? changeSet.afterJson as { tasks?: Array<Record<string, unknown>>; ideas?: Array<Record<string, unknown>> } : {};
+      const titles = new Set((payload.tasks ?? []).map((item) => String(item.title ?? ''))); const texts = new Set((payload.ideas ?? []).map((item) => String(item.text ?? '')));
+      return { changeSet, tasks: (await taskRepository.list(user)).filter((task) => titles.has(String(task.title ?? ''))).map(publicTask), ideas: (await ideaRepository.list(user)).filter((idea) => texts.has(String(idea.text ?? ''))).map(publicIdea) };
+    }
     const payload = (changeSet.afterJson && typeof changeSet.afterJson === 'object') ? changeSet.afterJson as { tasks?: unknown[]; ideas?: unknown[] } : {};
     const proposedTasks = Array.isArray(payload.tasks) ? payload.tasks : [];
     const proposedIdeas = Array.isArray(payload.ideas) ? payload.ideas : [];
@@ -82,8 +87,8 @@ export function createPlanService(deps: {
       const updated = await changeSetRepository.update(user, changeSetId, { status: 'applied' });
       return { changeSet: updated, tasks: createdTasks.map(publicTask), ideas: createdIdeas.map(publicIdea) };
     } catch (error) {
-      for (const task of createdTasks) { try { if (task.id) await taskRepository.delete(user, task.id); } catch { /* best-effort rollback */ } }
-      for (const idea of createdIdeas) { try { if (idea.id) await ideaRepository.delete(user, idea.id); } catch { /* best-effort rollback */ } }
+      for (const task of createdTasks) { try { if (task.id) await taskRepository.delete(user, task.id); } catch { try { if (task.id) await taskRepository.update(user, task.id, { status: 'cancelled' }); } catch { /* explicit failed change set remains retryable */ } } }
+      for (const idea of createdIdeas) { try { if (idea.id) await ideaRepository.delete(user, idea.id); } catch { try { if (idea.id) await ideaRepository.update(user, idea.id, { status: 'archived' }); } catch { /* explicit failed change set remains retryable */ } } }
       try { await changeSetRepository.update(user, changeSetId, { status: 'failed' }); } catch { /* retain retryable pending state */ }
       if (error instanceof RepositoryError) throw error;
       throw new PlanConflictError();

@@ -2,6 +2,7 @@ import { CalendarBlank, Check, Clock, Flag, Lightning, Link, ListChecks, LockSim
 import { AppFrame } from "../../components/AppFrame";
 import { Button } from "../../components/Button";
 import { InlineInsight } from "../../components/InlineInsight";
+import { StateView } from "../../components/StateView";
 import { DEMO_GOAL, DEMO_TASKS } from "../../data/demoData";
 import { getTask } from "../today/todayApi";
 import { useEffect, useState } from "react";
@@ -17,7 +18,10 @@ const rows = [
 
 export function TaskScreens({ screenId = "task-detail", onNavigate = () => {}, apiClient, taskId = "task-structure" }) {
   const [remoteTask, setRemoteTask] = useState(null);
-  useEffect(() => { if (!apiClient) return; let alive = true; getTask({ apiClient, id: taskId }).then((value) => alive && setRemoteTask(value)).catch(() => {}); return () => { alive = false; }; }, [apiClient, taskId]);
+  const [remoteError, setRemoteError] = useState("");
+  useEffect(() => { if (!apiClient) return; let alive = true; getTask({ apiClient, id: taskId }).then((value) => alive && setRemoteTask(value)).catch(() => alive && setRemoteError("Не вдалося завантажити задачу. Спробуй оновити сторінку.")); return () => { alive = false; }; }, [apiClient, taskId]);
+  if (apiClient && !remoteTask && !remoteError) return <AppFrame title="Задача" onBack={() => onNavigate("today-normal")} noNav><div className="form-stack"><StateView state="loading" title="Завантажую задачу" message="Вектор відкриває деталі задачі." /></div></AppFrame>;
+  if (apiClient && remoteError) return <AppFrame title="Задача" onBack={() => onNavigate("today-normal")} noNav><StateView state="error" title="Задача недоступна" message={remoteError} action={<Button onClick={() => window.location.reload()}>Оновити</Button>} /></AppFrame>;
   const task = remoteTask ?? DEMO_TASKS[0];
   if (screenId === "task-edit") return <AppFrame title="Редагувати задачу" onBack={() => onNavigate("task-detail")} noNav><div className="form-stack"><label>Назва<textarea defaultValue={task.title} /></label><label>Опис<textarea defaultValue="Скласти хук, ключові тези та завершення першого епізоду" /></label><div className="form-grid"><label>Дата<input value="Сьогодні" readOnly /></label><label>Час<input value="09:30" readOnly /></label></div><div className="form-grid"><label>Тривалість<input value="60 хв" readOnly /></label><label>Енергія<input value="Висока" readOnly /></label></div><label className="switch-row"><span><LockSimple size={19} />Дозволити AI переносити</span><input type="checkbox" defaultChecked /></label><label>Проєкт<input value="Пілотний епізод" readOnly /></label><label>Мета<input value={DEMO_GOAL.title} readOnly /></label></div><div className="detail-actions"><Button onClick={() => onNavigate("task-detail")}>Зберегти зміни</Button></div></AppFrame>;
   if (screenId === "task-subtasks") return <AppFrame title="Підзадачі" onBack={() => onNavigate("task-detail")} noNav><section className="subtasks"><h1>{task.title}</h1>{["Сформулювати головний хук","Виписати 5 ключових тез","Додати завершальний заклик"].map((item,index) => <label key={item}><input type="checkbox" defaultChecked={index===0} /><span>{item}</span><small>::</small></label>)}<button className="add-row">+ Додати підзадачу</button></section><Button onClick={() => onNavigate("task-detail")}>Готово</Button></AppFrame>;

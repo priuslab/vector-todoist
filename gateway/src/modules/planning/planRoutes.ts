@@ -14,7 +14,7 @@ const mapError = (error: unknown) => {
 export async function planRoutes(app: FastifyInstance, service: PlanService): Promise<void> {
   const auth = { preHandler: (request: FastifyRequest, reply: FastifyReply) => app.requireUser(request, reply) };
   app.post('/api/v1/brain-dumps/:id/plan-preview', auth, async (request: FastifyRequest<{ Params: { id: string }; Body: unknown }>, reply) => {
-    try { return reply.code(200).send(await service.preview(request.user, request.params.id, request.body, request.id)); } catch (error) { const mapped = mapError(error); return reply.code(mapped.status).send(mapped.body); }
+    try { return reply.code(200).send(await service.preview(request.user, request.params.id, request.body)); } catch (error) { const mapped = mapError(error); return reply.code(mapped.status).send(mapped.body); }
   });
   app.post('/api/v1/change-sets/:id/apply', auth, async (request: FastifyRequest<{ Params: { id: string }; Body: unknown }>, reply) => {
     try { return reply.code(200).send(await service.apply(request.user, request.params.id, request.body)); } catch (error) { const mapped = mapError(error); return reply.code(mapped.status).send(mapped.body); }
