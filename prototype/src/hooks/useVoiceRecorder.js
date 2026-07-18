@@ -13,7 +13,8 @@ export function useVoiceRecorder({ onComplete } = {}) {
     try {
       setError("");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported?.("audio/webm") ? "audio/webm" : undefined });
+      const recorderOptions = MediaRecorder.isTypeSupported?.("audio/webm") ? { mimeType: "audio/webm" } : undefined;
+      const recorder = new MediaRecorder(stream, recorderOptions);
       chunksRef.current = [];
       recorder.ondataavailable = (event) => { if (event.data?.size) chunksRef.current.push(event.data); };
       recorder.onstop = () => {
