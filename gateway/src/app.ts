@@ -20,6 +20,10 @@ import type { ChangeSetRepository } from './repositories/changeSetRepository.js'
 import { transcriptionRoutes } from './modules/transcription/transcriptionRoutes.js';
 import { createGeminiTranscriptionAdapter, createTranscriptionService } from './modules/transcription/transcriptionService.js';
 import { createAudioStorage } from './modules/transcription/audioStorage.js';
+import { taskRoutes } from './modules/tasks/taskRoutes.js';
+import { createTaskService } from './modules/tasks/taskService.js';
+import { changeSetRoutes } from './modules/changeSets/changeSetRoutes.js';
+import { createUndoService } from './modules/changeSets/undoService.js';
 
 export interface GatewayServices {
   readonly [name: string]: unknown;
@@ -90,6 +94,13 @@ export async function buildApp({
       ideaRepository: _services.ideaRepository as IdeaRepository,
       changeSetRepository: _services.changeSetRepository as ChangeSetRepository,
     }));
+  }
+
+  const taskRepository = _services.taskRepository as TaskRepository | undefined;
+  const changeSetRepository = _services.changeSetRepository as ChangeSetRepository | undefined;
+  if (taskRepository && changeSetRepository) {
+    await taskRoutes(app, createTaskService({ taskRepository, changeSetRepository }));
+    await changeSetRoutes(app, createUndoService({ taskRepository, changeSetRepository }));
   }
 
   return app;

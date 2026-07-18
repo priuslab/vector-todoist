@@ -2,7 +2,7 @@ import type { PocketBaseClient, PocketBaseRecord } from '../pocketbase/client.js
 import type { VerifiedUser } from '../auth/verifyPocketBaseToken.js';
 
 export class RepositoryError extends Error {
-  constructor(readonly code: 'NOT_FOUND' | 'INVALID' | 'UNAVAILABLE', message = code) { super(message); }
+  constructor(readonly code: 'NOT_FOUND' | 'INVALID' | 'UNAVAILABLE', message: string = code) { super(message); }
 }
 
 const quote = (value: string) => value.replaceAll('\\', '\\\\').replaceAll("'", "\\'");

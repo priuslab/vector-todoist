@@ -21,6 +21,12 @@ test.describe('P0-A Brain Dump → Today', () => {
     await page.getByRole('button', { name: 'Застосувати план' }).click();
     await expect(page).toHaveURL(/today-normal/);
     await expect(page.getByText('Підготувати структуру епізоду')).toBeVisible();
+    const taskCheck = page.getByRole('button', { name: /Виконати: Підготувати структуру епізоду/ }).first();
+    if (await taskCheck.count()) {
+      await taskCheck.click();
+      await expect(page.getByRole('button', { name: 'Скасувати' })).toBeVisible();
+      await page.getByRole('button', { name: 'Скасувати' }).click();
+    }
     await page.getByRole('button', { name: 'Inbox' }).click();
     await expect(page.getByText('Зробити епізод про синдром самозванця')).toBeVisible();
   });
