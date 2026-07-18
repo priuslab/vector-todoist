@@ -24,3 +24,13 @@ it("places Telegram setup actions in the footer", () => {
   expect(within(footer).getByRole("button", { name: "Відкрити Telegram" })).toBeInTheDocument();
   expect(within(footer).getByRole("button", { name: "Підключити пізніше" })).toBeInTheDocument();
 });
+
+it("centers the goal-test result heading without centering manual goal forms", () => {
+  const result = render(<GoalSetup screenId="goal-test-result" onNext={vi.fn()} onRoute={vi.fn()} />);
+  expect(result.container.querySelector(".goal-test-result-content")).toBeInTheDocument();
+  expect(result.container.querySelector(".goal-test-result-content .section-heading")).toBeInTheDocument();
+  result.unmount();
+
+  const manual = render(<GoalSetup screenId="goal-manual" onNext={vi.fn()} onRoute={vi.fn()} />);
+  expect(manual.container.querySelector(".goal-test-result-content")).not.toBeInTheDocument();
+});

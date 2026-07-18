@@ -95,7 +95,9 @@
 .undo-snackbar button { min-height: 36px; border: 0; display: inline-flex; align-items: center; gap: 5px; color: #d8f1ea; background: transparent; font-weight: 800; }
 
 .action-footer-layout {
-  --action-footer-offset: 92px;
+  --action-footer-offset-base: 92px;
+  --action-footer-safe-area-delta: max(0px, calc(env(safe-area-inset-bottom) - 14px));
+  --action-footer-offset: calc(var(--action-footer-offset-base) + var(--action-footer-safe-area-delta));
   position: relative;
   min-height: 0;
   flex: 1;
@@ -103,7 +105,7 @@
   flex-direction: column;
 }
 
-.action-footer-layout--rows-2 { --action-footer-offset: 154px; }
+.action-footer-layout--rows-2 { --action-footer-offset-base: 154px; }
 
 .action-footer-layout__content {
   min-height: 0;
@@ -119,7 +121,7 @@
 .action-footer-layout--center .action-footer-layout__content {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: safe center;
 }
 
 .action-footer-layout__footer {

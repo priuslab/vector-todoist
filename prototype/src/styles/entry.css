@@ -77,6 +77,8 @@
 .conversation-preview { display: flex; flex-direction: column; gap: 10px; }
 .conversation-preview span { align-self: flex-start; max-width: 88%; border-radius: 14px 14px 14px 4px; padding: 10px 12px; color: var(--text-primary); background: var(--brand-soft); font-size: 13px; }
 .success-chip { display: inline-flex; border-radius: 999px; padding: 5px 9px; color: var(--brand-primary); background: var(--brand-soft); font-size: 11px; font-weight: 800; }
+.goal-test-result-content { width: 100%; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.goal-test-result-content .goal-result { width: 100%; text-align: left; }
 .goal-result { display: flex; flex-direction: column; gap: 10px; }
 .goal-result strong { font-size: 17px; line-height: 1.45; }
 .goal-result span { color: var(--brand-primary); font-size: 12px; font-weight: 800; }
