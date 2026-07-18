@@ -50,7 +50,7 @@ export function CalendarScreens({ screenId = "calendar-day", onNavigate = () => 
       {screenId === "calendar-week" ? <WeekView /> : remoteEvents ? <CalendarTimeline dragMode={false} items={remoteEvents} onSelect={setSelected} /> : <CalendarTimeline dragMode={screenId === "calendar-drag"} onSelect={setSelected} />}
       {screenId === "calendar-drag" ? <div className="calendar-action"><Button onClick={() => onNavigate("calendar-day")}>Перемістити на 12:30</Button></div> : null}
       {screenId === "calendar-conflict" ? <Button variant="secondary" icon={ArrowsClockwise} onClick={() => onNavigate("today-rescheduled")}>Знайти новий час</Button> : null}
-      {selected ? <EventSheet item={selected} onClose={() => setSelected(null)} /> : null}
+      {selected ? <EventSheet item={selected} onClose={() => setSelected(null)} onRetry={apiClient ? (item) => apiClient.request(`/api/v1/tasks/${encodeURIComponent(item.taskId)}/calendar-sync`, { method: "POST", headers: { "Idempotency-Key": `calendar:create:${item.taskId}:${item.start}:${item.end}` } }) : undefined} /> : null}
     </AppFrame>
   );
 }

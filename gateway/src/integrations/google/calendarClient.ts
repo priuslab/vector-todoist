@@ -14,6 +14,8 @@ export class GoogleCalendarError extends Error { constructor(message = 'Google C
 type Provider = {
   listEvents(input: { accessToken: string; calendarId: string; timeMin: string; timeMax: string; timezone: string }): Promise<CalendarEvent[]>;
   refreshAccessToken(input: { refreshToken: string }): Promise<{ accessToken: string; expiresIn?: number }>;
+  insertEvent?(input: { accessToken: string; calendarId: string; summary: string; start: string; end: string; idempotencyKey: string; eventId: string }): Promise<{ id: string; status?: string }>;
+  deleteEvent?(input: { accessToken: string; calendarId: string; googleEventId: string }): Promise<void>;
 };
 
 const zonedIso = (date: string, time: string, timezone: string) => {
@@ -44,7 +46,7 @@ export function createGoogleCalendarClient(options: {
   calendarIds?: string[];
   decrypt?: (value: string, key: Buffer | Uint8Array | string) => string;
   now?: () => number;
-}): { listBusyIntervals(input: { connection: CalendarConnection; date: string; timezone: string; workday: { start: string; end: string } }): Promise<{ intervals: BusyInterval[]; syncedAt: string }> } {
+}): { listBusyIntervals(input: { connection: CalendarConnection; date: string; timezone: string; workday: { start: string; end: string } }): Promise<{ intervals: BusyInterval[]; syncedAt: string }>; createEvent(input: { connection: CalendarConnection; calendarId: string; summary: string; start: string; end: string; idempotencyKey: string; eventId: string }): Promise<{ id: string; status?: string }> } {
   const provider = options.provider ?? (options.clientId && options.clientSecret ? {
     async refreshAccessToken({ refreshToken }: { refreshToken: string }) {
       const response = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: options.clientId!, client_secret: options.clientSecret!, refresh_token: refreshToken, grant_type: 'refresh_token' }) });
@@ -60,6 +62,21 @@ export function createGoogleCalendarClient(options: {
       if (!response.ok) throw new GoogleCalendarError();
       const payload = await response.json() as { items?: CalendarEvent[] };
       return Array.isArray(payload.items) ? payload.items : [];
+    },
+    async insertEvent({ accessToken, calendarId, summary, start, end, idempotencyKey, eventId }) {
+      const response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`, { method: 'POST', headers: { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' }, body: JSON.stringify({ id: eventId, summary, start: { dateTime: start }, end: { dateTime: end }, extendedProperties: { private: { vectorIdempotencyKey: idempotencyKey } } }) });
+      if (response.status === 409) {
+        const existing = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`, { headers: { authorization: `Bearer ${accessToken}` } });
+        if (existing.ok) { const payload = await existing.json() as Record<string, unknown>; if (typeof payload.id === 'string') return { id: payload.id, status: typeof payload.status === 'string' ? payload.status : undefined }; }
+      }
+      if (!response.ok) throw new GoogleCalendarError(response.status === 401 ? 'UNAUTHORIZED' : 'Google Calendar unavailable');
+      const payload = await response.json() as Record<string, unknown>;
+      if (typeof payload.id !== 'string') throw new GoogleCalendarError();
+      return { id: payload.id, status: typeof payload.status === 'string' ? payload.status : undefined };
+    },
+    async deleteEvent({ accessToken, calendarId, googleEventId }) {
+      const response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(googleEventId)}`, { method: 'DELETE', headers: { authorization: `Bearer ${accessToken}` } });
+      if (!response.ok && response.status !== 404) throw new GoogleCalendarError(response.status === 401 ? 'UNAUTHORIZED' : 'Google Calendar unavailable');
     },
   } satisfies Provider : undefined);
   if (!provider) throw new Error('Google Calendar provider is required');
@@ -110,6 +127,13 @@ export function createGoogleCalendarClient(options: {
         } else merged.push({ ...item });
       }
       return { intervals: merged, syncedAt: new Date(now()).toISOString() };
+    },
+    async createEvent({ connection, calendarId, summary, start, end, idempotencyKey, eventId }) {
+      if (!provider.insertEvent) throw new GoogleCalendarError();
+      if (!connection.encryptedRefreshToken) throw new GoogleCalendarError('Google Calendar is not connected');
+      const refreshToken = decryptToken(connection.encryptedRefreshToken, options.encryptionKey);
+      const token = await provider.refreshAccessToken({ refreshToken });
+      return provider.insertEvent({ accessToken: token.accessToken, calendarId, summary, start, end, idempotencyKey, eventId });
     },
   };
 }

@@ -13,6 +13,8 @@ import { createGoogleOAuthService } from './integrations/google/googleOAuth.js';
 import { createGoogleCalendarClient } from './integrations/google/calendarClient.js';
 import { createCalendarBusySlotRepository } from './repositories/calendarBusySlotRepository.js';
 import { createBusySlotService } from './modules/calendar/busySlotService.js';
+import { createCalendarEventLinkRepository, createCalendarEventService, createGoogleCalendarEventProvider } from './modules/calendar/calendarEventService.js';
+import { createJobRepository } from './modules/jobs/jobRepository.js';
 
 async function start(): Promise<void> {
   const config = loadConfig();
@@ -39,6 +41,13 @@ async function start(): Promise<void> {
         busySlotRepository: calendarBusySlotRepository,
         googleCalendarClient: createGoogleCalendarClient({ clientId: config.googleClientId, clientSecret: config.googleClientSecret, encryptionKey: config.googleTokenEncryptionKey }),
       }),
+      calendarEventService: config.pocketbaseServerToken ? createCalendarEventService({
+        linkRepository: createCalendarEventLinkRepository(pocketBase),
+        jobRepository: createJobRepository(pocketBase, { serverToken: config.pocketbaseServerToken }),
+        taskRepository: createTaskRepository(pocketBase),
+        provider: createGoogleCalendarEventProvider({ connectionRepository: calendarConnectionRepository, googleCalendarClient: createGoogleCalendarClient({ clientId: config.googleClientId, clientSecret: config.googleClientSecret, encryptionKey: config.googleTokenEncryptionKey }) }),
+        calendarId: 'primary',
+      }) : undefined,
     } : {}),
   } });
 

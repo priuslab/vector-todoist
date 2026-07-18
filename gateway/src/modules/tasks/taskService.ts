@@ -11,6 +11,7 @@ export class TaskConflictError extends Error { readonly code = 'CONFLICT'; }
 const publicTask = (task: TaskRecord) => taskResponseSchema.parse(Object.fromEntries([
   'id', 'title', 'description', 'status', 'priority', 'deadline', 'plannedStart', 'plannedEnd', 'estimatedMinutes',
   'actualMinutes', 'energy', 'flexible', 'locked', 'sourceDump', 'rescheduleCount', 'completedAt', 'version',
+  'syncStatus', 'calendarEventId',
 ].filter((key) => task[key] !== undefined).map((key) => [key, task[key]])));
 const versionOf = (task: TaskRecord): string | number | undefined => task.version as string | number | undefined;
 const matchesVersion = (task: TaskRecord, expected: string | number | undefined) => expected === undefined || String(versionOf(task) ?? task.updated ?? '') === String(expected);

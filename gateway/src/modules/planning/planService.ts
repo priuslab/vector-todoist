@@ -9,6 +9,7 @@ import { buildDailyPlan } from '../scheduler/buildDailyPlan.js';
 import type { SchedulerBusySlot, SchedulerTask, SchedulerProfile } from '../scheduler/types.js';
 import { applyBodySchema, applyResponseSchema, inboxResponseSchema, ideaResponseShape, planPreviewBodySchema, planPreviewSchema, taskResponseSchema, todayResponseSchema, type ChangeSetResponse, type PlanPreviewBody, type PlanPreview, type TaskResponse, type IdeaResponse } from './planSchemas.js';
 import type { BusySlotService } from '../calendar/busySlotService.js';
+import type { CalendarEventService } from '../calendar/calendarEventService.js';
 
 export class PlanNotFoundError extends Error { readonly code = 'NOT_FOUND'; }
 export class PlanValidationError extends Error { readonly code = 'INVALID_PLAN'; }
@@ -25,7 +26,7 @@ export interface PlanService {
 const asDate = (value: string | undefined) => value ? new Date(value) : new Date();
 const priorityAlignment: Record<string, number> = { urgent: 1, high: .9, medium: .6, low: .3 };
 const pick = (record: Record<string, unknown>, keys: string[]) => Object.fromEntries(keys.filter((key) => record[key] !== undefined).map((key) => [key, record[key]]));
-const publicTask = (task: TaskRecord): TaskResponse => taskResponseSchema.parse(pick(task, ['id', 'title', 'description', 'status', 'priority', 'deadline', 'plannedStart', 'plannedEnd', 'estimatedMinutes', 'actualMinutes', 'energy', 'flexible', 'locked', 'sourceDump', 'rescheduleCount']));
+const publicTask = (task: TaskRecord): TaskResponse => taskResponseSchema.parse(pick(task, ['id', 'title', 'description', 'status', 'priority', 'deadline', 'plannedStart', 'plannedEnd', 'estimatedMinutes', 'actualMinutes', 'energy', 'flexible', 'locked', 'sourceDump', 'rescheduleCount', 'syncStatus', 'calendarEventId']));
 const publicIdea = <T extends Record<string, unknown>>(idea: T): IdeaResponse => ideaResponseShape.parse(pick(idea, ['id', 'text', 'summary', 'status', 'sourceDump']));
 const publicChangeSet = (changeSet: ChangeSetRecord): ChangeSetResponse => ({ id: changeSet.id, status: String(changeSet.status ?? ''), ...(changeSet.kind ? { kind: changeSet.kind } : {}), ...(typeof changeSet.idempotencyKey === 'string' ? { idempotencyKey: changeSet.idempotencyKey } : {}), ...(changeSet.beforeJson !== undefined ? { beforeJson: changeSet.beforeJson } : {}), ...(changeSet.afterJson !== undefined ? { afterJson: changeSet.afterJson } : {}) });
 
@@ -36,8 +37,9 @@ export function createPlanService(deps: {
   ideaRepository: IdeaRepository;
   changeSetRepository: ChangeSetRepository;
   calendarService?: BusySlotService;
+  calendarEventService?: CalendarEventService;
 }): PlanService {
-  const { dumpRepository, analysisService, taskRepository, ideaRepository, changeSetRepository, calendarService } = deps;
+  const { dumpRepository, analysisService, taskRepository, ideaRepository, changeSetRepository, calendarService, calendarEventService } = deps;
 
   async function preview(user: VerifiedUser, dumpId: string, input: unknown): Promise<PlanPreview> {
     const dump = await dumpRepository.get(user, dumpId);
@@ -99,6 +101,11 @@ export function createPlanService(deps: {
     try {
       for (const proposed of proposedTasks) { const value = proposed as Record<string, unknown>; const { id: _id, ...input } = value; const existing = (await taskRepository.list(user)).find((task) => task.id === value.id || (task.sourceDump === value.sourceDump && task.title === value.title)); createdTasks.push(existing ?? await taskRepository.create(user, input as never)); }
       for (const proposed of proposedIdeas) { const value = proposed as Record<string, unknown>; const { id: _id, ...input } = value; const existing = (await ideaRepository.list(user)).find((idea) => idea.id === value.id || (idea.sourceDump === value.sourceDump && idea.text === value.text)); createdIdeas.push(existing ?? await ideaRepository.create(user, input as never)); }
+      if (calendarEventService) {
+        await Promise.all(createdTasks.filter((task) => Boolean(task.plannedStart && task.plannedEnd)).map(async (task) => {
+          try { await calendarEventService.syncTask(user, task.id); } catch { /* local task remains valid with sync_pending and an outbox job */ }
+        }));
+      }
       const updated = await changeSetRepository.update(user, changeSetId, { status: 'applied', afterJson: { ...payload, appliedTaskIds: createdTasks.map((task) => task.id), appliedIdeaIds: createdIdeas.map((idea) => idea.id) } });
       return applyResponseSchema.parse({ changeSet: publicChangeSet(updated), tasks: createdTasks.map(publicTask), ideas: createdIdeas.map(publicIdea) });
     } catch (error) {

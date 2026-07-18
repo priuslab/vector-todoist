@@ -23,9 +23,15 @@ export function decryptSecret(payload: string, key: Buffer | Uint8Array | string
   try {
     const parts = payload.split('.');
     if (parts.length !== 4 || parts[0] !== VERSION) throw new Error('Invalid encrypted secret');
-    const nonce = Buffer.from(parts[1], 'base64url');
-    const tag = Buffer.from(parts[2], 'base64url');
-    const ciphertext = Buffer.from(parts[3], 'base64url');
+    const decode = (value: string) => {
+      if (!/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('Invalid encrypted secret');
+      const decoded = Buffer.from(value, 'base64url');
+      if (decoded.toString('base64url') !== value) throw new Error('Invalid encrypted secret');
+      return decoded;
+    };
+    const nonce = decode(parts[1]);
+    const tag = decode(parts[2]);
+    const ciphertext = decode(parts[3]);
     if (nonce.length !== NONCE_BYTES || tag.length !== TAG_BYTES || ciphertext.length === 0) throw new Error('Invalid encrypted secret');
     const decipher = createDecipheriv('aes-256-gcm', asKey(key), nonce);
     decipher.setAuthTag(tag);

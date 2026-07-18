@@ -32,6 +32,7 @@ export const taskResponseSchema = z.object({
   actualMinutes: z.number().int().nullable().optional(), energy: z.string().nullable().optional(), flexible: z.boolean().optional(),
   locked: z.boolean().optional(), sourceDump: z.string().nullable().optional(), rescheduleCount: z.number().int().optional(),
   completedAt: z.string().nullable().optional(), version: z.union([z.string(), z.number()]).optional(),
+  syncStatus: z.enum(['synced', 'sync_pending', 'attention', 'unscheduled']).optional(), calendarEventId: z.string().nullable().optional(),
 }).strict();
 
 export const changeSetResponseSchema = z.object({ id: z.string(), kind: z.string(), status: z.string(), taskId: z.string().optional() }).strict();
