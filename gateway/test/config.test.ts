@@ -93,7 +93,7 @@ describe('loadConfig', () => {
   it.each([
     ['Google', 'ENABLE_GOOGLE_INTEGRATION', { GOOGLE_CLIENT_ID: 'client-id', GOOGLE_CLIENT_SECRET: 'client-secret' }],
     ['Telegram', 'ENABLE_TELEGRAM_INTEGRATION', { TELEGRAM_BOT_TOKEN: 'bot-token', TELEGRAM_WEBHOOK_SECRET: 'webhook-secret' }],
-    ['Stripe', 'ENABLE_STRIPE_INTEGRATION', { STRIPE_SECRET_KEY: 'stripe-secret', STRIPE_WEBHOOK_SECRET: 'webhook-secret' }],
+    ['Stripe', 'ENABLE_STRIPE_INTEGRATION', { STRIPE_SECRET_KEY: 'stripe-secret', STRIPE_WEBHOOK_SECRET: 'webhook-secret', STRIPE_PRICE_ID: 'price_lifetime_test' }],
   ] as const)('accepts non-empty %s integration secrets when enabled', (_integration, flag, secrets) => {
     expect(loadConfig(validEnv({ [flag]: 'true', ...secrets }))[flag === 'ENABLE_GOOGLE_INTEGRATION'
       ? 'enableGoogleIntegration'
@@ -109,6 +109,7 @@ describe('loadConfig', () => {
     ['TELEGRAM_WEBHOOK_SECRET', 'ENABLE_TELEGRAM_INTEGRATION'],
     ['STRIPE_SECRET_KEY', 'ENABLE_STRIPE_INTEGRATION'],
     ['STRIPE_WEBHOOK_SECRET', 'ENABLE_STRIPE_INTEGRATION'],
+    ['STRIPE_PRICE_ID', 'ENABLE_STRIPE_INTEGRATION'],
   ])('rejects missing %s when %s is enabled', (secret, flag) => {
     expect(() => loadConfig(validEnv({ [flag]: 'true', [secret]: undefined }))).toThrow(secret);
   });
