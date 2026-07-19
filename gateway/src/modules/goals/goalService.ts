@@ -28,7 +28,7 @@ export function createGoalService(deps: { repository: GoalGraphRepository; chang
   const getProject = async (u: VerifiedUser, id: string) => owned(u, await r.projects.get(u, id));
   const getIdea = async (u: VerifiedUser, id: string) => owned(u, await r.ideas.get(u, id));
   const conversionLocks = new Map<string, Promise<unknown>>();
-  async function withConversionLock<T>(key: string, work: () => Promise<T>): Promise<T> { const prior = conversionLocks.get(key) ?? Promise.resolve(); let release!: () => void; const current = new Promise<void>((resolve) => { release = resolve; }); conversionLocks.set(key, prior.then(() => current)); await prior; try { return await work(); } finally { release(); if (conversionLocks.get(key) === current) conversionLocks.delete(key); } }
+  async function withConversionLock<T>(key: string, work: () => Promise<T>): Promise<T> { const prior = conversionLocks.get(key) ?? Promise.resolve(); let release!: () => void; const current = new Promise<void>((resolve) => { release = resolve; }); const queued = prior.then(() => current); conversionLocks.set(key, queued); await prior; try { return await work(); } finally { release(); if (conversionLocks.get(key) === queued) conversionLocks.delete(key); } }
   async function assertNode(u: VerifiedUser, type: string, id: string) {
     if (type === 'goal') await getGoal(u, id);
     else if (type === 'project') await getProject(u, id);
