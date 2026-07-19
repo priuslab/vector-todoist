@@ -69,6 +69,7 @@ const configSchema = z
     GOOGLE_OAUTH_REDIRECT_URI: optionalHttpUrl,
     GOOGLE_TOKEN_ENCRYPTION_KEY: optionalEncryptionKey,
     TELEGRAM_BOT_TOKEN: optionalTrimmedString,
+    TELEGRAM_WEBHOOK_SECRET: optionalTrimmedString,
     STRIPE_SECRET_KEY: optionalTrimmedString,
     STRIPE_WEBHOOK_SECRET: optionalTrimmedString,
   })
@@ -92,6 +93,7 @@ const configSchema = z
 
     if (env.ENABLE_TELEGRAM_INTEGRATION) {
       requireSecret(env.TELEGRAM_BOT_TOKEN, 'TELEGRAM_BOT_TOKEN', 'ENABLE_TELEGRAM_INTEGRATION');
+      requireSecret(env.TELEGRAM_WEBHOOK_SECRET, 'TELEGRAM_WEBHOOK_SECRET', 'ENABLE_TELEGRAM_INTEGRATION');
     }
 
     if (env.ENABLE_STRIPE_INTEGRATION) {
@@ -128,6 +130,7 @@ const configSchema = z
     googleOAuthRedirectUri: env.GOOGLE_OAUTH_REDIRECT_URI,
     googleTokenEncryptionKey: env.GOOGLE_TOKEN_ENCRYPTION_KEY,
     telegramBotToken: env.TELEGRAM_BOT_TOKEN,
+    telegramWebhookSecret: env.TELEGRAM_WEBHOOK_SECRET,
     stripeSecretKey: env.STRIPE_SECRET_KEY,
     stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET,
   }));

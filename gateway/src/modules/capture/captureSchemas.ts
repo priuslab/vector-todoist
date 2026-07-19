@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const captureRequestSchema = z.object({
-  kind: z.literal('text'),
+  kind: z.enum(['text', 'voice']),
   text: z.string(),
   timezone: z.string().trim().min(1).max(100),
 });

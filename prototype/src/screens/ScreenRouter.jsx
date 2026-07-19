@@ -56,7 +56,7 @@ export function ScreenRouter({ route, onNavigate, onGoogleLogin, onAuthComplete,
   }
   if (screen.group === "Onboarding") {
     if (route.startsWith("goal-")) return <GoalSetup screenId={route} onBack={back} onRoute={onNavigate} onNext={() => onNavigate("telegram-connect")} />;
-    if (route.startsWith("telegram-") || route === "first-brain-dump") return <TelegramSetup screenId={route} onBack={back} onNext={() => onNavigate(route === "telegram-connect" ? "telegram-success" : route === "telegram-success" ? "first-brain-dump" : "capture-chooser")} />;
+    if (route.startsWith("telegram-") || route === "first-brain-dump") return <TelegramSetup screenId={route} onBack={back} apiClient={apiClient} onNext={() => onNavigate(route === "telegram-connect" ? "telegram-success" : route === "telegram-success" ? "first-brain-dump" : "capture-chooser")} />;
     const nextOnboarding = () => onNavigate(ONBOARDING_NEXT[route] ?? "goal-choice");
     const connectCalendar = async () => {
       if (!apiClient) return nextOnboarding();
@@ -77,6 +77,6 @@ export function ScreenRouter({ route, onNavigate, onGoogleLogin, onAuthComplete,
   if (screen.group === "Calendar") return <CalendarScreens screenId={route} onNavigate={onNavigate} apiClient={apiClient} />;
   if (screen.group === "Oracle") return <OracleScreens screenId={route} onNavigate={onNavigate} />;
   if (screen.group === "Goals") return route.startsWith("paywall") || route.startsWith("payment") || route === "stripe-loading" ? <PaywallScreens screenId={route} onNavigate={onNavigate} /> : <GoalScreens screenId={route} onNavigate={onNavigate} />;
-  if (screen.group === "Settings") return <SettingsScreens screenId={route} onNavigate={onNavigate} />;
+  if (screen.group === "Settings") return <SettingsScreens screenId={route} onNavigate={onNavigate} apiClient={apiClient} />;
   return <SystemScreens screenId={route} onNavigate={onNavigate} />;
 }

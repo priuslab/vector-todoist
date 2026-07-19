@@ -33,6 +33,7 @@ import { rescheduleRoutes } from './modules/rescheduling/rescheduleRoutes.js';
 import { createRescheduleService, type RescheduleService } from './modules/rescheduling/rescheduleService.js';
 import type { JobRepository } from './modules/jobs/jobRepository.js';
 import { calendarWebhookRoutes } from './modules/calendar/calendarWebhookRoutes.js';
+import { telegramRoutes } from './integrations/telegram/pairingService.js';
 
 export interface GatewayServices {
   readonly [name: string]: unknown;
@@ -129,6 +130,9 @@ export async function buildApp({
       watchService: _services.calendarWatchService as Parameters<typeof calendarWebhookRoutes>[1]['watchService'],
       jobRepository: _services.jobRepository as Pick<JobRepository, 'getByIdempotencyKey' | 'create'>,
     });
+  }
+  if (config.enableTelegramIntegration && _services.telegramPairingService) {
+    await telegramRoutes(app, _services.telegramPairingService as Parameters<typeof telegramRoutes>[1], { webhookSecret: config.telegramWebhookSecret, onUpdate: _services.telegramUpdateHandler as ((update: unknown) => Promise<void>) | undefined });
   }
 
   return app;

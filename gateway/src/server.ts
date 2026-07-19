@@ -17,6 +17,11 @@ import { createCalendarEventLinkRepository, createCalendarEventService, createGo
 import { createJobRepository } from './modules/jobs/jobRepository.js';
 import { createCalendarWatchRepository, createCalendarWatchService } from './integrations/google/calendarWatch.js';
 import { createCalendarReconcileService } from './modules/calendar/calendarReconcileService.js';
+import { createTelegramClient } from './integrations/telegram/telegramClient.js';
+import { createTelegramPairingRepository, createTelegramPairingService } from './integrations/telegram/pairingService.js';
+import { createTelegramCaptureHandler, createTelegramUpdateStore } from './integrations/telegram/telegramCaptureHandler.js';
+import { createGeminiTranscriptionAdapter, createTranscriptionService } from './modules/transcription/transcriptionService.js';
+import { createAudioStorage } from './modules/transcription/audioStorage.js';
 
 async function start(): Promise<void> {
   const config = loadConfig();
@@ -27,6 +32,10 @@ async function start(): Promise<void> {
   const workerCalendarConnectionRepository = createCalendarConnectionRepository(workerPocketBase);
   const calendarBusySlotRepository = createCalendarBusySlotRepository(pocketBase);
   const jobRepository = config.pocketbaseServerToken ? createJobRepository(pocketBase, { serverToken: config.pocketbaseServerToken }) : undefined;
+  const telegramPairingService = config.enableTelegramIntegration && config.telegramBotToken && config.telegramWebhookSecret
+    ? createTelegramPairingService({ repository: createTelegramPairingRepository(pocketBase), botUsername: process.env.TELEGRAM_BOT_USERNAME ?? 'vector_assistant_bot' }) : undefined;
+  const telegramHandler = config.enableTelegramIntegration && config.telegramBotToken && telegramPairingService
+    ? createTelegramCaptureHandler({ pairing: telegramPairingService, captureService: createCaptureService(brainDumpRepository, { maxTextLength: config.brainDumpMaxTextLength }), updateStore: createTelegramUpdateStore(workerPocketBase), telegram: createTelegramClient({ botToken: config.telegramBotToken }), resolveUser: async (connection) => ({ userId: connection.user, email: '' }), transcriptionService: config.geminiApiKey ? createTranscriptionService(createGeminiTranscriptionAdapter({ apiKey: config.geminiApiKey, model: config.geminiModel, timeoutMs: config.aiTimeoutMs }), createAudioStorage(), { maxBytes: config.voiceMaxBytes, maxDurationSeconds: config.voiceMaxDurationSeconds, timeoutMs: config.voiceTranscriptionTimeoutMs }) : undefined, maxVoiceBytes: config.voiceMaxBytes, maxVoiceDurationSeconds: config.voiceMaxDurationSeconds }) : undefined;
   const googleOAuthService = config.enableGoogleIntegration && config.googleClientId && config.googleClientSecret && config.googleOAuthRedirectUri && config.googleTokenEncryptionKey
     ? createGoogleOAuthService({ clientId: config.googleClientId, clientSecret: config.googleClientSecret, redirectUri: config.googleOAuthRedirectUri, encryptionKey: config.googleTokenEncryptionKey, repository: calendarConnectionRepository })
     : undefined;
@@ -41,6 +50,8 @@ async function start(): Promise<void> {
     changeSetRepository: createChangeSetRepository(pocketBase),
     ...(jobRepository ? { jobRepository } : {}),
     ...(googleOAuthService ? { googleOAuthService } : {}),
+    ...(telegramPairingService ? { telegramPairingService } : {}),
+    ...(telegramHandler ? { telegramUpdateHandler: telegramHandler.handle } : {}),
     ...(googleOAuthService && config.googleClientId && config.googleClientSecret && config.googleTokenEncryptionKey ? {
       busySlotService: createBusySlotService({
         connectionRepository: calendarConnectionRepository,
