@@ -114,3 +114,12 @@
 .focus-stat span { color: var(--text-secondary); font-size: 11px; }
 .focus-screen--complete h2 { margin: 28px 0 0; font-size: 15px; }
 .focus-screen--complete .button { margin-top: 18px; }
+.focus-screen--complete .focus-note { max-width: 280px; margin-top: 12px; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+.focus-confirm { width: min(100%, 330px); margin-top: 18px; padding: 14px; border: 1px solid rgb(255 255 255 / 22%); border-radius: 16px; display: grid; gap: 8px; text-align: left; background: rgb(0 0 0 / 12%); }
+.focus-confirm strong { font-size: 14px; }
+.focus-confirm > span { color: rgb(255 255 255 / 72%); font-size: 11px; line-height: 1.4; }
+.focus-confirm > div { display: flex; gap: 8px; flex-wrap: wrap; }
+.focus-confirm button { min-height: 44px; border: 0; border-radius: 10px; padding: 0 12px; color: var(--brand-primary); background: #fff; font-size: 12px; font-weight: 700; }
+.focus-confirm button:last-child { color: #fff; background: transparent; border: 1px solid rgb(255 255 255 / 26%); }
+.focus-notifications { min-height: 44px; margin-top: 10px; border: 0; display: inline-flex; gap: 6px; align-items: center; color: rgb(255 255 255 / 62%); background: transparent; font-size: 10px; }
+@media (prefers-reduced-motion: reduce) { .focus-screen * { animation: none !important; transition: none !important; } }

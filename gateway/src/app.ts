@@ -44,6 +44,7 @@ import { focusModeRoutes } from './modules/focus/focusModeRoutes.js';
 import { createFocusModeService } from './modules/focus/focusModeService.js';
 import { checkoutRoutes } from './integrations/stripe/checkoutRoutes.js';
 import { stripeWebhookRoutes } from './integrations/stripe/stripeWebhookRoutes.js';
+import { focusSessionRoutes, createFocusSessionService, type FocusSessionRepository } from './modules/focusSessions/focusSessionRoutes.js';
 
 export interface GatewayServices {
   readonly [name: string]: unknown;
@@ -130,6 +131,9 @@ export async function buildApp({
     });
     await rescheduleRoutes(app, rescheduleService);
     await focusModeRoutes(app, createFocusModeService({ taskRepository, changeSetRepository }));
+    if (_services.focusSessionRepository) {
+      await focusSessionRoutes(app, createFocusSessionService({ repository: _services.focusSessionRepository as FocusSessionRepository, taskRepository }));
+    }
   }
 
   if (_services.goalGraphRepository && changeSetRepository) {

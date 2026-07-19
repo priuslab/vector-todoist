@@ -27,6 +27,7 @@ import { createStripeClient } from './integrations/stripe/stripeClient.js';
 import { createStripeBillingService } from './integrations/stripe/checkoutRoutes.js';
 import { createStripeWebhookService } from './integrations/stripe/stripeWebhookRoutes.js';
 import { createEntitlementRepository } from './repositories/entitlementRepository.js';
+import { createFocusSessionRepository } from './modules/focusSessions/focusSessionRoutes.js';
 
 async function start(): Promise<void> {
   const config = loadConfig();
@@ -54,6 +55,7 @@ async function start(): Promise<void> {
     analysisSessionRepository: createAnalysisSessionRepository(pocketBase),
     aiClient: createGeminiClient({ apiKey: config.geminiApiKey, model: config.geminiModel, timeoutMs: config.aiTimeoutMs }),
     taskRepository: createTaskRepository(pocketBase),
+    focusSessionRepository: createFocusSessionRepository(pocketBase),
     ideaRepository: createIdeaRepository(pocketBase),
     goalGraphRepository: createGoalGraphRepository(pocketBase),
     changeSetRepository: createChangeSetRepository(pocketBase),
