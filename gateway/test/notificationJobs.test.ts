@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createMemoryNotificationClaimStore, createTelegramNotificationJobHandler } from '../src/modules/notifications/notificationJobs.js';
+import { createMemoryNotificationClaimStore, createPocketBaseNotificationClaimStore, createTelegramNotificationJobHandler } from '../src/modules/notifications/notificationJobs.js';
 
 const job = (payload: Record<string, unknown>) => ({ id: 'job-1', type: 'telegram.notification.task_reminder', idempotencyKey: 'key', payloadJson: { preferences: { timezone: 'Europe/Warsaw', quietHours: { start: '21:00', end: '08:00' } }, ...payload }, status: 'processing', attempts: 0 });
 
@@ -28,5 +28,19 @@ describe('Telegram notification jobs', () => {
     const handler = createTelegramNotificationJobHandler({ telegram: { sendMessage }, claims: createMemoryNotificationClaimStore(), now: () => new Date('2026-07-18T20:30:00.000Z') });
     await handler(job({ type: 'morning_plan', recipientId: 'u1', chatId: 'c1', timezone: 'Europe/Warsaw', preferences: { timezone: 'Europe/Warsaw', quietHours: { start: '21:00', end: '08:00' }, morningPlanEnabled: false } }) as never);
     expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('uses a durable unique PocketBase claim across worker processes', async () => {
+    const records: any[] = [];
+    const client: any = {
+      async create(_collection: string, data: any) { if (records.some((row) => row.notificationKey === data.notificationKey)) throw new Error('unique'); const row = { id: `c${records.length + 1}`, ...data }; records.push(row); return row; },
+      async list(_collection: string, _filter: string) { return records; },
+      async delete(_collection: string, id: string) { const index = records.findIndex((row) => row.id === id); if (index >= 0) records.splice(index, 1); },
+    };
+    const first = createPocketBaseNotificationClaimStore(client);
+    const second = createPocketBaseNotificationClaimStore(client);
+    expect(await Promise.all([first.claim('telegram:u1:morning_plan:2026-07-18'), second.claim('telegram:u1:morning_plan:2026-07-18')])).toEqual([true, false]);
+    await first.release?.('telegram:u1:morning_plan:2026-07-18');
+    expect(await second.claim('telegram:u1:morning_plan:2026-07-18')).toBe(true);
   });
 });

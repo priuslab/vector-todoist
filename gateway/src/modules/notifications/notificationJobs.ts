@@ -1,5 +1,7 @@
 import type { VerifiedUser } from '../../auth/verifyPocketBaseToken.js';
 import type { TelegramClient } from '../../integrations/telegram/telegramClient.js';
+import type { PocketBaseClient, PocketBaseRecord } from '../../pocketbase/client.js';
+import { RepositoryError } from '../../repositories/base.js';
 import type { JobHandler } from '../jobs/jobRunner.js';
 import type { JobRecord } from '../jobs/jobRepository.js';
 import { localDate, notificationKey, shouldSendNotification, type NotificationPreferences, type NotificationType } from './notificationPolicy.js';
@@ -32,6 +34,27 @@ export interface NotificationClaimStore {
 export function createMemoryNotificationClaimStore(): NotificationClaimStore {
   const claimed = new Set<string>();
   return { async claim(key) { if (claimed.has(key)) return false; claimed.add(key); return true; }, async release(key) { claimed.delete(key); } };
+}
+
+/** Durable unique-key claim used by the VPS worker; duplicate creates are safe no-ops. */
+export function createPocketBaseNotificationClaimStore(client: PocketBaseClient): NotificationClaimStore {
+  return {
+    async claim(key) {
+      try { await client.create('notification_claims', { notificationKey: key, claimedAt: new Date().toISOString() }); return true; }
+      catch {
+        try {
+          const rows = await client.list<PocketBaseRecord & { notificationKey?: string }>('notification_claims', `notificationKey = '${key.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'`);
+          if (rows.some((row) => row.notificationKey === key)) return false;
+        } catch { throw new RepositoryError('UNAVAILABLE'); }
+        throw new RepositoryError('UNAVAILABLE');
+      }
+    },
+    async release(key) {
+      const rows = await client.list<PocketBaseRecord & { notificationKey?: string }>('notification_claims', `notificationKey = '${key.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'`);
+      const claim = rows.find((row) => row.notificationKey === key);
+      if (claim) await client.delete('notification_claims', claim.id);
+    },
+  };
 }
 
 function messageFor(payload: NotificationJobPayload) {

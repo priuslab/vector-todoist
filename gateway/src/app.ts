@@ -34,6 +34,7 @@ import { createRescheduleService, type RescheduleService } from './modules/resch
 import type { JobRepository } from './modules/jobs/jobRepository.js';
 import { calendarWebhookRoutes } from './modules/calendar/calendarWebhookRoutes.js';
 import { telegramRoutes } from './integrations/telegram/pairingService.js';
+import { createNotificationPreferencesService, notificationPreferencesRoutes } from './modules/notifications/notificationPreferencesRoutes.js';
 
 export interface GatewayServices {
   readonly [name: string]: unknown;
@@ -131,6 +132,7 @@ export async function buildApp({
       jobRepository: _services.jobRepository as Pick<JobRepository, 'getByIdempotencyKey' | 'create'>,
     });
   }
+  if (_services.notificationPreferencesClient) await notificationPreferencesRoutes(app, createNotificationPreferencesService(_services.notificationPreferencesClient as Parameters<typeof createNotificationPreferencesService>[0]));
   if (config.enableTelegramIntegration && _services.telegramPairingService) {
     await telegramRoutes(app, _services.telegramPairingService as Parameters<typeof telegramRoutes>[1], { webhookSecret: config.telegramWebhookSecret, onUpdate: _services.telegramUpdateHandler as ((update: unknown) => Promise<void>) | undefined });
   }

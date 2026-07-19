@@ -41,6 +41,7 @@ async function start(): Promise<void> {
     : undefined;
   const app = await buildApp({ config, services: {
     pocketBase,
+    notificationPreferencesClient: pocketBase,
     brainDumpRepository,
     captureService: createCaptureService(brainDumpRepository, { maxTextLength: config.brainDumpMaxTextLength }),
     analysisSessionRepository: createAnalysisSessionRepository(pocketBase),
