@@ -1,6 +1,7 @@
 migrate((app) => {
   const users = app.findCollectionByNameOrId('users');
-  if (!users || app.findCollectionByNameOrId('goal_discovery_sessions')) return;
+  if (!users) return;
+  try { if (app.findCollectionByNameOrId('goal_discovery_sessions')) return; } catch (_) { /* collection not created yet */ }
   const sessions = new Collection({
     type: 'base', name: 'goal_discovery_sessions',
     listRule: '@request.auth.id != "" && user = @request.auth.id',
