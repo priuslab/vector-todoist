@@ -28,6 +28,7 @@ import { createStripeBillingService } from './integrations/stripe/checkoutRoutes
 import { createStripeWebhookService } from './integrations/stripe/stripeWebhookRoutes.js';
 import { createEntitlementRepository } from './repositories/entitlementRepository.js';
 import { createFocusSessionRepository } from './modules/focusSessions/focusSessionRoutes.js';
+import { createAdaptationRepository, createAdaptationService } from './modules/adaptation/adaptationService.js';
 
 async function start(): Promise<void> {
   const config = loadConfig();
@@ -36,6 +37,7 @@ async function start(): Promise<void> {
   const entitlementRepository = config.enableStripeIntegration ? createEntitlementRepository(workerPocketBase) : undefined;
   const stripeClient = config.enableStripeIntegration && config.stripeSecretKey && config.stripePriceId ? createStripeClient({ secretKey: config.stripeSecretKey }) : undefined;
   const brainDumpRepository = createBrainDumpRepository(pocketBase);
+  const adaptationService = createAdaptationService(createAdaptationRepository(pocketBase));
   const calendarConnectionRepository = createCalendarConnectionRepository(pocketBase);
   const workerCalendarConnectionRepository = createCalendarConnectionRepository(workerPocketBase);
   const calendarBusySlotRepository = createCalendarBusySlotRepository(pocketBase);
@@ -56,6 +58,7 @@ async function start(): Promise<void> {
     aiClient: createGeminiClient({ apiKey: config.geminiApiKey, model: config.geminiModel, timeoutMs: config.aiTimeoutMs }),
     taskRepository: createTaskRepository(pocketBase),
     focusSessionRepository: createFocusSessionRepository(pocketBase),
+    adaptationService,
     ideaRepository: createIdeaRepository(pocketBase),
     goalGraphRepository: createGoalGraphRepository(pocketBase),
     changeSetRepository: createChangeSetRepository(pocketBase),
