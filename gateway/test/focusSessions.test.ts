@@ -6,12 +6,15 @@ const alice = { userId: 'alice', email: 'alice@example.test' } as any;
 const bob = { userId: 'bob', email: 'bob@example.test' } as any;
 function setup() {
   let now = new Date('2026-07-20T09:00:00.000Z'); let seq = 0; const rows: FocusSessionRecord[] = [];
+  const claims = new Set<string>();
   const repository: FocusSessionRepository = {
     list: vi.fn(async (user) => rows.filter((row) => row.user === user.userId)),
     get: vi.fn(async (user, id) => rows.find((row) => row.user === user.userId && row.id === id) ?? null),
     create: vi.fn(async (user, input) => { const row = { id: `focus-${++seq}`, user: user.userId, ...input } as FocusSessionRecord; rows.push(row); return row; }),
     update: vi.fn(async (user, id, input) => { const row = rows.find((item) => item.user === user.userId && item.id === id); if (!row) throw new Error('missing'); Object.assign(row, input); return row; }),
     updateIfVersion: vi.fn(async (user, id, expected, input) => { const row = rows.find((item) => item.user === user.userId && item.id === id); if (!row) throw new Error('missing'); if (row.version !== expected) throw Object.assign(new Error('VERSION_CONFLICT'), { code: 'INVALID' }); Object.assign(row, input); return row; }),
+    claimMutation: vi.fn(async (_user, sessionId, operationKey) => { const key = `${sessionId}:${operationKey}`; if (claims.has(key)) return false; claims.add(key); return true; }),
+    releaseMutation: vi.fn(async (_user, sessionId, operationKey) => { claims.delete(`${sessionId}:${operationKey}`); }),
   };
   const task = { id: 'task-1', user: 'alice', title: 'Структура епізоду', status: 'scheduled' } as any;
   const taskRepository = { get: vi.fn(async (user: any, id: string) => user.userId === 'alice' && id === task.id ? task : null) } as any;
@@ -49,5 +52,11 @@ describe('persistent focus sessions', () => {
     const state = setup(); const started = await state.service.start(alice, { taskId: 'task-1', durationMinutes: 25, idempotencyKey: 'focus-version-1' });
     state.repository.updateIfVersion = vi.fn().mockRejectedValue(new RepositoryError('INVALID', 'VERSION_CONFLICT'));
     await expect(state.service.pause(alice, started.id)).rejects.toMatchObject({ code: 'FOCUS_SESSION_CONFLICT' });
+  });
+  it('allows only one concurrent mutation claim to win', async () => {
+    const state = setup(); const started = await state.service.start(alice, { taskId: 'task-1', durationMinutes: 25, idempotencyKey: 'focus-race-1' });
+    const results = await Promise.allSettled([state.service.pause(alice, started.id), state.service.pause(alice, started.id)]);
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
   });
 });

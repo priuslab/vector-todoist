@@ -22,7 +22,17 @@ migrate((app) => {
     'CREATE UNIQUE INDEX idx_focus_sessions_active_task ON focus_sessions (user, task) WHERE status != \'finished\'',
   ];
   app.save(sessions);
+  const mutations = new Collection({ type: 'base', name: 'focus_session_mutations', listRule: '@request.auth.id != "" && user = @request.auth.id', viewRule: '@request.auth.id != "" && user = @request.auth.id', createRule: '@request.auth.id != "" && user = @request.auth.id', updateRule: '@request.auth.id != "" && user = @request.auth.id', deleteRule: '@request.auth.id != "" && user = @request.auth.id', fields: [
+    { type: 'relation', name: 'user', required: true, collectionId: users.id, maxSelect: 1, cascadeDelete: true },
+    { type: 'text', name: 'session', required: true, max: 128 },
+    { type: 'text', name: 'operationKey', required: true, max: 255 },
+    { type: 'number', name: 'expectedVersion', required: true, min: 1 },
+  ] });
+  mutations.indexes = ['CREATE UNIQUE INDEX idx_focus_session_mutations_key ON focus_session_mutations (user, session, operationKey)'];
+  app.save(mutations);
 }, (app) => {
   const sessions = app.findCollectionByNameOrId('focus_sessions');
+  const mutations = app.findCollectionByNameOrId('focus_session_mutations');
+  if (mutations) app.delete(mutations);
   if (sessions) app.delete(sessions);
 });

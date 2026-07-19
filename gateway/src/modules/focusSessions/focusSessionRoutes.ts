@@ -22,6 +22,8 @@ export interface FocusSessionRepository {
   create(user: VerifiedUser, input: Record<string, unknown>): Promise<FocusSessionRecord>;
   update(user: VerifiedUser, id: string, input: Record<string, unknown>): Promise<FocusSessionRecord>;
   updateIfVersion?(user: VerifiedUser, id: string, expectedVersion: number, input: Record<string, unknown>): Promise<FocusSessionRecord>;
+  claimMutation?(user: VerifiedUser, sessionId: string, operationKey: string, expectedVersion: number): Promise<boolean>;
+  releaseMutation?(user: VerifiedUser, sessionId: string, operationKey: string): Promise<void>;
 }
 
 const esc = (value: string) => value.replaceAll('\\', '\\\\').replaceAll("'", "\\'");
@@ -40,6 +42,15 @@ export function createFocusSessionRepository(client: PocketBaseClient): FocusSes
       if (!current) throw new RepositoryError('NOT_FOUND');
       if (Number(current.version ?? 0) !== expectedVersion) throw new RepositoryError('INVALID', 'VERSION_CONFLICT');
       return scoped(user).update<FocusSessionRecord>('focus_sessions', id, { ...input, user: user.userId });
+    },
+    claimMutation: async (user, sessionId, operationKey, expectedVersion) => {
+      const c = scoped(user); const filter = `user = '${esc(user.userId)}' && session = '${esc(sessionId)}' && operationKey = '${esc(operationKey)}'`;
+      if ((await c.list('focus_session_mutations', filter)).length) return false;
+      try { await c.create('focus_session_mutations', { user: user.userId, session: sessionId, operationKey, expectedVersion }); return true; }
+      catch { if ((await c.list('focus_session_mutations', filter)).length) return false; throw new RepositoryError('UNAVAILABLE'); }
+    },
+    releaseMutation: async (user, sessionId, operationKey) => {
+      const c = scoped(user); const rows = await c.list('focus_session_mutations', `user = '${esc(user.userId)}' && session = '${esc(sessionId)}' && operationKey = '${esc(operationKey)}'`); if (rows[0]) await c.delete('focus_session_mutations', rows[0].id);
     },
   };
 }
@@ -62,12 +73,15 @@ export function createFocusSessionService(deps: { repository: FocusSessionReposi
     const task = await taskRepository.get(user, taskId);
     if (!task || task.user !== user.userId) throw new FocusSessionNotFoundError();
   };
-  const update = async (user: VerifiedUser, session: FocusSessionRecord, patch: Record<string, unknown>) => {
+  const update = async (user: VerifiedUser, session: FocusSessionRecord, operation: string, patch: Record<string, unknown>) => {
+    const operationKey = `${operation}:${Number(session.version ?? 1)}`;
+    if (repository.claimMutation && !(await repository.claimMutation(user, session.id, operationKey, Number(session.version ?? 1)))) throw new FocusSessionConflictError();
     try {
       const expected = Number(session.version ?? 1);
       return await (repository.updateIfVersion ? repository.updateIfVersion(user, session.id, expected, { ...patch, version: expected + 1 }) : repository.update(user, session.id, { ...patch, version: expected + 1 }));
     } catch (error) {
       if (error instanceof RepositoryError && (error.code === 'INVALID' || error.code === 'NOT_FOUND')) throw new FocusSessionConflictError();
+      if (repository.releaseMutation) await repository.releaseMutation(user, session.id, operationKey).catch(() => {});
       throw new RepositoryError('UNAVAILABLE');
     }
   };
@@ -103,7 +117,7 @@ export function createFocusSessionService(deps: { repository: FocusSessionReposi
       if (session.status !== 'active') throw new FocusSessionConflictError();
       const paused = clock();
       if (!validNow(paused)) throw new FocusSessionValidationError();
-      return publicSession(await update(user, session, { status: 'paused', pausedAt: paused.toISOString() }));
+      return publicSession(await update(user, session, 'pause', { status: 'paused', pausedAt: paused.toISOString() }));
     },
     async resume(user, id) {
       const session = await own(user, id);
@@ -114,7 +128,7 @@ export function createFocusSessionService(deps: { repository: FocusSessionReposi
       if (!validNow(resumed) || !validNow(pausedAt) || resumed.getTime() < pausedAt.getTime()) throw new FocusSessionValidationError();
       const added = Math.max(0, Math.floor((resumed.getTime() - pausedAt.getTime()) / 1000));
       const plannedEnd = new Date(new Date(session.plannedEndAt).getTime() + added * 1000);
-      return publicSession(await update(user, session, { status: 'active', pausedAt: null, pausedSeconds: Number(session.pausedSeconds ?? 0) + added, plannedEndAt: plannedEnd.toISOString() }));
+      return publicSession(await update(user, session, 'resume', { status: 'active', pausedAt: null, pausedSeconds: Number(session.pausedSeconds ?? 0) + added, plannedEndAt: plannedEnd.toISOString() }));
     },
     async finish(user, id, raw) {
       const parsed = finishSchema.safeParse(raw ?? {});
@@ -128,7 +142,7 @@ export function createFocusSessionService(deps: { repository: FocusSessionReposi
       const started = new Date(session.startedAt);
       if (!validNow(finished) || !validNow(started)) throw new FocusSessionValidationError();
       const actualMinutes = Math.max(0, Math.round(((finished.getTime() - started.getTime()) / 60_000 - pausedSeconds / 60) * 10) / 10);
-      const result = await update(user, session, { status: 'finished', pausedAt: null, pausedSeconds, finishedAt: finished.toISOString(), actualMinutes });
+      const result = await update(user, session, 'finish', { status: 'finished', pausedAt: null, pausedSeconds, finishedAt: finished.toISOString(), actualMinutes });
       // Completing a focus session never completes its task implicitly. The explicit flag is
       // accepted for future task-confirmation UI, but task mutation remains a separate action.
       void parsed.data.completeTask;
