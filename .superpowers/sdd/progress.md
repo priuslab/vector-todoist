@@ -61,3 +61,29 @@ Task 16: implementation complete pending review. Automatic future-flexible resch
 Task 17: implementation complete pending review. Two-way Google Calendar sync foundation: random owned watch channels with renewal jobs, strict token/resource webhook validation and idempotent reconciliation queue, resource-list reconciliation with moved/deleted handling, app-origin echo suppression, owned Change Set snapshots, provider-version metadata, server-token worker repositories, explicit gateway webhook config, and VPS worker entry. Gateway: 141/141 tests, typecheck/build and diff checks pass; live Google watch/webhook and Docker runtime smoke remain deployment prerequisites.
 
 Task 18: implementation complete pending review. Telegram pairing and shared capture: expiring hashed single-use deep links, ownership-scoped status/delete routes, constant-time webhook secret validation, atomic duplicate update claims, safe unpaired replies, text/voice adaptation into the existing capture/transcription services, bounded Telegram audio download, Ukrainian replies with non-executing inline actions, PocketBase migration (including unique pairing claims), and onboarding/settings wiring. Gateway: 150/150 tests, typecheck/build; frontend: 81/81 tests and build; PocketBase rules, Compose config and diff checks pass. Live Telegram Bot API and server runtime smoke remain deployment prerequisites.
+
+Task 18: complete (`181647f..9d2905e`, review r4 PASS). Atomic pairing/dedupe and retry-safe Telegram webhook verified.
+
+Task 19: complete (`9d2905e..50223e0`, review r2 PASS). Calm Telegram reminders/rituals with timezone quiet-hours policy, durable idempotent claims, worker dispatch, retry-safe Telegram client, and authenticated settings persistence. Gateway 159/159; frontend 81/81; typecheck/build pass.
+
+Task 20: complete (`50223e0..7d4e724`, review r5 PASS). Mobile Calendar Day/Week with live timezone-safe data, locked-vs-flexible task affordances, EventSheet keyboard alternative, optimistic sync/Undo, overload/offline states, and empty-live-state safeguards. Prototype 87 tests; build PASS.
+
+Task 21: complete (`7d4e724..e2a44be`, review r4 PASS). Goals/projects/ideas/graph domain with ownership-safe CRUD, one-goal entitlement gate, transactional idempotent idea conversion + Change Set/Undo, graph endpoint validation, AI proposed/confirmed audit, and backward-compatible AI schema v2. Gateway 163 tests; prototype 87 + goals-live; typecheck/build pass.
+
+Task 22: complete (`e2a44be..0abe418`, review PASS). Deterministic Oracle alignment scores and shortest useful paths with confirmed/proposed weighting, completed-node muting, deadline-neutral logic, cycle/missing-path explanations, ownership-safe strict graph/path/insight APIs, and bounded AI fallback. Gateway 168 tests; typecheck/build pass.
+
+Task 23: complete (`0abe418..972c31d`, review PASS). Live mobile SVG Oracle graph with filters/path dimming, semantic edges, node drag, one-hand viewport pan/zoom/reset, reduced-motion/list accessibility, per-user viewport persistence, router API wiring, and fixture-gated flow. Prototype Oracle 5/5; full 91/91; build PASS.
+
+Task 24: complete (`972c31d..36811fd`, review r2 PASS). Balanced/Goal Focus scheduler mode with safe flexible-only deferrals, strict preview/apply, durable Change Set versions, generic authenticated Undo, Ukrainian mobile controls and UndoSnackbar. Gateway 171 tests; typecheck/build; prototype tests/build pass.
+
+Task 25: complete (`36811fd..35aa26e`, review r3 PASS). Stripe Test Mode Lifetime Pro entitlement with server-only client, exact raw-body HMAC, webhook-first idempotent grants/retries, stable checkout idempotency, ownership/status/paywall polling, config/Compose wiring and paywall tests. Gateway 180 tests; prototype 94; typecheck/build pass.
+
+Task 26: complete (`35aa26e..bf4c7159`, review r4 PASS). Persistent Pomodoro focus sessions with ownership-safe server lifecycle, active-session rehydration, per-run idempotency, paused-time-correct timer, durable version-scoped mutation claims for mixed races, optional notifications and no implicit task completion. Gateway 187 tests; frontend 97; typecheck/build pass.
+
+Task 27: complete (`bf4c7159..70f5055`, review r5 PASS). Consent-controlled behavioral adaptation with bounded valid-session metrics, reschedule/window/category insights, accept/reject/reset, production server and planner wiring, live settings controls, and supportive max-three Evening Review. Gateway 190 tests; prototype 98; typecheck/build pass.
+
+Task 28: complete (`70f5055..f69ad5a`, review r3 PASS). Versioned fail-closed AI goal discovery protocol with owned resumable sessions, bounded/safe structured suggestions, complete `{answers}` support, persistent editable suggestion PATCH, Ukrainian onboarding, and production dist/Docker protocol packaging. Gateway 193 tests; prototype 99; typecheck/build pass.
+
+Task 29: complete (`f69ad5a..7bccd0e`, review final PASS). Security/failure/accessibility audit matrix, named checklists, fixture-gated mobile/Oracle/keyboard/reduced-motion/failure E2E specs with file-based auth fixture loading, and proven reduced-motion CSS hardening. Gateway 193 tests; prototype 99; builds/diff-check/rules pass; E2E collection clean with expected fixture skips.
+
+Task 30: complete (`7bccd0e..7ed673b`, review PASS). Full verification/demo package: core/full demo runbooks, final release report, known limitations, production full-flow fixture-gated spec, and honest external prerequisite tracking. Gateway 193/193; prototype 99/99; typecheck/build, E2E collection (17 expected skips), rules and diff-check pass.

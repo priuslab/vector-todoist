@@ -1,16 +1,18 @@
-migrate((app) => {
-  const users = new Collection({
-    type: 'auth',
-    name: 'users',
-    listRule: '@request.auth.id != "" && id = @request.auth.id',
-    viewRule: '@request.auth.id != "" && id = @request.auth.id',
-    createRule: '',
-    updateRule: '@request.auth.id != "" && id = @request.auth.id',
-    deleteRule: '@request.auth.id != "" && id = @request.auth.id',
-    fields: [
-      { type: 'bool', name: 'onboardingCompleted', default: false },
-    ],
-  });
+ migrate((app) => {
+  let users = app.findCollectionByNameOrId('users');
+  if (!users) {
+    users = new Collection({
+      type: 'auth',
+      name: 'users',
+      listRule: '@request.auth.id != "" && id = @request.auth.id',
+      viewRule: '@request.auth.id != "" && id = @request.auth.id',
+      createRule: '',
+      updateRule: '@request.auth.id != "" && id = @request.auth.id',
+      deleteRule: '@request.auth.id != "" && id = @request.auth.id',
+      fields: [],
+    });
+  }
+  if (!users.fields.getByName('onboardingCompleted')) users.fields.add(new BoolField({ name: 'onboardingCompleted', default: false }));
   app.save(users);
 
   const workProfiles = new Collection({
@@ -143,7 +145,7 @@ migrate((app) => {
   });
   app.save(changeSets);
 }, (app) => {
-  for (const name of ['change_sets', 'ai_sessions', 'ideas', 'tasks', 'brain_dumps', 'work_profiles', 'users']) {
+  for (const name of ['change_sets', 'ai_sessions', 'ideas', 'tasks', 'brain_dumps', 'work_profiles']) {
     app.delete(app.findCollectionByNameOrId(name));
   }
 });
