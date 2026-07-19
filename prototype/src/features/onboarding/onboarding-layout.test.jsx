@@ -45,3 +45,20 @@ it("uses native time pickers and updates work hours", () => {
   fireEvent.change(start, { target: { value: "10:00" } });
   expect(start).toHaveValue("10:00");
 });
+
+it("makes quiet hours and focus settings editable", () => {
+  const quiet = render(<OnboardingFlow screenId="quiet-hours" onNext={vi.fn()} />);
+  expect(quiet.getByLabelText("Тиха година початку")).toHaveAttribute("type", "time");
+  expect(quiet.getByLabelText("Тиха година завершення")).toHaveAttribute("type", "time");
+  quiet.unmount();
+
+  render(<OnboardingFlow screenId="focus-settings" onNext={vi.fn()} />);
+  expect(screen.getByLabelText("Фокус-блок").tagName).toBe("SELECT");
+  expect(screen.getByLabelText("Перерва").tagName).toBe("SELECT");
+  expect(screen.getByLabelText("Денний ліміт").tagName).toBe("SELECT");
+});
+
+it("uses a native date picker for a manually entered goal", () => {
+  render(<GoalSetup screenId="goal-manual" onNext={vi.fn()} onRoute={vi.fn()} />);
+  expect(screen.getByLabelText("Строк")).toHaveAttribute("type", "date");
+});

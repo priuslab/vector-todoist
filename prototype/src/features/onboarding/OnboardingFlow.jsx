@@ -18,6 +18,11 @@ export function OnboardingFlow({ screenId, onBack, onNext, onCalendarConnect = o
   const [energy, setEnergy] = useState("Ранок");
   const [workStart, setWorkStart] = useState("09:00");
   const [workEnd, setWorkEnd] = useState("18:00");
+  const [quietStart, setQuietStart] = useState("21:00");
+  const [quietEnd, setQuietEnd] = useState("08:00");
+  const [focusBlock, setFocusBlock] = useState("50");
+  const [breakMinutes, setBreakMinutes] = useState("10");
+  const [dailyLimit, setDailyLimit] = useState("6");
   const item = content[screenId] ?? content["onboarding-welcome"];
   const Icon = item.icon;
   const calendar = screenId === "calendar-permission";
@@ -60,7 +65,7 @@ export function OnboardingFlow({ screenId, onBack, onNext, onCalendarConnect = o
           ) : null}
           {screenId === "quiet-hours" ? (
             <div className="form-stack">
-              <label>Не турбувати<input value="21:00–08:00" readOnly /></label>
+              <div className="form-grid"><label htmlFor="quiet-start">Тиха година початку<input id="quiet-start" type="time" value={quietStart} onChange={(event) => setQuietStart(event.target.value)} /></label><label htmlFor="quiet-end">Тиха година завершення<input id="quiet-end" type="time" value={quietEnd} onChange={(event) => setQuietEnd(event.target.value)} /></label></div>
               <label className="switch-row"><span><Bell size={20} />Ранковий план</span><input type="checkbox" defaultChecked /></label>
               <label className="switch-row"><span><Bell size={20} />Вечірній підсумок</span><input type="checkbox" defaultChecked /></label>
             </div>
@@ -77,9 +82,9 @@ export function OnboardingFlow({ screenId, onBack, onNext, onCalendarConnect = o
           ) : null}
           {screenId === "focus-settings" ? (
             <div className="form-stack">
-              <label>Фокус-блок<input value="50 хв" readOnly /></label>
-              <label>Перерва<input value="10 хв" readOnly /></label>
-              <label>Денний ліміт<input value="6 год" readOnly /></label>
+              <label htmlFor="focus-block">Фокус-блок<select id="focus-block" value={focusBlock} onChange={(event) => setFocusBlock(event.target.value)}>{[25, 50, 60, 90].map((value) => <option key={value} value={value}>{value} хв</option>)}</select></label>
+              <label htmlFor="break-minutes">Перерва<select id="break-minutes" value={breakMinutes} onChange={(event) => setBreakMinutes(event.target.value)}>{[5, 10, 15, 20].map((value) => <option key={value} value={value}>{value} хв</option>)}</select></label>
+              <label htmlFor="daily-limit">Денний ліміт<select id="daily-limit" value={dailyLimit} onChange={(event) => setDailyLimit(event.target.value)}>{[3, 4, 5, 6, 7, 8].map((value) => <option key={value} value={value}>{value} год</option>)}</select></label>
             </div>
           ) : null}
         </div>
