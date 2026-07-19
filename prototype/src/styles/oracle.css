@@ -1,10 +1,16 @@
 .oracle-toolbar { display: flex; gap: 8px; margin: 4px 0 10px; }
 .oracle-toolbar button { min-height: 40px; border: 1px solid var(--border-default); border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; color: var(--text-secondary); background: var(--bg-surface); font-size: 11px; font-weight: 700; }
-.oracle-graph { position: relative; height: 500px; margin-inline: calc(var(--screen-pad) * -1); overflow: hidden; background: var(--bg-base); touch-action: none; }
-.oracle-graph canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.graph-stage { position: absolute; inset: 0; transform-origin: center; transition: transform 160ms ease-out; }
-.oracle-node { position: absolute; z-index: 2; max-width: 104px; min-width: 48px; min-height: 48px; border: 2px solid currentColor; border-radius: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 6px; text-align: center; background: var(--bg-surface); box-shadow: var(--shadow-card); transform: translate(-50%,-50%); transition: opacity 160ms ease-out, transform 160ms ease-out; }
-.oracle-node span { max-width: 92px; overflow: hidden; font-size: 8px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.oracle-graph { position: relative; height: 500px; margin-inline: calc(var(--screen-pad) * -1); overflow: hidden; background: var(--bg-base); touch-action: none; border-block: 1px solid var(--border-default); }
+.oracle-graph--state { display: grid; place-items: center; padding: 28px; color: var(--text-secondary); font-size: 13px; text-align: center; }
+.oracle-edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.oracle-edge { stroke: #cdd1db; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.oracle-edge.is-active { stroke: var(--brand-primary); stroke-width: 3; }
+.oracle-edge.is-proposed { stroke: var(--accent-sand); stroke-dasharray: 6 5; }
+.oracle-edge.is-dimmed { opacity: .16; }
+.graph-stage { position: absolute; inset: 0; transform-origin: 195px 260px; transition: transform 160ms ease-out; }
+.oracle-node { position: absolute; z-index: 2; max-width: 112px; min-width: 52px; min-height: 52px; border: 2px solid currentColor; border-radius: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px; text-align: center; background: var(--bg-surface); box-shadow: var(--shadow-card); transform: translate(-50%,-50%); transition: opacity 160ms ease-out, transform 160ms ease-out; cursor: pointer; }
+.oracle-node span { max-width: 100px; overflow: hidden; font-size: 8px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.oracle-node small { color: var(--text-secondary); font-size: 7px; line-height: 1.1; }
 .oracle-node--goal { width: 92px; height: 74px; color: var(--oracle-goal); border-radius: 26px; font-weight: 800; }
 .oracle-node--project { width: 82px; height: 64px; color: var(--oracle-project); }
 .oracle-node--idea { color: var(--oracle-idea); }
@@ -13,8 +19,18 @@
 .oracle-node.is-selected { z-index: 4; box-shadow: 0 8px 26px rgb(36 107 94 / 22%); transform: translate(-50%,-50%) scale(1.12); }
 .oracle-node.is-dimmed { opacity: .18; }
 .oracle-node.is-path { border-width: 3px; opacity: 1; }
-.graph-zoom { position: absolute; right: 12px; bottom: 12px; z-index: 4; display: flex; flex-direction: column; gap: 5px; }
-.graph-zoom button { width: 40px; height: 40px; border: 1px solid var(--border-default); border-radius: 12px; display: grid; place-items: center; color: var(--text-primary); background: var(--bg-surface); box-shadow: var(--shadow-card); }
+.graph-controls { position: absolute; right: 12px; bottom: 12px; z-index: 4; display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--border-default); border-radius: 14px; background: rgb(255 255 255 / 94%); box-shadow: var(--shadow-card); }
+.graph-controls button { width: 40px; height: 40px; border: 0; border-radius: 10px; display: grid; place-items: center; color: var(--text-primary); background: transparent; }
+.graph-controls span { min-width: 38px; color: var(--text-secondary); font-size: 10px; text-align: center; }
+.oracle-selection-hint { position: absolute; left: 12px; right: 98px; bottom: 14px; z-index: 3; margin: 0; padding: 7px 9px; border-radius: 10px; color: var(--text-secondary); background: rgb(255 255 255 / 90%); font-size: 9px; line-height: 1.35; pointer-events: none; }
+.oracle-accessible-list { margin: 12px 0; padding: 12px; border: 1px solid var(--border-default); border-radius: 16px; background: var(--bg-surface); }
+.oracle-accessible-list[hidden] { display: none; }
+.oracle-accessible-list h2 { margin: 0 0 8px; font-size: 15px; }
+.oracle-accessible-list ul { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.oracle-accessible-list li button { width: 100%; min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid var(--border-default); border-radius: 12px; background: var(--bg-base); text-align: left; }
+.oracle-accessible-list li button[aria-pressed="true"] { border-color: var(--brand-primary); background: var(--brand-soft); }
+.oracle-accessible-list strong { font-size: 12px; }
+.oracle-accessible-list span { color: var(--text-secondary); font-size: 10px; white-space: nowrap; }
 .oracle-footer { position: relative; z-index: 5; margin-top: -10px; border: 1px solid var(--border-default); border-radius: var(--radius-large); display: grid; grid-template-columns: 90px 1fr; gap: 10px; align-items: center; padding: 12px; background: var(--bg-surface); box-shadow: var(--shadow-card); }
 .oracle-footer > div { display: flex; flex-direction: column; }
 .oracle-footer span { color: var(--text-secondary); font-size: 9px; }
@@ -23,11 +39,17 @@
 .selected-node-title { margin: 0; font-size: 19px; line-height: 1.35; }
 .selected-node-copy { margin: 8px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
 .filter-groups { display: flex; flex-direction: column; gap: 18px; }
-.filter-groups > label { display: flex; flex-direction: column; gap: 8px; color: var(--text-secondary); font-size: 11px; font-weight: 800; }
+.filter-groups > label,.filter-groups fieldset { display: flex; flex-direction: column; gap: 8px; color: var(--text-secondary); font-size: 11px; font-weight: 800; border: 0; padding: 0; margin: 0; }
+.filter-groups legend { padding: 0; }
 .filter-groups label > div { display: flex; flex-wrap: wrap; gap: 7px; }
 .filter-groups button { min-height: 38px; border: 1px solid var(--border-default); border-radius: 999px; padding: 0 12px; color: var(--text-primary); background: var(--bg-surface); font-size: 11px; }
 .filter-groups button.is-active { border-color: var(--brand-primary); color: var(--brand-primary); background: var(--brand-soft); }
 .filter-groups select { min-height: 46px; border: 1px solid var(--border-default); border-radius: 12px; padding: 0 12px; background: var(--bg-surface); }
+.filter-note { margin: 0; color: var(--text-tertiary); font-size: 11px; line-height: 1.45; }
+
+@media (prefers-reduced-motion: reduce) {
+  .graph-stage,.oracle-node { transition: none; }
+}
 .path-list { display: flex; flex-direction: column; gap: 0; margin: 18px 0; }
 .path-list > div { position: relative; min-height: 72px; display: grid; grid-template-columns: 38px 1fr; gap: 10px; align-items: center; }
 .path-list > div::after { content: ""; position: absolute; left: 18px; top: 52px; bottom: -20px; border-left: 2px solid var(--border-default); }
