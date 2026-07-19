@@ -81,8 +81,8 @@ export function CalendarScreens({ screenId = "calendar-day", onNavigate = () => 
     return () => { active = false; };
   }, [apiClient, selectedDate, timezone, view]);
 
-  const tasks = useMemo(() => (remote?.tasks?.length ? remote.tasks.map(normalizeTask) : DEMO_TASKS), [remote]);
-  const busy = useMemo(() => (remote?.slots?.length ? remote.slots.map((slot) => ({ ...slot, title: "Зайнято", locked: true, source: "google", start: new Date(slot.start).toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" }), end: new Date(slot.end).toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" }) })) : DEMO_EVENTS), [remote]);
+  const tasks = useMemo(() => (remote ? (Array.isArray(remote.tasks) ? remote.tasks.map(normalizeTask) : []) : DEMO_TASKS), [remote]);
+  const busy = useMemo(() => (remote ? (Array.isArray(remote.slots) ? remote.slots.map((slot) => ({ ...slot, title: "Зайнято", locked: true, source: "google", start: new Date(slot.start).toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" }), end: new Date(slot.end).toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" }) })) : []) : DEMO_EVENTS), [remote]);
   const items = [...tasks, ...busy];
   const overload = screenId === "calendar-overload" || remote?.overload === true || (tasks.length > 6);
 

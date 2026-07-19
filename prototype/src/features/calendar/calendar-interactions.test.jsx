@@ -68,3 +68,11 @@ it("shows a calm overload explanation and recovery action", () => {
   expect(screen.getByText("День перевантажений")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Знайти новий час" })).toBeInTheDocument();
 });
+
+it("does not inject demo events into a valid empty live calendar", async () => {
+  const apiClient = { request: vi.fn(async (path) => path.includes("today?") || path.includes("day?") ? { date: "2026-07-19", tasks: [], slots: [], stale: false } : { status: "disconnected" }) };
+  render(<CalendarScreens apiClient={apiClient} />);
+  await waitFor(() => expect(screen.getByLabelText("Розклад дня")).toBeInTheDocument());
+  expect(screen.queryByRole("button", { name: "Командний синк" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Підготувати структуру першого епізоду" })).not.toBeInTheDocument();
+});
