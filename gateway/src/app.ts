@@ -118,6 +118,7 @@ export async function buildApp({
       changeSetRepository: _services.changeSetRepository as ChangeSetRepository,
       calendarService: _services.busySlotService as BusySlotService | undefined,
       calendarEventService: _services.calendarEventService as CalendarEventService | undefined,
+      adaptationService: _services.adaptationService as import('./modules/adaptation/adaptationService.js').AdaptationService | undefined,
     }));
   }
 

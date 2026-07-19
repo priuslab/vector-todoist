@@ -10,6 +10,7 @@ import type { SchedulerBusySlot, SchedulerTask, SchedulerProfile } from '../sche
 import { applyBodySchema, applyResponseSchema, inboxResponseSchema, ideaResponseShape, planPreviewBodySchema, planPreviewSchema, taskResponseSchema, todayResponseSchema, type ChangeSetResponse, type PlanPreviewBody, type PlanPreview, type TaskResponse, type IdeaResponse } from './planSchemas.js';
 import type { BusySlotService } from '../calendar/busySlotService.js';
 import type { CalendarEventService } from '../calendar/calendarEventService.js';
+import type { AdaptationService } from '../adaptation/adaptationService.js';
 
 export class PlanNotFoundError extends Error { readonly code = 'NOT_FOUND'; }
 export class PlanValidationError extends Error { readonly code = 'INVALID_PLAN'; }
@@ -38,8 +39,9 @@ export function createPlanService(deps: {
   changeSetRepository: ChangeSetRepository;
   calendarService?: BusySlotService;
   calendarEventService?: CalendarEventService;
+  adaptationService?: AdaptationService;
 }): PlanService {
-  const { dumpRepository, analysisService, taskRepository, ideaRepository, changeSetRepository, calendarService, calendarEventService } = deps;
+  const { dumpRepository, analysisService, taskRepository, ideaRepository, changeSetRepository, calendarService, calendarEventService, adaptationService } = deps;
 
   async function preview(user: VerifiedUser, dumpId: string, input: unknown): Promise<PlanPreview> {
     const dump = await dumpRepository.get(user, dumpId);
@@ -62,7 +64,7 @@ export function createPlanService(deps: {
     }
     const busySlots: SchedulerBusySlot[] = inputBusySlots.map((slot) => ({ ...slot, locked: true }));
     let plan;
-    try { plan = buildDailyPlan({ tasks, busySlots, profile, now: asDate(body.now) }); } catch { throw new PlanValidationError(); }
+    try { plan = buildDailyPlan({ tasks, busySlots, profile, now: asDate(body.now), acceptedAdaptations: adaptationService ? await adaptationService.schedulerAdjustments(user) : [] }); } catch { throw new PlanValidationError(); }
     const scheduled = new Map<string, { start: string; end: string }>();
     for (const block of plan.blocks) if (block.taskId && !scheduled.has(block.taskId)) scheduled.set(block.taskId, { start: block.start, end: block.end });
     const proposedTasks = analysis.tasks.map((task, index) => {
