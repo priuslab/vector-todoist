@@ -15,12 +15,16 @@ import { createCalendarBusySlotRepository } from './repositories/calendarBusySlo
 import { createBusySlotService } from './modules/calendar/busySlotService.js';
 import { createCalendarEventLinkRepository, createCalendarEventService, createGoogleCalendarEventProvider } from './modules/calendar/calendarEventService.js';
 import { createJobRepository } from './modules/jobs/jobRepository.js';
+import { createCalendarWatchRepository, createCalendarWatchService } from './integrations/google/calendarWatch.js';
+import { createCalendarReconcileService } from './modules/calendar/calendarReconcileService.js';
 
 async function start(): Promise<void> {
   const config = loadConfig();
   const pocketBase = createPocketBaseClient({ baseUrl: config.pocketbaseUrl });
+  const workerPocketBase = config.pocketbaseServerToken && pocketBase.withToken ? pocketBase.withToken(config.pocketbaseServerToken) : pocketBase;
   const brainDumpRepository = createBrainDumpRepository(pocketBase);
   const calendarConnectionRepository = createCalendarConnectionRepository(pocketBase);
+  const workerCalendarConnectionRepository = createCalendarConnectionRepository(workerPocketBase);
   const calendarBusySlotRepository = createCalendarBusySlotRepository(pocketBase);
   const jobRepository = config.pocketbaseServerToken ? createJobRepository(pocketBase, { serverToken: config.pocketbaseServerToken }) : undefined;
   const googleOAuthService = config.enableGoogleIntegration && config.googleClientId && config.googleClientSecret && config.googleOAuthRedirectUri && config.googleTokenEncryptionKey
@@ -50,6 +54,15 @@ async function start(): Promise<void> {
         provider: createGoogleCalendarEventProvider({ connectionRepository: calendarConnectionRepository, googleCalendarClient: createGoogleCalendarClient({ clientId: config.googleClientId, clientSecret: config.googleClientSecret, encryptionKey: config.googleTokenEncryptionKey }) }),
         calendarId: 'primary',
       }) : undefined,
+      ...(config.pocketbaseServerToken && jobRepository ? (() => {
+        const googleCalendarClient = createGoogleCalendarClient({ clientId: config.googleClientId!, clientSecret: config.googleClientSecret!, encryptionKey: config.googleTokenEncryptionKey!, callbackUrl: config.googleWebhookUrl! });
+        const watchRepository = createCalendarWatchRepository(workerPocketBase);
+        const watchService = createCalendarWatchService({ repository: watchRepository, connectionRepository: workerCalendarConnectionRepository, provider: { watch: (input) => googleCalendarClient.watchCalendar(input), stop: (input) => googleCalendarClient.stopWatch(input) }, jobRepository });
+        const taskRepository = createTaskRepository(workerPocketBase);
+        const eventLinkRepository = createCalendarEventLinkRepository(workerPocketBase);
+        const reconcileService = createCalendarReconcileService({ linkRepository: eventLinkRepository as never, taskRepository, changeSetRepository: createChangeSetRepository(workerPocketBase), connectionRepository: workerCalendarConnectionRepository, googleCalendarClient: { getEvent: (input) => googleCalendarClient.getEvent(input as Parameters<typeof googleCalendarClient.getEvent>[0]).then((event) => event && event.id ? event as never : null) }, listEvents: (input) => googleCalendarClient.listEvents(input as Parameters<typeof googleCalendarClient.listEvents>[0]).then((events) => events.filter((event) => typeof event.id === 'string') as never) });
+        return { calendarWatchService: watchService, calendarReconcileService: reconcileService };
+      })() : {}),
     } : {}),
   } });
 

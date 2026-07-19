@@ -49,6 +49,8 @@ const configSchema = z
     HOST: requiredString,
     PORT: z.coerce.number().int().min(1).max(65_535),
     PUBLIC_WEB_ORIGIN: publicWebOrigin,
+    PUBLIC_GATEWAY_ORIGIN: publicWebOrigin.optional(),
+    GOOGLE_WEBHOOK_URL: optionalHttpUrl,
     POCKETBASE_URL: requiredString.url(),
     POCKETBASE_SERVER_TOKEN: optionalTrimmedString,
     BRAIN_DUMP_MAX_TEXT_LENGTH: z.coerce.number().int().min(1).max(20_000).default(20_000),
@@ -83,6 +85,8 @@ const configSchema = z
       if (env.NODE_ENV === 'production') {
         requireSecret(env.GOOGLE_OAUTH_REDIRECT_URI, 'GOOGLE_OAUTH_REDIRECT_URI', 'ENABLE_GOOGLE_INTEGRATION');
         requireSecret(env.GOOGLE_TOKEN_ENCRYPTION_KEY, 'GOOGLE_TOKEN_ENCRYPTION_KEY', 'ENABLE_GOOGLE_INTEGRATION');
+        requireSecret(env.PUBLIC_GATEWAY_ORIGIN, 'PUBLIC_GATEWAY_ORIGIN', 'ENABLE_GOOGLE_INTEGRATION');
+        requireSecret(env.GOOGLE_WEBHOOK_URL, 'GOOGLE_WEBHOOK_URL', 'ENABLE_GOOGLE_INTEGRATION');
       }
     }
 
@@ -104,6 +108,8 @@ const configSchema = z
     host: env.HOST,
     port: env.PORT,
     publicWebOrigin: env.PUBLIC_WEB_ORIGIN,
+    publicGatewayOrigin: env.PUBLIC_GATEWAY_ORIGIN,
+    googleWebhookUrl: env.GOOGLE_WEBHOOK_URL,
     pocketbaseUrl: env.POCKETBASE_URL,
     pocketbaseServerToken: env.POCKETBASE_SERVER_TOKEN,
     brainDumpMaxTextLength: env.BRAIN_DUMP_MAX_TEXT_LENGTH,

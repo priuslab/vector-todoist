@@ -45,6 +45,12 @@ function ruleValue(source: string, rule: string): string {
 }
 
 describe('PocketBase core schema contract', () => {
+  it('makes calendar watch plaintext token optional via a reversible follow-up migration', async () => {
+    const source = await readFile(resolve(import.meta.dirname, '../../pocketbase/pb_migrations/1784333030_calendar_watch_token_hash.js'), 'utf8');
+    expect(source).toContain('token.required = false');
+    expect(source).toContain('token.required = true');
+    expect(source).toContain('channelTokenHash');
+  });
   it('defines every user-owned collection with auth-bound access rules', async () => {
     const source = await readFile(coreMigrationPath, 'utf8');
 

@@ -32,6 +32,7 @@ import type { CalendarEventService } from './modules/calendar/calendarEventServi
 import { rescheduleRoutes } from './modules/rescheduling/rescheduleRoutes.js';
 import { createRescheduleService, type RescheduleService } from './modules/rescheduling/rescheduleService.js';
 import type { JobRepository } from './modules/jobs/jobRepository.js';
+import { calendarWebhookRoutes } from './modules/calendar/calendarWebhookRoutes.js';
 
 export interface GatewayServices {
   readonly [name: string]: unknown;
@@ -123,6 +124,12 @@ export async function buildApp({
   if (config.enableGoogleIntegration && googleOAuthService) await googleRoutes(app, googleOAuthService);
   const busySlotService = _services.busySlotService as BusySlotService | undefined;
   if (busySlotService) await calendarRoutes(app, busySlotService, _services.calendarEventService as CalendarEventService | undefined);
+  if (_services.calendarWatchService && _services.jobRepository) {
+    await calendarWebhookRoutes(app, {
+      watchService: _services.calendarWatchService as Parameters<typeof calendarWebhookRoutes>[1]['watchService'],
+      jobRepository: _services.jobRepository as Pick<JobRepository, 'getByIdempotencyKey' | 'create'>,
+    });
+  }
 
   return app;
 }

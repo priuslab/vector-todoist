@@ -8,6 +8,8 @@ function validEnv(overrides: Record<string, string | undefined> = {}): NodeJS.Pr
     HOST: '127.0.0.1',
     PORT: '8787',
     PUBLIC_WEB_ORIGIN: 'https://app.vector.test',
+    PUBLIC_GATEWAY_ORIGIN: 'https://api.vector.test',
+    GOOGLE_WEBHOOK_URL: 'https://api.vector.test/webhooks/google/calendar',
     POCKETBASE_URL: 'http://127.0.0.1:8090',
     ...overrides,
   };

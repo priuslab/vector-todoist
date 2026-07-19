@@ -2,6 +2,33 @@ import type { JobRecord, JobRepository } from './jobRepository.js';
 
 export type JobHandler = (job: JobRecord) => Promise<void>;
 
+/** Dispatches Calendar background jobs without letting untrusted webhook payloads choose ownership. */
+export function createCalendarJobHandler(deps: {
+  watchService?: { renew(user: { userId: string; email: string }, calendarId?: string): Promise<unknown> };
+  reconcileService?: { reconcile(user: { userId: string; email: string }, input: { calendarId: string; googleEventId: string; version?: string }): Promise<unknown>; reconcileWatch?(user: { userId: string; email: string }, input: { calendarId: string }): Promise<unknown> };
+  resolveUser: (userId: string) => Promise<{ userId: string; email: string } | null>;
+}): JobHandler {
+  return async (job) => {
+    const payload = job.payloadJson && typeof job.payloadJson === 'object' ? job.payloadJson as Record<string, unknown> : {};
+    const userId = typeof job.user === 'string' ? job.user : typeof payload.userId === 'string' ? payload.userId : '';
+    if (!userId) throw new Error('JOB_OWNER_REQUIRED');
+    const user = await deps.resolveUser(userId);
+    if (!user || user.userId !== userId) throw new Error('JOB_OWNER_UNAVAILABLE');
+    if (job.type === 'calendar.watch.renew') {
+      if (!deps.watchService || typeof payload.calendarId !== 'string') throw new Error('CALENDAR_WATCH_HANDLER_UNAVAILABLE');
+      await deps.watchService.renew(user, payload.calendarId);
+      return;
+    }
+    if (job.type === 'calendar.reconcile') {
+      if (!deps.reconcileService || typeof payload.calendarId !== 'string') throw new Error('CALENDAR_RECONCILE_HANDLER_UNAVAILABLE');
+      if (!deps.reconcileService.reconcileWatch) throw new Error('CALENDAR_RECONCILE_SYNC_UNAVAILABLE');
+      await deps.reconcileService.reconcileWatch(user, { calendarId: payload.calendarId });
+      return;
+    }
+    throw new Error('UNKNOWN_CALENDAR_JOB');
+  };
+}
+
 export function createJobRunner(options: {
   repository: Pick<JobRepository, 'claim' | 'complete' | 'fail'>;
   handler: JobHandler;

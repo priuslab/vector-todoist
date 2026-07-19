@@ -16,11 +16,15 @@ export type CalendarEventLink = {
   idempotencyKey: string;
   status: 'pending' | 'synced' | 'sync_pending' | 'attention' | 'unscheduled';
   lastError?: string;
+  /** Last Google event version acknowledged by reconciliation (etag/updated). */
+  providerVersion?: string;
 };
 
 export interface CalendarEventLinkRepository {
   getByTask(user: VerifiedUser, taskId: string): Promise<CalendarEventLink | null>;
   getByIdempotencyKey(user: VerifiedUser, key: string): Promise<CalendarEventLink | null>;
+  getByGoogleEvent?(user: VerifiedUser, calendarId: string, googleEventId: string): Promise<CalendarEventLink | null>;
+  listByCalendar?(user: VerifiedUser, calendarId: string): Promise<CalendarEventLink[]>;
   create(user: VerifiedUser, input: Omit<CalendarEventLink, 'id' | 'user'>): Promise<CalendarEventLink>;
   update(user: VerifiedUser, id: string, input: Partial<CalendarEventLink>): Promise<CalendarEventLink>;
 }
@@ -30,6 +34,8 @@ export function createCalendarEventLinkRepository(client: PocketBaseClient): Cal
   return {
     async getByTask(user, taskId) { const rows = await scoped(user).list<CalendarEventLink>('calendar_event_links', `user = '${user.userId}' && taskId = '${taskId}'`); return rows[0] ?? null; },
     async getByIdempotencyKey(user, key) { const rows = await scoped(user).list<CalendarEventLink>('calendar_event_links', `user = '${user.userId}' && idempotencyKey = '${key}'`); return rows[0] ?? null; },
+    async getByGoogleEvent(user, calendarId, googleEventId) { const rows = await scoped(user).list<CalendarEventLink>('calendar_event_links', `user = '${user.userId}' && calendarId = '${calendarId}' && googleEventId = '${googleEventId}'`); return rows.find((row) => row.user === user.userId && row.calendarId === calendarId && row.googleEventId === googleEventId) ?? null; },
+    async listByCalendar(user, calendarId) { const rows = await scoped(user).list<CalendarEventLink>('calendar_event_links', `user = '${user.userId}' && calendarId = '${calendarId}'`); return rows.filter((row) => row.user === user.userId && row.calendarId === calendarId); },
     create: (user, input) => createOwned<CalendarEventLink>(client, 'calendar_event_links', user, input),
     update: (user, id, input) => updateOwned<CalendarEventLink>(client, 'calendar_event_links', user, id, input),
   };
@@ -48,7 +54,7 @@ export type CalendarCreateEventInput = {
 
 export interface CalendarEventProvider {
   validateUser?(user: VerifiedUser): Promise<void>;
-  createEvent(input: CalendarCreateEventInput): Promise<{ id: string; status?: string }>;
+  createEvent(input: CalendarCreateEventInput): Promise<{ id: string; status?: string; etag?: string }>;
   deleteEvent?(input: { calendarId: string; googleEventId: string }): Promise<void>;
 }
 
@@ -106,7 +112,7 @@ export function createCalendarEventService(deps: {
         if (!inFlight.has(key)) inFlight.set(key, request);
         let event: { id: string; status?: string };
         try { event = await request; } finally { if (inFlight.get(key) === request) inFlight.delete(key); }
-        link = await linkRepository.update(user, link.id, { googleEventId: event.id, status: 'synced', lastError: '' });
+        link = await linkRepository.update(user, link.id, { googleEventId: event.id, status: 'synced', lastError: '', providerVersion: (event as { etag?: string }).etag });
         await taskRepository.update(user, taskId, { syncStatus: 'synced', calendarEventId: event.id });
         if (jobRepository.complete) await jobRepository.complete((await jobRepository.getByIdempotencyKey(user, key))?.id ?? '', 'inline');
         return link;
