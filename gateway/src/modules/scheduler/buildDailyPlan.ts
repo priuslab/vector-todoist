@@ -2,6 +2,7 @@ import { compareTasks } from './scoreTask.js';
 import { explainTask } from './explainPlan.js';
 import { splitTask } from './splitTask.js';
 import type { DailyPlan, DailyPlanInput, PlannedBlock, ScheduleReason, SchedulerBusySlot, SchedulerProfile, SchedulerTask } from './types.js';
+import { applyAcceptedAdaptations } from './types.js';
 import { SchedulerValidationError } from './types.js';
 
 const minute = 60_000;
@@ -38,7 +39,8 @@ function energyFits(task: SchedulerTask, start: number, profile: SchedulerProfil
 function overlaps(start: number, end: number, occupied: Array<[number, number]>): boolean { return occupied.some(([a, b]) => start < b && end > a); }
 
 export function buildDailyPlan(input: DailyPlanInput): DailyPlan {
-  const { tasks, busySlots, profile, now, mode = 'balanced', goalId } = input;
+  const { profile, now, mode = 'balanced', goalId, busySlots } = input;
+  const tasks = (input.tasks ?? []).map((task) => applyAcceptedAdaptations(task, (input as DailyPlanInput & { acceptedAdaptations?: import('./types.js').AcceptedAdaptation[] }).acceptedAdaptations));
   if (!(now instanceof Date) || !Number.isFinite(now.getTime())) throw new SchedulerValidationError('now is required and must be a valid Date');
   if (!validClock(profile.workHours.start) || !validClock(profile.workHours.end) || profile.workHours.start >= profile.workHours.end) throw new SchedulerValidationError('Invalid workHours profile');
   if (!validClock(profile.energyPeak.start) || !validClock(profile.energyPeak.end) || profile.energyPeak.start >= profile.energyPeak.end) throw new SchedulerValidationError('Invalid energyPeak profile');

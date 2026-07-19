@@ -45,6 +45,8 @@ import { createFocusModeService } from './modules/focus/focusModeService.js';
 import { checkoutRoutes } from './integrations/stripe/checkoutRoutes.js';
 import { stripeWebhookRoutes } from './integrations/stripe/stripeWebhookRoutes.js';
 import { focusSessionRoutes, createFocusSessionService, type FocusSessionRepository } from './modules/focusSessions/focusSessionRoutes.js';
+import { adaptationRoutes } from './modules/adaptation/adaptationRoutes.js';
+import { createAdaptationService, createAdaptationRepository } from './modules/adaptation/adaptationService.js';
 
 export interface GatewayServices {
   readonly [name: string]: unknown;
@@ -147,6 +149,9 @@ export async function buildApp({
   if (_services.goalGraphRepository || _services.oracleService) {
     await oracleRoutes(app, (_services.oracleService as import('./modules/oracle/oracleService.js').OracleService | undefined) ?? createOracleService({ repository: _services.goalGraphRepository as GoalGraphRepository, taskRepository }));
   }
+
+  if (_services.adaptationService) await adaptationRoutes(app, _services.adaptationService as import('./modules/adaptation/adaptationService.js').AdaptationService);
+  else if (_services.adaptationClient) await adaptationRoutes(app, createAdaptationService(createAdaptationRepository(_services.adaptationClient as import('./pocketbase/client.js').PocketBaseClient)));
 
   const googleOAuthService = _services.googleOAuthService as GoogleOAuthService | undefined;
   if (config.enableGoogleIntegration && googleOAuthService) await googleRoutes(app, googleOAuthService);
