@@ -27,6 +27,14 @@ export function createGoalService(deps: { repository: GoalGraphRepository; chang
   const getGoal = async (u: VerifiedUser, id: string) => owned(u, await r.goals.get(u, id));
   const getProject = async (u: VerifiedUser, id: string) => owned(u, await r.projects.get(u, id));
   const getIdea = async (u: VerifiedUser, id: string) => owned(u, await r.ideas.get(u, id));
+  const conversionLocks = new Map<string, Promise<unknown>>();
+  async function withConversionLock<T>(key: string, work: () => Promise<T>): Promise<T> { const prior = conversionLocks.get(key) ?? Promise.resolve(); let release!: () => void; const current = new Promise<void>((resolve) => { release = resolve; }); conversionLocks.set(key, prior.then(() => current)); await prior; try { return await work(); } finally { release(); if (conversionLocks.get(key) === current) conversionLocks.delete(key); } }
+  async function assertNode(u: VerifiedUser, type: string, id: string) {
+    if (type === 'goal') await getGoal(u, id);
+    else if (type === 'project') await getProject(u, id);
+    else if (type === 'idea') await getIdea(u, id);
+    else if (type === 'task' || type === 'completed') { if (!taskRepository) throw new GoalNotFoundError(); const task = await taskRepository.get(u, id); if (!task || task.user !== u.userId || (type === 'completed' && task.status !== 'completed')) throw new GoalNotFoundError(); }
+  }
   async function previewConversion(u: VerifiedUser, ideaId: string, input: unknown) { const idea = await getIdea(u, ideaId); if (idea.status === 'converted') throw new GoalConflictError(); const parsed = convertPreviewSchema.safeParse(input ?? {}); if (!parsed.success) throw new GoalValidationError(); const projectTitle = parsed.data.projectTitle ?? idea.summary ?? idea.text ?? 'Новий проєкт'; const taskTitles = parsed.data.taskTitles ?? ['Уточнити наступний крок', 'Підготувати перший результат']; if (parsed.data.goalId) await getGoal(u, parsed.data.goalId); return { idea: strip(idea), project: { title: projectTitle, goalId: parsed.data.goalId ?? idea.goalId ?? null, status: 'active' }, tasks: taskTitles.map((title, index) => ({ title, status: 'inbox', priority: index === 0 ? 'high' : 'medium', estimatedMinutes: 25 })), requiresConfirmation: true }; }
   return {
     goals: {
@@ -49,27 +57,41 @@ export function createGoalService(deps: { repository: GoalGraphRepository; chang
     },
     graph: {
       list: (u) => r.edges.list(u),
-      async create(u, input) { const parsed = edgeCreateSchema.safeParse(input ?? {}); if (!parsed.success) throw new GoalValidationError(); if (parsed.data.actor === 'ai' && parsed.data.status === 'confirmed') throw new GoalValidationError(); return r.edges.create(u, parsed.data); },
-      async update(u, id, input) { const parsed = edgePatchSchema.safeParse(input ?? {}); if (!parsed.success) throw new GoalValidationError(); const current = owned(u, await r.edges.get(u, id)); if (parsed.data.actor === 'ai' && parsed.data.status === 'confirmed') throw new GoalValidationError(); return r.edges.update(u, current.id, parsed.data); },
+      async create(u, input) { const parsed = edgeCreateSchema.safeParse(input ?? {}); if (!parsed.success) throw new GoalValidationError(); if (parsed.data.actor === 'ai' && parsed.data.status === 'confirmed' && parsed.data.confirmedBy !== u.userId) throw new GoalValidationError(); await assertNode(u, parsed.data.fromType, parsed.data.fromId); await assertNode(u, parsed.data.toType, parsed.data.toId); return r.edges.create(u, parsed.data); },
+      async update(u, id, input) { const parsed = edgePatchSchema.safeParse(input ?? {}); if (!parsed.success) throw new GoalValidationError(); const current = owned(u, await r.edges.get(u, id)); if (parsed.data.actor === 'ai' && parsed.data.status === 'confirmed' && parsed.data.confirmedBy !== u.userId) throw new GoalValidationError(); await assertNode(u, parsed.data.fromType ?? String(current.fromType), parsed.data.fromId ?? String(current.fromId)); await assertNode(u, parsed.data.toType ?? String(current.toType), parsed.data.toId ?? String(current.toId)); return r.edges.update(u, current.id, parsed.data); },
       async delete(u, id) { const current = owned(u, await r.edges.get(u, id)); return r.edges.delete(u, current.id); },
     },
     conversion: {
       preview: previewConversion,
       async apply(u, ideaId, input) {
-        const parsed = convertApplySchema.safeParse(input ?? {}); if (!parsed.success) throw new GoalValidationError(); const idea = await getIdea(u, ideaId); if (idea.status === 'converted') { const prior = (await changes.list(u)).find((c) => c.kind === 'idea_conversion' && c.taskId === ideaId && c.status === 'applied'); if (prior) return { changeSet: prior, idea }; throw new GoalConflictError(); }
-        const key = parsed.data.idempotencyKey ?? `idea-convert:${u.userId}:${ideaId}`; const existing = (await changes.list(u)).find((c) => c.idempotencyKey === key); if (existing?.status === 'applied') return { changeSet: existing, idea: await getIdea(u, ideaId) };
-        const { confirm: _confirm, idempotencyKey: _key, ...conversionInput } = parsed.data; const preview = await previewConversion(u, ideaId, conversionInput); const before = { idea: strip(idea) }; const created: { project?: ProjectRecord; tasks: unknown[] } = { tasks: [] };
-        try {
-          created.project = await r.projects.create(u, preview.project as Record<string, unknown>);
-          if (taskRepository) for (const task of preview.tasks as Array<Record<string, unknown>>) created.tasks.push(await taskRepository.create(u, { ...task, projectId: created.project.id, sourceIdea: ideaId }));
-          const updatedIdea = await r.ideas.update(u, ideaId, { status: 'converted', projectId: created.project.id });
-          const change = existing ?? await changes.create(u, { kind: 'idea_conversion', status: 'pending', idempotencyKey: key, taskId: ideaId, beforeJson: before, afterJson: { idea: strip(updatedIdea), project: strip(created.project), tasks: created.tasks } });
-          const applied = await changes.update(u, change.id, { status: 'applied', afterJson: { idea: strip(updatedIdea), project: strip(created.project), tasks: created.tasks } });
-          return { changeSet: applied, idea: updatedIdea, project: created.project, tasks: created.tasks };
-        } catch (error) {
-          if (created.project) { try { await r.projects.delete(u, created.project.id); } catch { /* retain retryable change */ } }
-          throw error instanceof RepositoryError ? error : new GoalConflictError();
-        }
+        const parsed = convertApplySchema.safeParse(input ?? {}); if (!parsed.success) throw new GoalValidationError();
+        const key = parsed.data.idempotencyKey ?? `idea-convert:${u.userId}:${ideaId}`;
+        return withConversionLock(`${u.userId}:${key}`, async () => {
+          const idea = await getIdea(u, ideaId); const prior = (await changes.list(u)).find((c) => c.idempotencyKey === key || (c.kind === 'idea_conversion' && c.ideaId === ideaId));
+          if (prior?.status === 'applied') return { changeSet: prior, idea: await getIdea(u, ideaId) };
+          if (idea.status === 'converted') throw new GoalConflictError();
+          const { confirm: _confirm, idempotencyKey: _key, ...conversionInput } = parsed.data; const preview = await previewConversion(u, ideaId, conversionInput); const before = { idea: strip(idea) };
+          let change = prior;
+          if (!change) {
+            try { change = await changes.create(u, { kind: 'idea_conversion', status: 'pending', idempotencyKey: key, ideaId, beforeJson: before, afterJson: preview }); }
+            catch { const raced = (await changes.list(u)).find((c) => c.idempotencyKey === key); if (raced?.status === 'applied') return { changeSet: raced, idea: await getIdea(u, ideaId) }; if (raced) throw new GoalConflictError(); throw new RepositoryError('UNAVAILABLE'); }
+          }
+          const createdTasks: Array<{ id: string; [key: string]: unknown }> = []; let createdProject: ProjectRecord | undefined; let updatedIdea: IdeaRecord | undefined;
+          try {
+            createdProject = await r.projects.create(u, preview.project as Record<string, unknown>);
+            if (taskRepository) for (const task of preview.tasks as Array<Record<string, unknown>>) createdTasks.push(await taskRepository.create(u, { ...task, projectId: createdProject.id, sourceIdea: ideaId }) as { id: string; [key: string]: unknown });
+            updatedIdea = await r.ideas.update(u, ideaId, { status: 'converted', projectId: createdProject.id });
+            const appliedPayload = { idea: strip(updatedIdea), project: strip(createdProject), tasks: createdTasks };
+            const applied = await changes.update(u, change.id, { status: 'applied', afterJson: appliedPayload });
+            return { changeSet: applied, idea: updatedIdea, project: createdProject, tasks: createdTasks };
+          } catch (error) {
+            for (const task of createdTasks) { try { if (taskRepository) await taskRepository.delete(u, task.id); } catch { /* compensation is best effort */ } }
+            if (createdProject) { try { await r.projects.delete(u, createdProject.id); } catch { /* compensation is best effort */ } }
+            if (updatedIdea || idea.status !== 'backlog') { try { await r.ideas.update(u, ideaId, strip(idea)); } catch { /* retain explicit failed status */ } }
+            try { await changes.update(u, change.id, { status: 'failed' }); } catch { /* retry can inspect reservation */ }
+            throw error instanceof RepositoryError ? error : new GoalConflictError();
+          }
+        });
       },
       async undo(u, changeSetId) {
         const change = await changes.get(u, changeSetId); if (!change || change.user !== u.userId || change.kind !== 'idea_conversion') throw new GoalNotFoundError(); if (change.status === 'undone') return { changeSet: change };

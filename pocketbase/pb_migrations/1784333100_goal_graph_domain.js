@@ -35,12 +35,13 @@ migrate((app) => {
     { type: 'relation', name: 'user', required: true, collectionId: users.id, maxSelect: 1, cascadeDelete: true },
     { type: 'select', name: 'fromType', required: true, maxSelect: 1, values: ['goal', 'project', 'idea', 'task', 'completed'] }, { type: 'text', name: 'fromId', required: true, max: 128 },
     { type: 'select', name: 'toType', required: true, maxSelect: 1, values: ['goal', 'project', 'idea', 'task', 'completed'] }, { type: 'text', name: 'toId', required: true, max: 128 },
-    { type: 'select', name: 'actor', required: true, maxSelect: 1, values: ['user', 'ai'] }, { type: 'select', name: 'status', required: true, maxSelect: 1, values: ['proposed', 'confirmed', 'rejected'] },
+    { type: 'select', name: 'actor', required: true, maxSelect: 1, values: ['user', 'ai'] }, { type: 'select', name: 'status', required: true, maxSelect: 1, values: ['proposed', 'confirmed', 'rejected'] }, { type: 'text', name: 'confirmedBy', required: false, max: 128 },
     { type: 'number', name: 'confidence', required: false, min: 0, max: 1 }, { type: 'text', name: 'rationale', required: false, max: 1_000 },
   ] });
   graph.indexes = ['CREATE INDEX idx_graph_edges_user_from ON graph_edges (user, fromType, fromId)', 'CREATE INDEX idx_graph_edges_user_to ON graph_edges (user, toType, toId)']; app.save(graph);
-  if (changes) { const kind = changes.fields.getByName ? changes.fields.getByName('kind') : changes.fields.find((field) => field.name === 'kind'); if (kind && Array.isArray(kind.values) && !kind.values.includes('idea_conversion')) kind.values = [...kind.values, 'idea_conversion']; app.save(changes); }
+  if (changes) { const kind = changes.fields.getByName ? changes.fields.getByName('kind') : changes.fields.find((field) => field.name === 'kind'); if (kind && Array.isArray(kind.values) && !kind.values.includes('idea_conversion')) kind.values = [...kind.values, 'idea_conversion']; if (ideas && !changes.fields.find((field) => field.name === 'ideaId')) changes.fields.push({ type: 'relation', name: 'ideaId', required: false, collectionId: ideas.id, maxSelect: 1, cascadeDelete: false }); app.save(changes); }
 }, (app) => {
   for (const name of ['graph_edges', 'projects', 'goals']) { const collection = app.findCollectionByNameOrId(name); if (collection) app.delete(collection); }
   const ideas = app.findCollectionByNameOrId('ideas'); if (ideas) { for (const field of ['goalId', 'projectId']) { const existing = ideas.fields.getByName ? ideas.fields.getByName(field) : ideas.fields.find((item) => item.name === field); if (existing) ideas.fields.removeById(existing.id); } app.save(ideas); }
+  const changes = app.findCollectionByNameOrId('change_sets'); if (changes) { const existing = changes.fields.getByName ? changes.fields.getByName('ideaId') : changes.fields.find((item) => item.name === 'ideaId'); if (existing) changes.fields.removeById(existing.id); app.save(changes); }
 });
