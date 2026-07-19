@@ -18,7 +18,7 @@ export async function goalDiscoveryRoutes(app: FastifyInstance, service: GoalDis
   app.post('/api/v1/goals/discovery/sessions', secured, safe((request) => service.start(request.user)));
   app.get('/api/v1/goals/discovery/sessions/:id', secured, safe((request: FastifyRequest<{ Params: { id: string } }>) => service.get(request.user, request.params.id)));
   app.post('/api/v1/goals/discovery/sessions/:id/answers', secured, safe((request: FastifyRequest<{ Params: { id: string }; Body: unknown }>) => service.answer(request.user, request.params.id, request.body)));
-  app.post('/api/v1/goals/discovery/sessions/:id/complete', secured, safe((request: FastifyRequest<{ Params: { id: string } }>) => service.complete(request.user, request.params.id)));
+  app.post('/api/v1/goals/discovery/sessions/:id/complete', secured, safe((request: FastifyRequest<{ Params: { id: string }; Body: unknown }>) => service.complete(request.user, request.params.id, request.body)));
   app.patch('/api/v1/goals/discovery/sessions/:id/suggestion', secured, safe((request: FastifyRequest<{ Params: { id: string }; Body: unknown }>) => service.edit(request.user, request.params.id, request.body)));
   app.post('/api/v1/goals/discovery/sessions/:id/skip', secured, safe((request: FastifyRequest<{ Params: { id: string } }>) => service.skip(request.user, request.params.id)));
 }
