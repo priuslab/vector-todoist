@@ -72,6 +72,7 @@ const configSchema = z
     TELEGRAM_WEBHOOK_SECRET: optionalTrimmedString,
     STRIPE_SECRET_KEY: optionalTrimmedString,
     STRIPE_WEBHOOK_SECRET: optionalTrimmedString,
+    STRIPE_PRICE_ID: optionalTrimmedString,
   })
   .superRefine((env, context) => {
     const requireSecret = (value: string | undefined, field: string, flag: string) => {
@@ -99,6 +100,7 @@ const configSchema = z
     if (env.ENABLE_STRIPE_INTEGRATION) {
       requireSecret(env.STRIPE_SECRET_KEY, 'STRIPE_SECRET_KEY', 'ENABLE_STRIPE_INTEGRATION');
       requireSecret(env.STRIPE_WEBHOOK_SECRET, 'STRIPE_WEBHOOK_SECRET', 'ENABLE_STRIPE_INTEGRATION');
+      requireSecret(env.STRIPE_PRICE_ID, 'STRIPE_PRICE_ID', 'ENABLE_STRIPE_INTEGRATION');
     }
 
     if (env.NODE_ENV === 'production') {
@@ -133,6 +135,7 @@ const configSchema = z
     telegramWebhookSecret: env.TELEGRAM_WEBHOOK_SECRET,
     stripeSecretKey: env.STRIPE_SECRET_KEY,
     stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET,
+    stripePriceId: env.STRIPE_PRICE_ID,
   }));
 
 export type GatewayConfig = z.infer<typeof configSchema>;

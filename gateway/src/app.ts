@@ -42,6 +42,8 @@ import { oracleRoutes } from './modules/oracle/oracleRoutes.js';
 import { createOracleService } from './modules/oracle/oracleService.js';
 import { focusModeRoutes } from './modules/focus/focusModeRoutes.js';
 import { createFocusModeService } from './modules/focus/focusModeService.js';
+import { checkoutRoutes } from './integrations/stripe/checkoutRoutes.js';
+import { stripeWebhookRoutes } from './integrations/stripe/stripeWebhookRoutes.js';
 
 export interface GatewayServices {
   readonly [name: string]: unknown;
@@ -156,6 +158,8 @@ export async function buildApp({
   if (config.enableTelegramIntegration && _services.telegramPairingService) {
     await telegramRoutes(app, _services.telegramPairingService as Parameters<typeof telegramRoutes>[1], { webhookSecret: config.telegramWebhookSecret, onUpdate: _services.telegramUpdateHandler as ((update: unknown) => Promise<void>) | undefined });
   }
+  if (config.enableStripeIntegration && _services.stripeBillingService) await checkoutRoutes(app, _services.stripeBillingService as Parameters<typeof checkoutRoutes>[1]);
+  if (config.enableStripeIntegration && _services.stripeWebhookService) await stripeWebhookRoutes(app, _services.stripeWebhookService as Parameters<typeof stripeWebhookRoutes>[1]);
 
   return app;
 }

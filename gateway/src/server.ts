@@ -23,11 +23,17 @@ import { createTelegramCaptureHandler, createTelegramUpdateStore } from './integ
 import { createGeminiTranscriptionAdapter, createTranscriptionService } from './modules/transcription/transcriptionService.js';
 import { createAudioStorage } from './modules/transcription/audioStorage.js';
 import { createGoalGraphRepository } from './repositories/goalGraphRepository.js';
+import { createStripeClient } from './integrations/stripe/stripeClient.js';
+import { createStripeBillingService } from './integrations/stripe/checkoutRoutes.js';
+import { createStripeWebhookService } from './integrations/stripe/stripeWebhookRoutes.js';
+import { createEntitlementRepository } from './repositories/entitlementRepository.js';
 
 async function start(): Promise<void> {
   const config = loadConfig();
   const pocketBase = createPocketBaseClient({ baseUrl: config.pocketbaseUrl });
   const workerPocketBase = config.pocketbaseServerToken && pocketBase.withToken ? pocketBase.withToken(config.pocketbaseServerToken) : pocketBase;
+  const entitlementRepository = config.enableStripeIntegration ? createEntitlementRepository(workerPocketBase) : undefined;
+  const stripeClient = config.enableStripeIntegration && config.stripeSecretKey && config.stripePriceId ? createStripeClient({ secretKey: config.stripeSecretKey }) : undefined;
   const brainDumpRepository = createBrainDumpRepository(pocketBase);
   const calendarConnectionRepository = createCalendarConnectionRepository(pocketBase);
   const workerCalendarConnectionRepository = createCalendarConnectionRepository(workerPocketBase);
@@ -52,6 +58,11 @@ async function start(): Promise<void> {
     goalGraphRepository: createGoalGraphRepository(pocketBase),
     changeSetRepository: createChangeSetRepository(pocketBase),
     ...(jobRepository ? { jobRepository } : {}),
+    ...(stripeClient && entitlementRepository && config.stripeWebhookSecret && config.stripePriceId ? {
+      stripeBillingService: createStripeBillingService({ client: stripeClient, repository: entitlementRepository, priceId: config.stripePriceId, mode: stripeClient.mode, webOrigin: config.publicWebOrigin }),
+      stripeWebhookService: createStripeWebhookService({ secret: config.stripeWebhookSecret, priceId: config.stripePriceId, mode: stripeClient.mode, repository: entitlementRepository, resolveUser: async (userId) => { const rows = await workerPocketBase.list<{ id: string }>('users', `id = '${userId.replaceAll("'", "\\'")}'`); return rows.some((row) => row.id === userId); } }),
+      goalEntitlement: async (user: { userId: string }) => Boolean(await entitlementRepository.get(user.userId, 'lifetime_pro')),
+    } : {}),
     ...(googleOAuthService ? { googleOAuthService } : {}),
     ...(telegramPairingService ? { telegramPairingService } : {}),
     ...(telegramHandler ? { telegramUpdateHandler: telegramHandler.handle } : {}),
