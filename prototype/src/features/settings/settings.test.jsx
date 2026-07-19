@@ -30,10 +30,10 @@ it("does not add an action footer to settings home", () => {
   expect(screen.queryByTestId("action-footer")).not.toBeInTheDocument();
 });
 
-it("uses editable native controls for work and energy settings", () => {
+it("uses editable controls for work and energy settings", () => {
   const work = render(<SettingsScreens screenId="settings-work" />);
-  expect(work.getByLabelText("Початок")).toHaveAttribute("type", "time");
-  expect(work.getByLabelText("Завершення")).toHaveAttribute("type", "time");
+  expect(work.getByRole("button", { name: "Початок 09:00" })).toBeInTheDocument();
+  expect(work.getByRole("button", { name: "Завершення 18:00" })).toBeInTheDocument();
   work.unmount();
 
   render(<SettingsScreens screenId="settings-energy" />);

@@ -3,6 +3,7 @@ import { Bell, CalendarBlank, Clock, Lightning, Moon, Timer } from "@phosphor-ic
 import { AppFrame } from "../../components/AppFrame";
 import { Button } from "../../components/Button";
 import { SegmentedControl } from "../../components/SegmentedControl";
+import { TimePicker } from "../../components/TimePicker";
 
 const content = {
   "onboarding-welcome": { icon: CalendarBlank, title: "Налаштуй Вектор під свій ритм", text: "Три короткі кроки — календар, енергія та головна мета. Усе можна змінити пізніше." },
@@ -59,13 +60,13 @@ export function OnboardingFlow({ screenId, onBack, onNext, onCalendarConnect = o
                 value={days}
                 onChange={setDays}
               />
-              <label htmlFor="work-start">Початок<input id="work-start" type="time" value={workStart} onChange={(event) => setWorkStart(event.target.value)} /></label>
-              <label htmlFor="work-end">Завершення<input id="work-end" type="time" value={workEnd} onChange={(event) => setWorkEnd(event.target.value)} /></label>
+              <TimePicker label="Початок" value={workStart} onChange={setWorkStart} title="Вибери час початку" />
+              <TimePicker label="Завершення" value={workEnd} onChange={setWorkEnd} title="Вибери час завершення" />
             </div>
           ) : null}
           {screenId === "quiet-hours" ? (
             <div className="form-stack">
-              <div className="form-grid"><label htmlFor="quiet-start">Тиха година початку<input id="quiet-start" type="time" value={quietStart} onChange={(event) => setQuietStart(event.target.value)} /></label><label htmlFor="quiet-end">Тиха година завершення<input id="quiet-end" type="time" value={quietEnd} onChange={(event) => setQuietEnd(event.target.value)} /></label></div>
+              <div className="form-grid"><TimePicker label="Тиха година початку" value={quietStart} onChange={setQuietStart} title="Вибери початок тихих годин" /><TimePicker label="Тиха година завершення" value={quietEnd} onChange={setQuietEnd} title="Вибери завершення тихих годин" /></div>
               <label className="switch-row"><span><Bell size={20} />Ранковий план</span><input type="checkbox" defaultChecked /></label>
               <label className="switch-row"><span><Bell size={20} />Вечірній підсумок</span><input type="checkbox" defaultChecked /></label>
             </div>

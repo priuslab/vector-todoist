@@ -35,21 +35,19 @@ it("centers the goal-test result heading without centering manual goal forms", (
   expect(manual.container.querySelector(".goal-test-result-content")).not.toBeInTheDocument();
 });
 
-it("uses native time pickers and updates work hours", () => {
+it("opens custom time pickers and updates work hours", () => {
   render(<OnboardingFlow screenId="work-rhythm" onNext={vi.fn()} />);
 
-  const start = screen.getByLabelText("Початок");
-  const end = screen.getByLabelText("Завершення");
-  expect(start).toHaveAttribute("type", "time");
-  expect(end).toHaveAttribute("type", "time");
-  fireEvent.change(start, { target: { value: "10:00" } });
-  expect(start).toHaveValue("10:00");
+  fireEvent.click(screen.getByRole("button", { name: "Початок 09:00" }));
+  expect(screen.getByRole("dialog", { name: "Вибери час початку" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("option", { name: "10:00" }));
+  expect(screen.getByRole("button", { name: "Початок 10:00" })).toBeInTheDocument();
 });
 
 it("makes quiet hours and focus settings editable", () => {
   const quiet = render(<OnboardingFlow screenId="quiet-hours" onNext={vi.fn()} />);
-  expect(quiet.getByLabelText("Тиха година початку")).toHaveAttribute("type", "time");
-  expect(quiet.getByLabelText("Тиха година завершення")).toHaveAttribute("type", "time");
+  expect(quiet.getByRole("button", { name: "Тиха година початку 21:00" })).toBeInTheDocument();
+  expect(quiet.getByRole("button", { name: "Тиха година завершення 08:00" })).toBeInTheDocument();
   quiet.unmount();
 
   render(<OnboardingFlow screenId="focus-settings" onNext={vi.fn()} />);
