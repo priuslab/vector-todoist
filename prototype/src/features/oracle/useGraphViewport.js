@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const DEFAULT_VIEWPORT = { x: 0, y: 0, scale: 1 };
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
-export function useGraphViewport({ storageKey = "vector-oracle-viewport-v1" } = {}) {
+export function useGraphViewport({ storageKey = "vector-oracle-viewport-v1:local" } = {}) {
   const [viewport, setViewport] = useState(() => {
     try {
       const saved = JSON.parse(globalThis.localStorage?.getItem(storageKey) ?? "null");
