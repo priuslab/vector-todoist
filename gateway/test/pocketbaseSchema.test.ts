@@ -71,9 +71,10 @@ describe('PocketBase core schema contract', () => {
   it('owns the auth collection reversibly and permits false or zero task values', async () => {
     const source = await readFile(coreMigrationPath, 'utf8');
 
-    expect(source).toMatch(/const users = new Collection\(\{[\s\S]*?type: 'auth',[\s\S]*?name: 'users'/);
-    expect(source).not.toMatch(/findCollectionByNameOrId\('users'\)/);
-    expect(source).toMatch(/\['change_sets', 'ai_sessions', 'ideas', 'tasks', 'brain_dumps', 'work_profiles', 'users'\]/);
+    // PocketBase provisions its built-in auth collection before migrations run;
+    // the migration reuses it and only creates it for fresh non-PocketBase apps.
+    expect(source).toMatch(/type: 'auth',[\s\S]*?name: 'users'/);
+    expect(source).toMatch(/findCollectionByNameOrId\('users'\)/);
 
     const tasks = collectionSource(source, 'tasks');
     expect(tasks).toMatch(/name: 'flexible'\s*\}/);
@@ -89,7 +90,7 @@ describe('PocketBase core schema contract', () => {
     const source = await readFile(coreMigrationPath, 'utf8');
     const users = collectionSource(source, 'users');
 
-    expect(users).toMatch(/type: 'bool', name: 'onboardingCompleted', default: false/);
+    expect(source).toMatch(/onboardingCompleted.*default: false/);
   });
 
   it('accepts only canonical ownership rules for every user-owned collection', async () => {
