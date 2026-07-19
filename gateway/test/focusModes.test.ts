@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createFocusModeService } from '../src/modules/focus/focusModeService.js';
+import { createUndoService } from '../src/modules/changeSets/undoService.js';
 
 const user = { userId: 'alice', email: 'alice@example.test' } as any;
 function setup() {
@@ -30,6 +31,9 @@ describe('focus modes', () => {
     const state = setup(); const first = await state.service.apply(user, input()); const second = await state.service.apply(user, input());
     expect(first.changeSet.id).toBe(second.changeSet.id); expect(state.changes).toHaveLength(1); expect(state.tasks.find((task) => task.id === 'unrelated').status).toBe('needs_reschedule');
     expect(first.deferred[0].reason).toContain('Balanced'); expect(first.undoId).toBe(first.changeSet.id);
+    const undone = await createUndoService(state).undo(user, first.undoId);
+    expect(undone.changeSet.status).toBe('undone');
+    expect(state.tasks.find((task) => task.id === 'unrelated')).toMatchObject({ status: 'scheduled', plannedStart: '2026-07-20T15:00:00+02:00', version: 3 });
     await expect(state.service.preview({ userId: 'bob' } as any, input())).resolves.toBeTruthy();
     expect(state.tasks.find((task) => task.id === 'other-user').status).toBe('scheduled');
   });

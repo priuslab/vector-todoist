@@ -47,6 +47,7 @@ export function TodayScreens({ screenId = "today-normal", onNavigate = () => {},
   const [focusLoading, setFocusLoading] = useState(false);
   const [focusError, setFocusError] = useState("");
   const [focusPreview, setFocusPreview] = useState(null);
+  const [focusUndoId, setFocusUndoId] = useState(null);
   useEffect(() => { if (!apiClient || !["today-normal", "today-active", "today-overload"].includes(screenId)) return; let alive = true; const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; getToday({ apiClient, date: localDate(timezone), timezone }).then((value) => alive && setRemote(value)).catch(() => alive && setRemoteError("Не вдалося завантажити план. Спробуй оновити сторінку.")); return () => { alive = false; }; }, [apiClient, screenId]);
   const common = { title: "Сьогодні", eyebrow: "П'ятниця, 18 липня", activeRoute: "today-normal", onNavigate, avatar: true };
 
@@ -94,7 +95,7 @@ export function TodayScreens({ screenId = "today-normal", onNavigate = () => {},
     if (mode === focusMode) return;
     setFocusError(""); setFocusLoading(true);
     try {
-      if (apiClient) { const preview = await previewFocus({ apiClient, ...focusInput(mode) }); setFocusPreview(preview); await applyFocus({ apiClient, ...focusInput(mode) }); }
+      if (apiClient) { const preview = await previewFocus({ apiClient, ...focusInput(mode) }); setFocusPreview(preview); const applied = await applyFocus({ apiClient, ...focusInput(mode) }); setFocusUndoId(applied.undoId ?? applied.changeSet?.id ?? null); }
       setFocusMode(mode);
     } catch { setFocusError("Не вдалося змінити режим. План залишився без змін."); }
     finally { setFocusLoading(false); }
@@ -117,6 +118,7 @@ export function TodayScreens({ screenId = "today-normal", onNavigate = () => {},
       {screenId === "today-overload" ? <Button variant="secondary" onClick={previewReschedulePlan} disabled={rescheduleLoading}>{rescheduleLoading ? "Готую новий план…" : "Переглянути новий план"}</Button> : <Button variant="tertiary" icon={ArrowRight} onClick={() => onNavigate("calendar-day")}>Відкрити календар</Button>}
       {showUndo ? <UndoSnackbar message="Зміни застосовано — можна скасувати." onUndo={() => setShowUndo(false)} /> : null}
       {undoChange ? <UndoSnackbar message={undoChange.reschedule ? "Перепланування застосовано" : "Задачу виконано"} onUndo={undo} /> : null}
+      {focusUndoId ? <UndoSnackbar message="Goal Focus увімкнено" onUndo={async () => { if (!apiClient) { setFocusMode("balanced"); setFocusUndoId(null); return; } try { await undoChangeSet({ apiClient, id: focusUndoId }); setFocusMode("balanced"); setFocusUndoId(null); setFocusPreview(null); } catch { setFocusError("Не вдалося скасувати режим. Онови план."); } }} /> : null}
     </AppFrame>
   );
 }

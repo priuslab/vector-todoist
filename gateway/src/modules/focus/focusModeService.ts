@@ -36,11 +36,11 @@ const inputSchema = z.object({
 export type FocusInput = z.infer<typeof inputSchema>;
 
 export type FocusDeferred = { taskId: string; title: string; reason: string };
-export type FocusTaskSnapshot = { id: string; title?: string; status?: string; plannedStart?: string | null; plannedEnd?: string | null; version?: string | number; flexible?: boolean; locked?: boolean; deadline?: string | null; goalId?: string | null; goalAlignment?: number };
+export type FocusTaskSnapshot = { id: string; title?: string; description?: string; status?: string; priority?: string; plannedStart?: string | null; plannedEnd?: string | null; version?: string | number; flexible?: boolean; locked?: boolean; deadline?: string | null; estimatedMinutes?: number | null; energy?: string | null; goalId?: string | null; goalAlignment?: number };
 export type FocusPreview = { mode: FocusMode; goalId?: string; deferred: FocusDeferred[]; warnings: string[]; tasks: FocusTaskSnapshot[]; plan: ReturnType<typeof buildDailyPlan> };
 export type FocusResult = FocusPreview & { changeSet: { id: string; status: string; kind: string }; undoId: string };
 
-const snapshot = (task: TaskRecord): FocusTaskSnapshot => ({ id: task.id, title: typeof task.title === 'string' ? task.title : undefined, status: typeof task.status === 'string' ? task.status : undefined, plannedStart: typeof task.plannedStart === 'string' ? task.plannedStart : null, plannedEnd: typeof task.plannedEnd === 'string' ? task.plannedEnd : null, version: typeof task.version === 'number' || typeof task.version === 'string' ? task.version : undefined, flexible: typeof task.flexible === 'boolean' ? task.flexible : undefined, locked: typeof task.locked === 'boolean' ? task.locked : undefined, deadline: typeof task.deadline === 'string' ? task.deadline : null, goalId: typeof task.goalId === 'string' ? task.goalId : null, goalAlignment: typeof task.goalAlignment === 'number' ? task.goalAlignment : undefined });
+const snapshot = (task: TaskRecord): FocusTaskSnapshot => ({ id: task.id, title: String(task.title ?? 'Задача'), description: typeof task.description === 'string' ? task.description : undefined, status: String(task.status ?? 'scheduled'), priority: String(task.priority ?? 'medium'), plannedStart: typeof task.plannedStart === 'string' ? task.plannedStart : null, plannedEnd: typeof task.plannedEnd === 'string' ? task.plannedEnd : null, version: typeof task.version === 'number' || typeof task.version === 'string' ? task.version : undefined, flexible: typeof task.flexible === 'boolean' ? task.flexible : undefined, locked: typeof task.locked === 'boolean' ? task.locked : undefined, deadline: typeof task.deadline === 'string' ? task.deadline : null, estimatedMinutes: typeof task.estimatedMinutes === 'number' ? task.estimatedMinutes : null, energy: typeof task.energy === 'string' ? task.energy : null, goalId: typeof task.goalId === 'string' ? task.goalId : null, goalAlignment: typeof task.goalAlignment === 'number' ? task.goalAlignment : undefined });
 const publicChange = (record: ChangeSetRecord) => ({ id: record.id, status: String(record.status ?? ''), kind: String(record.kind ?? 'focus_mode') });
 const owned = (task: TaskRecord, user: VerifiedUser) => task.user === user.userId;
 
@@ -112,8 +112,9 @@ export function createFocusModeService(deps: { taskRepository: TaskRepository; c
         const current = calculated.records.find((task) => task.id === item.id);
         if (!current) throw new FocusNotFoundError();
         const patch = { plannedStart: item.plannedStart, plannedEnd: item.plannedEnd, status: item.status, version: (Number(current.version) || 0) + 1 };
-        if (taskRepository.updateIfVersion) await taskRepository.updateIfVersion(user, item.id, Number(current.version ?? 0), patch);
-        else await taskRepository.update(user, item.id, patch);
+        const updated = taskRepository.updateIfVersion ? await taskRepository.updateIfVersion(user, item.id, Number(current.version ?? 0), patch) : await taskRepository.update(user, item.id, patch);
+        const index = calculated.after.findIndex((candidate) => candidate.id === item.id);
+        if (index >= 0) calculated.after[index] = snapshot(updated);
       }
       const applied = await changeSetRepository.update(user, change.id, { status: 'applied', afterJson: { mode: calculated.mode, goalId: calculated.goalId, tasks: calculated.after, deferred: calculated.deferred, warnings: calculated.warnings } });
       return resultFrom(applied, calculated);
