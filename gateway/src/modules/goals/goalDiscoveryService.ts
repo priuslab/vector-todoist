@@ -53,6 +53,7 @@ export interface GoalDiscoveryService {
   start(user: VerifiedUser): Promise<ReturnType<typeof publicSession>>;
   get(user: VerifiedUser, id: string): Promise<ReturnType<typeof publicSession>>;
   answer(user: VerifiedUser, id: string, input: unknown): Promise<ReturnType<typeof publicSession>>;
+  complete(user: VerifiedUser, id: string): Promise<ReturnType<typeof publicSession>>;
   edit(user: VerifiedUser, id: string, input: unknown): Promise<ReturnType<typeof publicSession>>;
   skip(user: VerifiedUser, id: string): Promise<ReturnType<typeof publicSession>>;
 }
@@ -64,7 +65,8 @@ export function createGoalDiscoveryService(deps: { repository: GoalDiscoveryRepo
   const requireSession = async (user: VerifiedUser, id: string) => { const record = await deps.repository.get(user, id); if (!record || record.user !== user.userId) throw new GoalDiscoveryNotFoundError(); return record; };
   const safeAnswers = (value: unknown, p: GoalDiscoveryProtocol, existing: GoalDiscoveryAnswer[] = []): GoalDiscoveryAnswer[] => {
     const schema = z.array(z.object({ id: z.string().trim().min(1).max(64), text: z.string().trim().min(1).max(2_000) }).strict()).max(p.completion.maximumAnswers);
-    const parsed = schema.safeParse(value); if (!parsed.success) throw new GoalDiscoveryValidationError();
+    const candidate = Array.isArray(value) ? value : value && typeof value === 'object' && Array.isArray((value as { answers?: unknown }).answers) ? (value as { answers: unknown[] }).answers : value;
+    const parsed = schema.safeParse(candidate); if (!parsed.success) throw new GoalDiscoveryValidationError();
     const answers = [...existing];
     for (const item of parsed.data) { const question = p.questions.find((q) => q.id === item.id); if (!question || item.text.length > question.maxLength) throw new GoalDiscoveryValidationError(); const index = answers.findIndex((a) => a.id === item.id); if (index >= 0) answers[index] = item; else answers.push(item); }
     if (answers.length > p.completion.maximumAnswers) throw new GoalDiscoveryValidationError(); return answers;
@@ -72,7 +74,8 @@ export function createGoalDiscoveryService(deps: { repository: GoalDiscoveryRepo
   const fallback = (answers: GoalDiscoveryAnswer[], p: GoalDiscoveryProtocol): GoalDiscoverySuggestion => {
     const result = answers.find((a) => a.id === 'result')?.text || answers[0]?.text || 'Сформувати один важливий результат';
     const title = result.replace(/[.!?]+$/g, '').trim().slice(0, p.output.titleMaxLength);
-    return { title: title || 'Сформувати один важливий результат', rationale: 'Це чернетка мети на основі твоїх відповідей. Її можна змінити перед збереженням.', confidence: Math.min(0.85, 0.45 + answers.length * 0.15), safetyNotice: p.safety.notice, editable: true };
+    const safeTitle = title && !unsafe(title, p) ? title : 'Сформувати один важливий результат';
+    return { title: safeTitle, rationale: 'Це чернетка мети на основі твоїх відповідей. Її можна змінити перед збереженням.', confidence: Math.min(0.85, 0.45 + answers.length * 0.15), safetyNotice: p.safety.notice, editable: true };
   };
   const finish = async (user: VerifiedUser, record: GoalDiscoverySessionRecord, answers: GoalDiscoveryAnswer[], p: GoalDiscoveryProtocol) => {
     let suggestion = fallback(answers, p);
@@ -84,6 +87,7 @@ export function createGoalDiscoveryService(deps: { repository: GoalDiscoveryRepo
     async start(user) { const p = requireEnabled(); const record = await deps.repository.create(user, { protocolVersion: p.version, status: 'active', answersJson: [], suggestionJson: null, startedAt: now(), completedAt: null }); return publicSession(record, p); },
     async get(user, id) { const p = requireEnabled(); return publicSession(await requireSession(user, id), p); },
     async answer(user, id, input) { const p = requireEnabled(); const record = await requireSession(user, id); if (record.status === 'skipped') throw new GoalDiscoveryConflictError(); const existing = Array.isArray(record.answersJson) ? record.answersJson as GoalDiscoveryAnswer[] : []; const answers = safeAnswers(input, p, existing); if (answers.length < p.completion.minimumAnswers) return publicSession(await deps.repository.update(user, id, { answersJson: answers }), p); const updated = await finish(user, record, answers, p); return publicSession(updated, p); },
+    async complete(user, id) { const p = requireEnabled(); const record = await requireSession(user, id); if (record.status === 'skipped') throw new GoalDiscoveryConflictError(); const answers = safeAnswers(record.answersJson ?? [], p); if (answers.length < p.completion.minimumAnswers) throw new GoalDiscoveryValidationError(); return publicSession(await finish(user, record, answers, p), p); },
     async edit(user, id, input) { const p = requireEnabled(); const record = await requireSession(user, id); if (record.status !== 'completed') throw new GoalDiscoveryConflictError(); const parsed = z.object({ title: z.string().trim().min(3).max(p.output.titleMaxLength), rationale: z.string().trim().min(3).max(p.output.rationaleMaxLength) }).strict().safeParse(input); if (!parsed.success || unsafe(`${parsed.data?.title ?? ''} ${parsed.data?.rationale ?? ''}`, p)) throw new GoalDiscoveryValidationError(); const suggestion = { ...(suggestionSchema.parse(record.suggestionJson)), ...parsed.data, safetyNotice: p.safety.notice, editable: true } as GoalDiscoverySuggestion; return publicSession(await deps.repository.update(user, id, { suggestionJson: suggestion }), p); },
     async skip(user, id) { const p = requireEnabled(); const record = await requireSession(user, id); return publicSession(await deps.repository.update(user, id, { status: 'skipped', completedAt: now() }), p); },
   };
