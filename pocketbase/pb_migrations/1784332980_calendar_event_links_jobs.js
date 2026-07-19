@@ -1,8 +1,8 @@
 migrate((app) => {
   const users = app.findCollectionByNameOrId('users');
   const tasks = app.findCollectionByNameOrId('tasks');
-  if (tasks && !tasks.fields.find((field) => field.name === 'syncStatus')) tasks.fields.push({ type: 'select', name: 'syncStatus', required: false, maxSelect: 1, values: ['synced', 'sync_pending', 'attention', 'unscheduled'] });
-  if (tasks && !tasks.fields.find((field) => field.name === 'calendarEventId')) tasks.fields.push({ type: 'text', name: 'calendarEventId', required: false, max: 300 });
+  if (tasks && !tasks.fields.find((field) => field.name === 'syncStatus')) tasks.fields.add(new SelectField({ name: 'syncStatus', required: false, maxSelect: 1, values: ['synced', 'sync_pending', 'attention', 'unscheduled'] }));
+  if (tasks && !tasks.fields.find((field) => field.name === 'calendarEventId')) tasks.fields.add(new TextField({ name: 'calendarEventId', required: false, max: 300 }));
   if (tasks) app.save(tasks);
 
   const links = new Collection({

@@ -2,7 +2,7 @@ migrate((app) => {
   const users = app.findCollectionByNameOrId('users');
   const links = app.findCollectionByNameOrId('calendar_event_links');
   if (links && !links.fields.find((field) => field.name === 'providerVersion')) {
-    links.fields.push({ type: 'text', name: 'providerVersion', required: false, max: 500 });
+    links.fields.add(new TextField({ name: 'providerVersion', required: false, max: 500 }));
     app.save(links);
   }
   if (app.findCollectionByNameOrId('calendar_watch_channels')) return;

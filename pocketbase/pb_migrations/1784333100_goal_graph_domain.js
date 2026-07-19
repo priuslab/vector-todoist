@@ -27,8 +27,8 @@ migrate((app) => {
   if (ideas) {
     const status = ideas.fields.getByName ? ideas.fields.getByName('status') : ideas.fields.find((field) => field.name === 'status');
     if (status && Array.isArray(status.values) && !status.values.includes('converted')) status.values = [...status.values, 'converted'];
-    if (!ideas.fields.find((field) => field.name === 'goalId')) ideas.fields.push({ type: 'relation', name: 'goalId', required: false, collectionId: goals.id, maxSelect: 1, cascadeDelete: false });
-    if (!ideas.fields.find((field) => field.name === 'projectId')) ideas.fields.push({ type: 'relation', name: 'projectId', required: false, collectionId: projects.id, maxSelect: 1, cascadeDelete: false });
+    if (!ideas.fields.find((field) => field.name === 'goalId')) ideas.fields.add(new RelationField({ name: 'goalId', required: false, collectionId: goals.id, maxSelect: 1, cascadeDelete: false }));
+    if (!ideas.fields.find((field) => field.name === 'projectId')) ideas.fields.add(new RelationField({ name: 'projectId', required: false, collectionId: projects.id, maxSelect: 1, cascadeDelete: false }));
     app.save(ideas);
   }
   const graph = new Collection({ type: 'base', name: 'graph_edges', ...ownedRules, fields: [
@@ -39,7 +39,7 @@ migrate((app) => {
     { type: 'number', name: 'confidence', required: false, min: 0, max: 1 }, { type: 'text', name: 'rationale', required: false, max: 1_000 },
   ] });
   graph.indexes = ['CREATE INDEX idx_graph_edges_user_from ON graph_edges (user, fromType, fromId)', 'CREATE INDEX idx_graph_edges_user_to ON graph_edges (user, toType, toId)']; app.save(graph);
-  if (changes) { const kind = changes.fields.getByName ? changes.fields.getByName('kind') : changes.fields.find((field) => field.name === 'kind'); if (kind && Array.isArray(kind.values) && !kind.values.includes('idea_conversion')) kind.values = [...kind.values, 'idea_conversion']; if (ideas && !changes.fields.find((field) => field.name === 'ideaId')) changes.fields.push({ type: 'relation', name: 'ideaId', required: false, collectionId: ideas.id, maxSelect: 1, cascadeDelete: false }); app.save(changes); }
+  if (changes) { const kind = changes.fields.getByName ? changes.fields.getByName('kind') : changes.fields.find((field) => field.name === 'kind'); if (kind && Array.isArray(kind.values) && !kind.values.includes('idea_conversion')) kind.values = [...kind.values, 'idea_conversion']; if (ideas && !changes.fields.find((field) => field.name === 'ideaId')) changes.fields.add(new RelationField({ name: 'ideaId', required: false, collectionId: ideas.id, maxSelect: 1, cascadeDelete: false })); app.save(changes); }
 }, (app) => {
   for (const name of ['graph_edges', 'projects', 'goals']) { const collection = app.findCollectionByNameOrId(name); if (collection) app.delete(collection); }
   const ideas = app.findCollectionByNameOrId('ideas'); if (ideas) { for (const field of ['goalId', 'projectId']) { const existing = ideas.fields.getByName ? ideas.fields.getByName(field) : ideas.fields.find((item) => item.name === field); if (existing) ideas.fields.removeById(existing.id); } app.save(ideas); }
