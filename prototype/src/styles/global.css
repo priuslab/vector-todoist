@@ -42,6 +42,19 @@ a:focus-visible {
   outline-offset: 2px;
 }
 
+/* A user preference is a hard stop for decorative motion. Keep state changes
+ * understandable through color/labels instead of relying on animation. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 .mobile-prototype {
   position: relative;
   width: min(100vw, 390px);
