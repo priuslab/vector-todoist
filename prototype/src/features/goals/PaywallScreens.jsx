@@ -12,7 +12,7 @@ export function PaywallScreens({ screenId = "paywall-lifetime", onNavigate = () 
   React.useEffect(() => {
     if (screenId !== "stripe-loading" || !apiClient) return undefined;
     let cancelled = false;
-    apiClient.request("/api/v1/billing/checkout", { method: "POST", body: JSON.stringify({ idempotencyKey: `checkout-${Date.now()}` }), headers: { "content-type": "application/json" } }).then((result) => { if (!cancelled && result?.url) window.location.assign(result.url); }).catch(() => { if (!cancelled) setCheckoutError(true); });
+    apiClient.request("/api/v1/billing/checkout", { method: "POST", body: JSON.stringify({}), headers: { "content-type": "application/json" } }).then((result) => { if (!cancelled && result?.url) window.location.assign(result.url); }).catch(() => { if (!cancelled) setCheckoutError(true); });
     return () => { cancelled = true; };
   }, [apiClient, screenId]);
   React.useEffect(() => {

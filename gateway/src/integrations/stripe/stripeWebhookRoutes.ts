@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { Readable } from 'node:stream';
 import type { EntitlementRepository } from '../../repositories/entitlementRepository.js';
 import { StripeSignatureError, verifyStripeSignature, type StripeEvent } from './stripeClient.js';
 
@@ -8,10 +9,12 @@ export type StripeWebhookService = ReturnType<typeof createStripeWebhookService>
 export function createStripeWebhookService(options: { secret: string; priceId: string; mode: 'test' | 'live'; repository: EntitlementRepository; resolveUser?: (userId: string) => Promise<boolean> }) {
   const claim = async (event: StripeEvent) => {
     const existing = await options.repository.event(event.id);
-    if (existing) return { duplicate: true, event: existing };
+    if (existing && existing.status !== 'failed') return { duplicate: true, event: existing };
+    if (existing?.status === 'failed') return { duplicate: false, retry: true, event: existing };
     try { return { duplicate: false, event: await options.repository.createEvent({ eventId: event.id, eventType: event.type, status: 'received', userId: event.data.object.metadata?.userId, receivedAt: new Date().toISOString() }) }; }
     catch {
       const raced = await options.repository.event(event.id);
+      if (raced?.status === 'failed') return { duplicate: false, retry: true, event: raced };
       if (raced) return { duplicate: true, event: raced };
       throw new Error('EVENT_RESERVATION_UNAVAILABLE');
     }
@@ -46,12 +49,22 @@ export function createStripeWebhookService(options: { secret: string; priceId: s
 }
 
 function rawPayload(request: FastifyRequest): string {
+  const captured = (request as FastifyRequest & { rawBody?: string }).rawBody;
+  if (captured !== undefined) return captured;
   const body = request.body as unknown;
   if (typeof body === 'string') return body;
   if (Buffer.isBuffer(body)) return body.toString('utf8');
   return JSON.stringify(body ?? {});
 }
 export async function stripeWebhookRoutes(app: FastifyInstance, service: StripeWebhookService): Promise<void> {
+  app.addHook('preParsing', async (request, _reply, payload) => {
+    if (!request.url.startsWith('/webhooks/stripe')) return payload;
+    const chunks: Buffer[] = [];
+    for await (const chunk of payload as AsyncIterable<Buffer | string>) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const raw = Buffer.concat(chunks);
+    (request as FastifyRequest & { rawBody?: string }).rawBody = raw.toString('utf8');
+    return Readable.from([raw]);
+  });
   app.post('/webhooks/stripe', async (request: FastifyRequest, reply: FastifyReply) => {
     try { const signature = request.headers['stripe-signature']; return reply.code(200).send(await service.handle(rawPayload(request), Array.isArray(signature) ? signature[0] : signature)); }
     catch (error) {
