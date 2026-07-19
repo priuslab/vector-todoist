@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { OnboardingFlow } from "./OnboardingFlow";
 import { GoalSetup } from "./GoalSetup";
@@ -33,4 +33,15 @@ it("centers the goal-test result heading without centering manual goal forms", (
 
   const manual = render(<GoalSetup screenId="goal-manual" onNext={vi.fn()} onRoute={vi.fn()} />);
   expect(manual.container.querySelector(".goal-test-result-content")).not.toBeInTheDocument();
+});
+
+it("uses native time pickers and updates work hours", () => {
+  render(<OnboardingFlow screenId="work-rhythm" onNext={vi.fn()} />);
+
+  const start = screen.getByLabelText("Початок");
+  const end = screen.getByLabelText("Завершення");
+  expect(start).toHaveAttribute("type", "time");
+  expect(end).toHaveAttribute("type", "time");
+  fireEvent.change(start, { target: { value: "10:00" } });
+  expect(start).toHaveValue("10:00");
 });

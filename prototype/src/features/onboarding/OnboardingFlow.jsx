@@ -16,6 +16,8 @@ const content = {
 export function OnboardingFlow({ screenId, onBack, onNext, onCalendarConnect = onNext, onCalendarSkip = onNext }) {
   const [days, setDays] = useState("Будні");
   const [energy, setEnergy] = useState("Ранок");
+  const [workStart, setWorkStart] = useState("09:00");
+  const [workEnd, setWorkEnd] = useState("18:00");
   const item = content[screenId] ?? content["onboarding-welcome"];
   const Icon = item.icon;
   const calendar = screenId === "calendar-permission";
@@ -52,8 +54,8 @@ export function OnboardingFlow({ screenId, onBack, onNext, onCalendarConnect = o
                 value={days}
                 onChange={setDays}
               />
-              <label>Початок<input value="09:00" readOnly /></label>
-              <label>Завершення<input value="18:00" readOnly /></label>
+              <label htmlFor="work-start">Початок<input id="work-start" type="time" value={workStart} onChange={(event) => setWorkStart(event.target.value)} /></label>
+              <label htmlFor="work-end">Завершення<input id="work-end" type="time" value={workEnd} onChange={(event) => setWorkEnd(event.target.value)} /></label>
             </div>
           ) : null}
           {screenId === "quiet-hours" ? (
