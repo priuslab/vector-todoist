@@ -22,6 +22,7 @@ import { createTelegramPairingRepository, createTelegramPairingService } from '.
 import { createTelegramCaptureHandler, createTelegramUpdateStore } from './integrations/telegram/telegramCaptureHandler.js';
 import { createGeminiTranscriptionAdapter, createTranscriptionService } from './modules/transcription/transcriptionService.js';
 import { createAudioStorage } from './modules/transcription/audioStorage.js';
+import { createGoalGraphRepository } from './repositories/goalGraphRepository.js';
 
 async function start(): Promise<void> {
   const config = loadConfig();
@@ -48,6 +49,7 @@ async function start(): Promise<void> {
     aiClient: createGeminiClient({ apiKey: config.geminiApiKey, model: config.geminiModel, timeoutMs: config.aiTimeoutMs }),
     taskRepository: createTaskRepository(pocketBase),
     ideaRepository: createIdeaRepository(pocketBase),
+    goalGraphRepository: createGoalGraphRepository(pocketBase),
     changeSetRepository: createChangeSetRepository(pocketBase),
     ...(jobRepository ? { jobRepository } : {}),
     ...(googleOAuthService ? { googleOAuthService } : {}),

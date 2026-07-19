@@ -35,6 +35,9 @@ import type { JobRepository } from './modules/jobs/jobRepository.js';
 import { calendarWebhookRoutes } from './modules/calendar/calendarWebhookRoutes.js';
 import { telegramRoutes } from './integrations/telegram/pairingService.js';
 import { createNotificationPreferencesService, notificationPreferencesRoutes } from './modules/notifications/notificationPreferencesRoutes.js';
+import { goalRoutes } from './modules/goals/goalRoutes.js';
+import { createGoalService } from './modules/goals/goalService.js';
+import type { GoalGraphRepository } from './repositories/goalGraphRepository.js';
 
 export interface GatewayServices {
   readonly [name: string]: unknown;
@@ -120,6 +123,15 @@ export async function buildApp({
       jobRepository: _services.jobRepository as Pick<JobRepository, 'getByIdempotencyKey' | 'create'> | undefined,
     });
     await rescheduleRoutes(app, rescheduleService);
+  }
+
+  if (_services.goalGraphRepository && changeSetRepository) {
+    await goalRoutes(app, createGoalService({
+      repository: _services.goalGraphRepository as GoalGraphRepository,
+      changeSetRepository,
+      taskRepository,
+      entitlement: _services.goalEntitlement as ((user: import('./auth/verifyPocketBaseToken.js').VerifiedUser) => Promise<boolean> | boolean) | undefined,
+    }));
   }
 
   const googleOAuthService = _services.googleOAuthService as GoogleOAuthService | undefined;

@@ -23,6 +23,17 @@ const ideaSchema = z.object({
   text: boundedText(2_000),
   summary: z.string().trim().max(500),
   confidence,
+  goalId: z.string().trim().min(1).max(128).nullable().optional(),
+  projectId: z.string().trim().min(1).max(128).nullable().optional(),
+}).strict();
+
+const linkSchema = z.object({
+  fromType: z.enum(['goal', 'project', 'idea', 'task', 'completed']),
+  fromId: z.string().trim().min(1).max(128),
+  toType: z.enum(['goal', 'project', 'idea', 'task', 'completed']),
+  toId: z.string().trim().min(1).max(128),
+  confidence,
+  rationale: z.string().trim().max(1_000).optional(),
 }).strict();
 
 export const analysisSchema = z.object({
@@ -32,6 +43,9 @@ export const analysisSchema = z.object({
   tasks: z.array(taskSchema).max(50),
   ideas: z.array(ideaSchema).max(50),
   context: z.array(z.string().trim().min(1).max(500)).max(20),
+  goal: z.object({ title: boundedText(500), confidence }).strict().optional(),
+  project: z.object({ title: boundedText(500), confidence }).strict().optional(),
+  links: z.array(linkSchema).max(100).optional(),
 }).strict();
 
 export type BrainDumpAnalysis = z.infer<typeof analysisSchema>;

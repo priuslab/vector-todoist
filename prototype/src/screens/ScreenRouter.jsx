@@ -72,11 +72,11 @@ export function ScreenRouter({ route, onNavigate, onGoogleLogin, onAuthComplete,
   }
   if (screen.group === "Capture") return <CaptureFlow key={route} screenId={route} onBack={() => onNavigate("today-normal")} onNavigate={onNavigate} apiClient={apiClient} />;
   if (screen.group === "Today") return <TodayScreens screenId={route} onNavigate={onNavigate} apiClient={apiClient} />;
-  if (screen.group === "Inbox") return ["idea-detail", "idea-decomposition", "project-detail"].includes(route) ? <IdeaProjectScreens screenId={route} onNavigate={onNavigate} /> : <InboxScreens screenId={route} onNavigate={onNavigate} apiClient={apiClient} />;
+  if (screen.group === "Inbox") return ["idea-detail", "idea-decomposition", "project-detail"].includes(route) ? <IdeaProjectScreens screenId={route} onNavigate={onNavigate} apiClient={apiClient} /> : <InboxScreens screenId={route} onNavigate={onNavigate} apiClient={apiClient} />;
   if (screen.group === "Task") return route.startsWith("focus-") ? <FocusScreens screenId={route} onNavigate={onNavigate} /> : <TaskScreens screenId={route} onNavigate={onNavigate} apiClient={apiClient} />;
   if (screen.group === "Calendar") return <CalendarScreens screenId={route} onNavigate={onNavigate} apiClient={apiClient} />;
   if (screen.group === "Oracle") return <OracleScreens screenId={route} onNavigate={onNavigate} />;
-  if (screen.group === "Goals") return route.startsWith("paywall") || route.startsWith("payment") || route === "stripe-loading" ? <PaywallScreens screenId={route} onNavigate={onNavigate} /> : <GoalScreens screenId={route} onNavigate={onNavigate} />;
+  if (screen.group === "Goals") return route.startsWith("paywall") || route.startsWith("payment") || route === "stripe-loading" ? <PaywallScreens screenId={route} onNavigate={onNavigate} /> : <GoalScreens screenId={route} onNavigate={onNavigate} apiClient={apiClient} />;
   if (screen.group === "Settings") return <SettingsScreens screenId={route} onNavigate={onNavigate} apiClient={apiClient} />;
   return <SystemScreens screenId={route} onNavigate={onNavigate} />;
 }
