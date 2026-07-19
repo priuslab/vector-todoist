@@ -19,6 +19,7 @@ export const SCREEN_REGISTRY = [
     ["goal-choice", "Вибір головної мети"],
     ["goal-manual", "Ручне введення мети"],
     ["goal-test-start", "Старт AI-тесту мети"],
+    ["goal-test-question", "Питання AI-тесту", "loading"],
     ["goal-test-result", "Результат AI-тесту"],
     ["goal-skip-warning", "Продовження без мети", "warning"],
     ["telegram-connect", "Підключення Telegram"],

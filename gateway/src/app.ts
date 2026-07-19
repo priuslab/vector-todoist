@@ -47,6 +47,8 @@ import { stripeWebhookRoutes } from './integrations/stripe/stripeWebhookRoutes.j
 import { focusSessionRoutes, createFocusSessionService, type FocusSessionRepository } from './modules/focusSessions/focusSessionRoutes.js';
 import { adaptationRoutes } from './modules/adaptation/adaptationRoutes.js';
 import { createAdaptationService, createAdaptationRepository } from './modules/adaptation/adaptationService.js';
+import { goalDiscoveryRoutes } from './modules/goals/goalDiscoveryRoutes.js';
+import type { GoalDiscoveryService } from './modules/goals/goalDiscoveryService.js';
 
 export interface GatewayServices {
   readonly [name: string]: unknown;
@@ -147,6 +149,8 @@ export async function buildApp({
       entitlement: _services.goalEntitlement as ((user: import('./auth/verifyPocketBaseToken.js').VerifiedUser) => Promise<boolean> | boolean) | undefined,
     }));
   }
+  const goalDiscoveryService = _services.goalDiscoveryService as GoalDiscoveryService | undefined;
+  if (goalDiscoveryService) await goalDiscoveryRoutes(app, goalDiscoveryService);
   if (_services.goalGraphRepository || _services.oracleService) {
     await oracleRoutes(app, (_services.oracleService as import('./modules/oracle/oracleService.js').OracleService | undefined) ?? createOracleService({ repository: _services.goalGraphRepository as GoalGraphRepository, taskRepository }));
   }

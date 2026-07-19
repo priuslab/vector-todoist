@@ -29,6 +29,7 @@ import { createStripeWebhookService } from './integrations/stripe/stripeWebhookR
 import { createEntitlementRepository } from './repositories/entitlementRepository.js';
 import { createFocusSessionRepository } from './modules/focusSessions/focusSessionRoutes.js';
 import { createAdaptationRepository, createAdaptationService } from './modules/adaptation/adaptationService.js';
+import { createGoalDiscoveryRepository, createGoalDiscoveryService } from './modules/goals/goalDiscoveryService.js';
 
 async function start(): Promise<void> {
   const config = loadConfig();
@@ -59,6 +60,12 @@ async function start(): Promise<void> {
     taskRepository: createTaskRepository(pocketBase),
     focusSessionRepository: createFocusSessionRepository(pocketBase),
     adaptationService,
+    goalDiscoveryService: createGoalDiscoveryService({ repository: createGoalDiscoveryRepository(pocketBase), aiClient: config.geminiApiKey ? { model: config.geminiModel, complete: async (input) => {
+      const result = await createGeminiClient({ apiKey: config.geminiApiKey, model: config.geminiModel, timeoutMs: config.aiTimeoutMs }).complete({ brainDumpText: input.questions.map((q) => `${q.prompt}\n${q.answer}`).join('\n') });
+      if (!result || typeof result !== 'object') throw new Error('Invalid goal discovery response');
+      const value = result as Record<string, unknown>;
+      return { title: value.title, rationale: value.rationale, confidence: value.confidence };
+    } } : undefined }),
     ideaRepository: createIdeaRepository(pocketBase),
     goalGraphRepository: createGoalGraphRepository(pocketBase),
     changeSetRepository: createChangeSetRepository(pocketBase),

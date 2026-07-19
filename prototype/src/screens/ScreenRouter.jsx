@@ -26,7 +26,7 @@ const ONBOARDING_NEXT = {
 const ONBOARDING_BACK = {
   "onboarding-welcome": "auth-loading", "calendar-permission": "onboarding-welcome", "work-rhythm": "calendar-permission",
   "quiet-hours": "work-rhythm", "energy-peak": "quiet-hours", "focus-settings": "energy-peak", "goal-choice": "focus-settings",
-  "goal-manual": "goal-choice", "goal-test-start": "goal-choice", "goal-test-result": "goal-test-start", "goal-skip-warning": "goal-choice",
+  "goal-manual": "goal-choice", "goal-test-start": "goal-choice", "goal-test-question": "goal-test-start", "goal-test-result": "goal-test-start", "goal-skip-warning": "goal-choice",
   "telegram-connect": "goal-choice", "telegram-success": "telegram-connect", "first-brain-dump": "telegram-success",
 };
 
@@ -55,7 +55,7 @@ export function ScreenRouter({ route, onNavigate, onGoogleLogin, onAuthComplete,
     return <EntryCarousel initialIndex={{ "entry-chaos": 0, "entry-voice": 1, "entry-path": 2 }[route]} onContinue={requestGoogleLogin} />;
   }
   if (screen.group === "Onboarding") {
-    if (route.startsWith("goal-")) return <GoalSetup screenId={route} onBack={back} onRoute={onNavigate} onNext={() => onNavigate("telegram-connect")} />;
+    if (route.startsWith("goal-")) return <GoalSetup screenId={route} onBack={back} onRoute={onNavigate} onNext={() => onNavigate("telegram-connect")} apiClient={apiClient} />;
     if (route.startsWith("telegram-") || route === "first-brain-dump") return <TelegramSetup screenId={route} onBack={back} apiClient={apiClient} onNext={() => onNavigate(route === "telegram-connect" ? "telegram-success" : route === "telegram-success" ? "first-brain-dump" : "capture-chooser")} />;
     const nextOnboarding = () => onNavigate(ONBOARDING_NEXT[route] ?? "goal-choice");
     const connectCalendar = async () => {
