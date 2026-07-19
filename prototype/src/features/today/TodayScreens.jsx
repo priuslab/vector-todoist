@@ -10,6 +10,7 @@ import { UndoSnackbar } from "../../components/UndoSnackbar";
 import { DEMO_EVENTS, DEMO_TASKS, DEMO_USER } from "../../data/demoData";
 import { EveningReview } from "./EveningReview";
 import { applyReschedule, completeTask, getToday, previewReschedule, undoChangeSet } from "./todayApi";
+import { applyFocus, previewFocus } from "../focus/focusApi";
 
 function localDate(timezone) {
   const parts = new Intl.DateTimeFormat("en-GB", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
@@ -42,6 +43,10 @@ export function TodayScreens({ screenId = "today-normal", onNavigate = () => {},
   const [rescheduleLoading, setRescheduleLoading] = useState(false);
   const [rescheduleError, setRescheduleError] = useState("");
   const [rescheduleApplied, setRescheduleApplied] = useState(false);
+  const [focusMode, setFocusMode] = useState("balanced");
+  const [focusLoading, setFocusLoading] = useState(false);
+  const [focusError, setFocusError] = useState("");
+  const [focusPreview, setFocusPreview] = useState(null);
   useEffect(() => { if (!apiClient || !["today-normal", "today-active", "today-overload"].includes(screenId)) return; let alive = true; const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; getToday({ apiClient, date: localDate(timezone), timezone }).then((value) => alive && setRemote(value)).catch(() => alive && setRemoteError("Не вдалося завантажити план. Спробуй оновити сторінку.")); return () => { alive = false; }; }, [apiClient, screenId]);
   const common = { title: "Сьогодні", eyebrow: "П'ятниця, 18 липня", activeRoute: "today-normal", onNavigate, avatar: true };
 
@@ -84,9 +89,22 @@ export function TodayScreens({ screenId = "today-normal", onNavigate = () => {},
     catch { setRescheduleError("План не змінився. Одна із задач могла оновитися в іншій вкладці."); }
     finally { setRescheduleLoading(false); }
   };
+  const focusInput = (mode) => ({ mode, goalId: "goal-podcast", timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", now: new Date().toISOString(), profile: { timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", workHours: { start: "09:00", end: "18:00" }, energyPeak: { start: "09:30", end: "12:30" }, focusBlockMinutes: 50, breakMinutes: 10, dailyLimitMinutes: 360 }, idempotencyKey: `focus-${mode}-${localDate(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC")}` });
+  const switchFocusMode = async (mode) => {
+    if (mode === focusMode) return;
+    setFocusError(""); setFocusLoading(true);
+    try {
+      if (apiClient) { const preview = await previewFocus({ apiClient, ...focusInput(mode) }); setFocusPreview(preview); await applyFocus({ apiClient, ...focusInput(mode) }); }
+      setFocusMode(mode);
+    } catch { setFocusError("Не вдалося змінити режим. План залишився без змін."); }
+    finally { setFocusLoading(false); }
+  };
   return (
     <AppFrame {...common}>
       <section className="today-header"><div><p>Привіт, {DEMO_USER.name}</p><h1>{screenId === "today-active" ? "Тримай один фокус" : "Спокійний план на день"}</h1><span>4 год 20 хв заплановано · 3 вільні слоти</span></div><ProgressRing value={screenId === "today-active" ? 38 : 25} /></section>
+      <section className="focus-mode-switcher" aria-label="Режим планування"><div><strong>{focusMode === "goal_focus" ? "Goal Focus" : "Balanced"}</strong><span>{focusMode === "goal_focus" ? "Показую кроки до обраної мети" : "Бачу весь день без зайвого тиску"}</span></div><div className="segmented-control"><button type="button" aria-pressed={focusMode === "balanced"} onClick={() => switchFocusMode("balanced")} disabled={focusLoading}>Balanced</button><button type="button" aria-pressed={focusMode === "goal_focus"} onClick={() => switchFocusMode("goal_focus")} disabled={focusLoading}>Goal Focus</button></div></section>
+      {focusPreview?.deferred?.length ? <InlineInsight title="Частину задач відкладено м’яко">{focusPreview.deferred.length} гнучкі задачі повернуться в Balanced. Нічого не видалено.</InlineInsight> : null}
+      {focusError ? <InlineInsight tone="warning" title="Режим не змінено">{focusError}</InlineInsight> : null}
       {screenId === "today-overload" ? <InlineInsight tone="warning" title="День перевантажений">На сьогодні заплановано на 1 год 20 хв більше твого ліміту. Я можу перенести дві гнучкі задачі.</InlineInsight> : null}
       {rescheduleError ? <InlineInsight tone="warning" title="Перепланування не виконано">{rescheduleError}</InlineInsight> : null}
       {reschedulePreview ? <section className="reschedule-preview" aria-label="Попередній перегляд перепланування"><h2>Що зміниться</h2><p>{reschedulePreview.changes?.filter((change) => change.changed).length ?? 0} задач отримають новий час.</p><ul>{(reschedulePreview.changes ?? []).filter((change) => change.changed).slice(0, 3).map((change) => <li key={change.taskId}>{change.title}: {change.after?.plannedStart?.slice(11, 16) ?? "без слоту"}</li>)}</ul><Button onClick={applyReschedulePlan} disabled={rescheduleLoading}>{rescheduleLoading ? "Застосовую…" : "Застосувати перепланування"}</Button></section> : null}

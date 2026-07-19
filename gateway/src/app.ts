@@ -40,6 +40,8 @@ import { createGoalService } from './modules/goals/goalService.js';
 import type { GoalGraphRepository } from './repositories/goalGraphRepository.js';
 import { oracleRoutes } from './modules/oracle/oracleRoutes.js';
 import { createOracleService } from './modules/oracle/oracleService.js';
+import { focusModeRoutes } from './modules/focus/focusModeRoutes.js';
+import { createFocusModeService } from './modules/focus/focusModeService.js';
 
 export interface GatewayServices {
   readonly [name: string]: unknown;
@@ -125,6 +127,7 @@ export async function buildApp({
       jobRepository: _services.jobRepository as Pick<JobRepository, 'getByIdempotencyKey' | 'create'> | undefined,
     });
     await rescheduleRoutes(app, rescheduleService);
+    await focusModeRoutes(app, createFocusModeService({ taskRepository, changeSetRepository }));
   }
 
   if (_services.goalGraphRepository && changeSetRepository) {

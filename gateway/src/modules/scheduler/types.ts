@@ -1,5 +1,6 @@
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 export type TaskEnergy = 'low' | 'medium' | 'high';
+export type SchedulerMode = 'balanced' | 'goal_focus';
 export type ScheduleReasonCode = 'deadline' | 'priority' | 'energy' | 'busy-conflict' | 'daily-cap' | 'no-viable-slot' | 'split';
 
 export interface SchedulerTask {
@@ -32,6 +33,6 @@ export type PlannedBlockKind = 'busy' | 'task' | 'break';
 export interface PlannedBlock { id: string; kind: PlannedBlockKind; title: string; start: string; end: string; locked: boolean; taskId?: string; }
 export interface PlanWarning { code: 'daily-cap' | 'no-viable-slot' | 'deadline-conflict'; message: string; taskId?: string; }
 export interface ScheduleReason { code: ScheduleReasonCode; message: string; }
-export interface DailyPlanInput { tasks: SchedulerTask[]; busySlots: SchedulerBusySlot[]; profile: SchedulerProfile; now: Date; }
+export interface DailyPlanInput { tasks: SchedulerTask[]; busySlots: SchedulerBusySlot[]; profile: SchedulerProfile; now: Date; mode?: SchedulerMode; goalId?: string; }
 export interface DailyPlan { blocks: PlannedBlock[]; unscheduledTaskIds: string[]; warnings: PlanWarning[]; reasons: Record<string, ScheduleReason[]>; }
 export class SchedulerValidationError extends Error { constructor(message: string) { super(message); this.name = 'SchedulerValidationError'; } }

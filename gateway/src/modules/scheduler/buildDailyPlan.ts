@@ -38,7 +38,7 @@ function energyFits(task: SchedulerTask, start: number, profile: SchedulerProfil
 function overlaps(start: number, end: number, occupied: Array<[number, number]>): boolean { return occupied.some(([a, b]) => start < b && end > a); }
 
 export function buildDailyPlan(input: DailyPlanInput): DailyPlan {
-  const { tasks, busySlots, profile, now } = input;
+  const { tasks, busySlots, profile, now, mode = 'balanced', goalId } = input;
   if (!(now instanceof Date) || !Number.isFinite(now.getTime())) throw new SchedulerValidationError('now is required and must be a valid Date');
   if (!validClock(profile.workHours.start) || !validClock(profile.workHours.end) || profile.workHours.start >= profile.workHours.end) throw new SchedulerValidationError('Invalid workHours profile');
   if (!validClock(profile.energyPeak.start) || !validClock(profile.energyPeak.end) || profile.energyPeak.start >= profile.energyPeak.end) throw new SchedulerValidationError('Invalid energyPeak profile');
@@ -59,7 +59,7 @@ export function buildDailyPlan(input: DailyPlanInput): DailyPlan {
     if (!task.start || !task.end) { reasons[task.id] = [{ code: 'busy-conflict', message: task.status === 'completed' ? 'Завершена задача збережена без змін' : 'Блок збережено без змін' }]; continue; }
     const [start, end] = parseInterval(task.start, task.end, task.id); if (overlaps(start, end, occupied)) throw new SchedulerValidationError(`Immutable task overlaps another interval: ${task.id}`); blocks.push({ id: task.id, kind: 'task', taskId: task.id, title: task.title, start: task.start, end: task.end, locked: true }); occupied.push([start, end]); reasons[task.id] = [{ code: 'busy-conflict', message: task.status === 'completed' ? 'Завершена задача збережена без змін' : active ? 'Активний блок збережено без змін' : past ? 'Минулий блок збережено без змін' : 'Заблокована задача збережена без змін' }];
   }
-  const flexible = tasks.filter((task) => !(task.locked || task.flexible === false || task.status === 'completed' || task.calendarSource === 'google' || (task.calendarEventId && task.calendarSource !== 'app') || Boolean(task.end && Date.parse(task.end) <= now.getTime()) || Boolean(task.start && task.end && Date.parse(task.start) < now.getTime() && Date.parse(task.end) > now.getTime()))).slice().sort((a, b) => compareTasks(a, b, now)); let usedMinutes = 0;
+  const flexible = tasks.filter((task) => !(task.locked || task.flexible === false || task.status === 'completed' || task.calendarSource === 'google' || (task.calendarEventId && task.calendarSource !== 'app') || Boolean(task.end && Date.parse(task.end) <= now.getTime()) || Boolean(task.start && task.end && Date.parse(task.start) < now.getTime() && Date.parse(task.end) > now.getTime()))).slice().sort((a, b) => compareTasks(a, b, now, mode, goalId)); let usedMinutes = 0;
   for (const task of flexible) {
     if (!Number.isInteger(task.estimatedMinutes) || task.estimatedMinutes <= 0 || !Number.isFinite(task.goalAlignment) || task.goalAlignment < 0 || task.goalAlignment > 1) throw new SchedulerValidationError(`Invalid task: ${task.id}`);
     if (task.deadline !== null && (!Number.isFinite(Date.parse(task.deadline)))) throw new SchedulerValidationError(`Invalid deadline for task ${task.id}`);
