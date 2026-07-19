@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createFocusSessionService, type FocusSessionRecord, type FocusSessionRepository } from '../src/modules/focusSessions/focusSessionRoutes.js';
+import { RepositoryError } from '../src/repositories/base.js';
 
 const alice = { userId: 'alice', email: 'alice@example.test' } as any;
 const bob = { userId: 'bob', email: 'bob@example.test' } as any;
@@ -10,6 +11,7 @@ function setup() {
     get: vi.fn(async (user, id) => rows.find((row) => row.user === user.userId && row.id === id) ?? null),
     create: vi.fn(async (user, input) => { const row = { id: `focus-${++seq}`, user: user.userId, ...input } as FocusSessionRecord; rows.push(row); return row; }),
     update: vi.fn(async (user, id, input) => { const row = rows.find((item) => item.user === user.userId && item.id === id); if (!row) throw new Error('missing'); Object.assign(row, input); return row; }),
+    updateIfVersion: vi.fn(async (user, id, expected, input) => { const row = rows.find((item) => item.user === user.userId && item.id === id); if (!row) throw new Error('missing'); if (row.version !== expected) throw Object.assign(new Error('VERSION_CONFLICT'), { code: 'INVALID' }); Object.assign(row, input); return row; }),
   };
   const task = { id: 'task-1', user: 'alice', title: 'Структура епізоду', status: 'scheduled' } as any;
   const taskRepository = { get: vi.fn(async (user: any, id: string) => user.userId === 'alice' && id === task.id ? task : null) } as any;
@@ -42,5 +44,10 @@ describe('persistent focus sessions', () => {
   it('rejects a second active session for the same task', async () => {
     const state = setup(); await state.service.start(alice, { taskId: 'task-1', durationMinutes: 25, idempotencyKey: 'focus-active-1' });
     await expect(state.service.start(alice, { taskId: 'task-1', durationMinutes: 25, idempotencyKey: 'focus-active-2' })).rejects.toMatchObject({ code: 'FOCUS_SESSION_CONFLICT' });
+  });
+  it('rejects stale pause/resume/finish mutations using the persisted version', async () => {
+    const state = setup(); const started = await state.service.start(alice, { taskId: 'task-1', durationMinutes: 25, idempotencyKey: 'focus-version-1' });
+    state.repository.updateIfVersion = vi.fn().mockRejectedValue(new RepositoryError('INVALID', 'VERSION_CONFLICT'));
+    await expect(state.service.pause(alice, started.id)).rejects.toMatchObject({ code: 'FOCUS_SESSION_CONFLICT' });
   });
 });

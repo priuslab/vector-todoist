@@ -30,11 +30,20 @@ export function usePersistentTimer({ durationMinutes = 50, storageKey = "vector-
     const added = Math.max(0, Date.now() - current.pausedAt);
     return { ...current, status: "active", pausedAt: null, endAt: current.endAt + added, pausedSeconds: current.pausedSeconds + Math.floor(added / 1000) };
   }), []);
-  const finish = useCallback(() => setSnapshot((current) => current.status === "finished" ? current : { ...current, status: "finished", finishedAt: Date.now() }), []);
+  const finish = useCallback(() => setSnapshot((current) => {
+    if (current.status === "finished") return current;
+    const finishedAt = Date.now();
+    const currentPause = current.status === "paused" && current.pausedAt ? Math.max(0, Math.floor((finishedAt - current.pausedAt) / 1000)) : 0;
+    return { ...current, status: "finished", finishedAt, pausedAt: null, pausedSeconds: current.pausedSeconds + currentPause };
+  }), []);
   const reset = useCallback(() => { const startedAt = Date.now(); setSnapshot({ status: "active", durationMinutes, startedAt, endAt: startedAt + durationMinutes * 60_000, pausedAt: null, pausedSeconds: 0, finishedAt: null }); }, [durationMinutes]);
+  const hydrate = useCallback((server) => {
+    if (!server?.startedAt || !server?.plannedEndAt) return;
+    setSnapshot((current) => ({ ...current, status: server.status === "paused" ? "paused" : "active", startedAt: Date.parse(server.startedAt), endAt: Date.parse(server.plannedEndAt), pausedAt: server.pausedAt ? Date.parse(server.pausedAt) : null, pausedSeconds: Number(server.pausedSeconds || 0), finishedAt: server.finishedAt ? Date.parse(server.finishedAt) : null, durationMinutes: Number(server.plannedMinutes || current.durationMinutes) }));
+  }, []);
   const remainingSeconds = snapshot.status === "paused" ? Math.max(0, Math.ceil((snapshot.endAt - (snapshot.pausedAt || now)) / 1000)) : Math.max(0, Math.ceil((snapshot.endAt - now) / 1000));
   const elapsedMinutes = Math.max(0, Math.round(((snapshot.finishedAt || now) - snapshot.startedAt - snapshot.pausedSeconds * 1000) / 60_000 * 10) / 10);
-  return { ...snapshot, remainingSeconds, elapsedMinutes, pause, resume, finish, reset, isComplete: remainingSeconds === 0 || snapshot.status === "finished" };
+  return { ...snapshot, remainingSeconds, elapsedMinutes, pause, resume, finish, reset, hydrate, isComplete: remainingSeconds === 0 || snapshot.status === "finished" };
 }
 
 export function formatTimer(seconds) {

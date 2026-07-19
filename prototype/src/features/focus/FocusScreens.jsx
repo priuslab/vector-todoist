@@ -3,17 +3,25 @@ import { useEffect, useState } from "react";
 import { Button } from "../../components/Button";
 import { DEMO_TASKS } from "../../data/demoData";
 import { formatTimer, usePersistentTimer } from "../../hooks/usePersistentTimer";
-import { finishFocusSession, pauseFocusSession, resumeFocusSession, startFocusSession } from "./focusApi";
+import { finishFocusSession, getActiveFocusSession, pauseFocusSession, resumeFocusSession, startFocusSession } from "./focusApi";
 
 export function FocusScreens({ screenId = "focus-mode", onNavigate = () => {}, mode = "balanced", apiClient, taskId = DEMO_TASKS[0].id || "demo-episode-task", durationMinutes = 50 }) {
   const timer = usePersistentTimer({ durationMinutes, storageKey: `vector-focus:${taskId}` });
   const [sessionId, setSessionId] = useState(null);
+  const [sessionResolved, setSessionResolved] = useState(!apiClient || screenId !== "focus-mode");
   const [confirmFinish, setConfirmFinish] = useState(false);
   const [notificationStatus, setNotificationStatus] = useState("idle");
   useEffect(() => {
-    if (!apiClient || screenId !== "focus-mode" || sessionId) return;
-    startFocusSession({ apiClient, taskId, durationMinutes }).then((result) => setSessionId(result?.id || null)).catch(() => {});
-  }, [apiClient, durationMinutes, screenId, sessionId, taskId]);
+    if (!apiClient || screenId !== "focus-mode" || sessionId || !sessionResolved) return;
+    const key = `vector-focus-run:${taskId}`;
+    let idempotencyKey = window.localStorage.getItem(key);
+    if (!idempotencyKey) { idempotencyKey = `${taskId}:${Date.now()}:${Math.random().toString(36).slice(2)}`; window.localStorage.setItem(key, idempotencyKey); }
+    startFocusSession({ apiClient, taskId, durationMinutes, idempotencyKey }).then((result) => setSessionId(result?.id || null)).catch(() => {});
+  }, [apiClient, durationMinutes, screenId, sessionId, sessionResolved, taskId]);
+  useEffect(() => {
+    if (!apiClient || screenId !== "focus-mode") return;
+    getActiveFocusSession({ apiClient, taskId }).then((result) => { if (result?.id) { setSessionId(result.id); timer.hydrate(result); } }).catch(() => {}).finally(() => setSessionResolved(true));
+  }, [apiClient, screenId, taskId]);
   if (screenId === "focus-complete") return <section className="focus-screen focus-screen--complete"><span className="focus-complete-icon"><CheckCircle size={42} weight="duotone" /></span><h1>Фокус-сесію завершено</h1><p>{DEMO_TASKS[0].title}</p><div className="focus-stat"><strong>{Math.round(timer.elapsedMinutes)} хв</strong><span>фактичний час</span></div><p className="focus-note">Задача не позначена виконаною автоматично. Ти вирішуєш сам.</p><h2>Як було?</h2><div className="reflection-pills"><button>Легше, ніж очікувала</button><button>Саме так</button><button>Потрібно більше часу</button></div><Button onClick={() => onNavigate("today-normal")}>Повернутися до дня</Button></section>;
   const togglePause = async () => {
     if (timer.status === "active") { timer.pause(); if (apiClient && sessionId) await pauseFocusSession({ apiClient, sessionId }).catch(() => {}); }
@@ -22,6 +30,7 @@ export function FocusScreens({ screenId = "focus-mode", onNavigate = () => {}, m
   const finish = async () => {
     timer.finish();
     if (apiClient && sessionId) await finishFocusSession({ apiClient, sessionId, completeTask: false }).catch(() => {});
+    window.localStorage.removeItem(`vector-focus-run:${taskId}`);
     onNavigate("focus-complete");
   };
   const requestNotifications = async () => {

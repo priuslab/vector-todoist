@@ -23,3 +23,11 @@ it("does not require notification permission to use focus", async () => {
   await user.click(screen.getByRole("button", { name: /Дозволити нагадування/ }));
   expect(screen.getByText(/Нагадування дозволено|Дозволити нагадування|недоступні/)).toBeInTheDocument();
 });
+
+it("rehydrates an active server session instead of starting a second one", async () => {
+  const apiClient = { request: vi.fn(async (path) => path.startsWith("/api/v1/focus-sessions/active") ? { id: "focus-server", taskId: "task-structure", status: "paused", plannedMinutes: 50, startedAt: "2026-07-20T09:00:00.000Z", plannedEndAt: "2026-07-20T09:50:00.000Z", pausedAt: "2026-07-20T09:05:00.000Z", pausedSeconds: 0 } : null) };
+  render(<FocusScreens apiClient={apiClient} taskId="task-structure" />);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(apiClient.request).toHaveBeenCalledWith(expect.stringContaining("/api/v1/focus-sessions/active"));
+  expect(apiClient.request).not.toHaveBeenCalledWith("/api/v1/focus-sessions/start", expect.anything());
+});

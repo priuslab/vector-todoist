@@ -19,6 +19,7 @@ migrate((app) => {
   sessions.indexes = [
     'CREATE UNIQUE INDEX idx_focus_sessions_user_idempotency ON focus_sessions (user, idempotencyKey)',
     'CREATE INDEX idx_focus_sessions_user_status ON focus_sessions (user, status)',
+    'CREATE UNIQUE INDEX idx_focus_sessions_active_task ON focus_sessions (user, task) WHERE status != \'finished\'',
   ];
   app.save(sessions);
 }, (app) => {
