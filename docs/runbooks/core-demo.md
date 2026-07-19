@@ -1,4 +1,4 @@
-# P0-A core demo script
+# Core demo script — P0-A
 
 Мета демонстрації — один стабільний наскрізний сценарій українською: Brain Dump → AI аналіз → preview → apply → Today → edit → Undo.
 
@@ -29,3 +29,22 @@
 9. Перезавантажте сторінку: persisted Today має залишитися, а не повернутись до локального mock.
 
 Не демонструйте ручне видалення даних, необроблені server errors, secrets або непідключені інтеграції як готові функції.
+
+## Release gate
+
+Перед записом демо запустіть локальний verification набір із
+`docs/qa/final-release-report.md`. Цей сценарій є єдиним обов'язковим demo
+flow. Telegram, Oracle, Stripe та Goal Focus показуйте тільки після окремого
+production smoke і лише з увімкненими flags. Якщо зовнішня інтеграція не
+пройшла smoke, назвіть її запланованою, а не готовою.
+
+## Rollback під час демо
+
+- Якщо AI або API недоступний, збережіть чернетку, покажіть retry/error state і
+  поверніться до останнього стабільного Today. Не створюйте задачі вручну в
+  production DB.
+- Якщо план змінився некоректно, натисніть **Скасувати** у snackbar. Undo має
+  бути видимим до перезавантаження сторінки.
+- Якщо deploy регресував core flow, у Vercel поверніть попередній успішний
+  deployment; Gateway поверніть на попередній image/tag за
+  `docs/runbooks/deploy.md`. Після rollback повторіть landing і core smoke.
