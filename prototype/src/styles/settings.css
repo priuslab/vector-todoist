@@ -49,3 +49,5 @@
 .app-frame--with-footer .adaptation {
   padding-block: 20px;
 }
+.form-help { margin: 0; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+.form-stack select, .form-stack input[type="time"] { width: 100%; min-height: 44px; border: 1px solid var(--border-default); border-radius: 12px; padding: 0 12px; color: var(--text-primary); background: var(--bg-surface); font: inherit; }

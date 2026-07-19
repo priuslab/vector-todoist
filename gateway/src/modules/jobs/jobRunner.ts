@@ -2,6 +2,21 @@ import type { JobRecord, JobRepository } from './jobRepository.js';
 
 export type JobHandler = (job: JobRecord) => Promise<void>;
 
+/** Routes server-owned jobs to their domain handler. Unknown job types fail closed. */
+export function createAppJobHandler(handlers: {
+  calendar: JobHandler;
+  notification?: JobHandler;
+}): JobHandler {
+  return async (job) => {
+    if (job.type.startsWith('calendar.')) return handlers.calendar(job);
+    if (job.type.startsWith('telegram.notification.')) {
+      if (!handlers.notification) throw new Error('NOTIFICATION_HANDLER_UNAVAILABLE');
+      return handlers.notification(job);
+    }
+    throw new Error('UNKNOWN_JOB');
+  };
+}
+
 /** Dispatches Calendar background jobs without letting untrusted webhook payloads choose ownership. */
 export function createCalendarJobHandler(deps: {
   watchService?: { renew(user: { userId: string; email: string }, calendarId?: string): Promise<unknown> };
