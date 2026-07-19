@@ -38,6 +38,8 @@ import { createNotificationPreferencesService, notificationPreferencesRoutes } f
 import { goalRoutes } from './modules/goals/goalRoutes.js';
 import { createGoalService } from './modules/goals/goalService.js';
 import type { GoalGraphRepository } from './repositories/goalGraphRepository.js';
+import { oracleRoutes } from './modules/oracle/oracleRoutes.js';
+import { createOracleService } from './modules/oracle/oracleService.js';
 
 export interface GatewayServices {
   readonly [name: string]: unknown;
@@ -132,6 +134,9 @@ export async function buildApp({
       taskRepository,
       entitlement: _services.goalEntitlement as ((user: import('./auth/verifyPocketBaseToken.js').VerifiedUser) => Promise<boolean> | boolean) | undefined,
     }));
+  }
+  if (_services.goalGraphRepository || _services.oracleService) {
+    await oracleRoutes(app, (_services.oracleService as import('./modules/oracle/oracleService.js').OracleService | undefined) ?? createOracleService({ repository: _services.goalGraphRepository as GoalGraphRepository, taskRepository }));
   }
 
   const googleOAuthService = _services.googleOAuthService as GoogleOAuthService | undefined;
