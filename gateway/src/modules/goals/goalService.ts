@@ -35,6 +35,10 @@ export function createGoalService(deps: { repository: GoalGraphRepository; chang
     else if (type === 'idea') await getIdea(u, id);
     else if (type === 'task' || type === 'completed') { if (!taskRepository) throw new GoalNotFoundError(); const task = await taskRepository.get(u, id); if (!task || task.user !== u.userId || (type === 'completed' && task.status !== 'completed')) throw new GoalNotFoundError(); }
   }
+  const validateEdgeAudit = (u: VerifiedUser, edge: { actor?: string; status?: string; confirmedBy?: string }) => {
+    if (edge.actor === 'user' && edge.confirmedBy !== undefined) throw new GoalValidationError();
+    if (edge.actor === 'ai' && edge.status === 'confirmed' && edge.confirmedBy !== u.userId) throw new GoalValidationError();
+  };
   async function previewConversion(u: VerifiedUser, ideaId: string, input: unknown) { const idea = await getIdea(u, ideaId); if (idea.status === 'converted') throw new GoalConflictError(); const parsed = convertPreviewSchema.safeParse(input ?? {}); if (!parsed.success) throw new GoalValidationError(); const projectTitle = parsed.data.projectTitle ?? idea.summary ?? idea.text ?? 'Новий проєкт'; const taskTitles = parsed.data.taskTitles ?? ['Уточнити наступний крок', 'Підготувати перший результат']; if (parsed.data.goalId) await getGoal(u, parsed.data.goalId); return { idea: strip(idea), project: { title: projectTitle, goalId: parsed.data.goalId ?? idea.goalId ?? null, status: 'active' }, tasks: taskTitles.map((title, index) => ({ title, status: 'inbox', priority: index === 0 ? 'high' : 'medium', estimatedMinutes: 25 })), requiresConfirmation: true }; }
   return {
     goals: {
@@ -57,8 +61,8 @@ export function createGoalService(deps: { repository: GoalGraphRepository; chang
     },
     graph: {
       list: (u) => r.edges.list(u),
-      async create(u, input) { const parsed = edgeCreateSchema.safeParse(input ?? {}); if (!parsed.success) throw new GoalValidationError(); if (parsed.data.actor === 'ai' && parsed.data.status === 'confirmed' && parsed.data.confirmedBy !== u.userId) throw new GoalValidationError(); await assertNode(u, parsed.data.fromType, parsed.data.fromId); await assertNode(u, parsed.data.toType, parsed.data.toId); return r.edges.create(u, parsed.data); },
-      async update(u, id, input) { const parsed = edgePatchSchema.safeParse(input ?? {}); if (!parsed.success) throw new GoalValidationError(); const current = owned(u, await r.edges.get(u, id)); if (parsed.data.actor === 'ai' && parsed.data.status === 'confirmed' && parsed.data.confirmedBy !== u.userId) throw new GoalValidationError(); await assertNode(u, parsed.data.fromType ?? String(current.fromType), parsed.data.fromId ?? String(current.fromId)); await assertNode(u, parsed.data.toType ?? String(current.toType), parsed.data.toId ?? String(current.toId)); return r.edges.update(u, current.id, parsed.data); },
+      async create(u, input) { const parsed = edgeCreateSchema.safeParse(input ?? {}); if (!parsed.success) throw new GoalValidationError(); validateEdgeAudit(u, parsed.data); await assertNode(u, parsed.data.fromType, parsed.data.fromId); await assertNode(u, parsed.data.toType, parsed.data.toId); return r.edges.create(u, parsed.data); },
+      async update(u, id, input) { const parsed = edgePatchSchema.safeParse(input ?? {}); if (!parsed.success) throw new GoalValidationError(); const current = owned(u, await r.edges.get(u, id)); const effective = { actor: String(parsed.data.actor ?? current.actor), status: String(parsed.data.status ?? current.status), confirmedBy: parsed.data.confirmedBy ?? (typeof current.confirmedBy === 'string' ? current.confirmedBy : undefined) }; validateEdgeAudit(u, effective); await assertNode(u, parsed.data.fromType ?? String(current.fromType), parsed.data.fromId ?? String(current.fromId)); await assertNode(u, parsed.data.toType ?? String(current.toType), parsed.data.toId ?? String(current.toId)); return r.edges.update(u, current.id, parsed.data); },
       async delete(u, id) { const current = owned(u, await r.edges.get(u, id)); return r.edges.delete(u, current.id); },
     },
     conversion: {
