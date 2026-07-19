@@ -25,15 +25,17 @@ function DayStrip({ selectedDate, onSelect }) {
   return <div className="day-strip" aria-label="Вибір дати">{days.map((date) => <button type="button" key={date} className={date === selectedDate ? "is-active" : ""} aria-pressed={date === selectedDate} onClick={() => onSelect(date)}><span>{dateLabel(date).split(",")[0]}</span><strong>{parseDate(date).getDate()}</strong></button>)}</div>;
 }
 
-function WeekView({ tasks, busySlots }) {
-  const busyMinutes = Math.round((busySlots?.length ?? 0) * 45);
-  return <div className="week-view" aria-label="Тижневий огляд"><div className="week-head">{Array.from({ length: 5 }, (_, index) => { const date = new Date(); date.setDate(date.getDate() + index); const label = dateLabel(isoDate(date)); return <span key={label}>{label.split(",")[0]}<b>{date.getDate()}</b></span>; })}</div><div className="week-grid">{Array.from({ length: 5 }, (_, index) => <div key={index}><span className="week-busy" style={{ height: `${Math.min(88, 24 + (busyMinutes + (tasks?.length ?? 0) * 30 + index * 11) % 65)}%` }} /><small>{index === 0 ? `${tasks?.length ?? 0} задач` : index === 1 ? "Вільний ранок" : "Легший день"}</small></div>)}</div><div className="week-legend"><span><i />Зайнято</span><span><i />AI-задачі</span></div><InlineInsight>Найкращий вільний ранок для Deep Work — середа, 09:30–12:00.</InlineInsight></div>;
+function WeekView({ selectedDate, weekDays = [] }) {
+  const anchor = parseDate(selectedDate);
+  const days = Array.from({ length: 5 }, (_, index) => { const date = new Date(anchor); date.setDate(date.getDate() + index); return isoDate(date); });
+  return <div className="week-view" aria-label="Тижневий огляд"><div className="week-head">{days.map((date) => { const label = dateLabel(date); return <span key={date}>{label.split(",")[0]}<b>{parseDate(date).getDate()}</b></span>; })}</div><div className="week-grid">{days.map((date) => { const day = weekDays.find((entry) => entry.date === date) ?? {}; const taskCount = day.tasks?.length ?? 0; const busyCount = day.slots?.length ?? 0; const load = Math.min(88, 18 + taskCount * 11 + busyCount * 9); return <div key={date}><span className="week-busy" style={{ height: `${load}%` }} /><small>{taskCount ? `${taskCount} задач` : busyCount ? `${busyCount} подій` : "Вільний день"}</small></div>; })}</div><div className="week-legend"><span><i />Зайнято</span><span><i />AI-задачі</span></div><InlineInsight>Найкращий вільний ранок для Deep Work — середа, 09:30–12:00.</InlineInsight></div>;
 }
 
 function normalizeTask(task) {
   const start = task.start ?? (task.plannedStart ? new Date(task.plannedStart).toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" }) : undefined);
   const end = task.end ?? (task.plannedEnd ? new Date(task.plannedEnd).toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" }) : undefined);
-  return { ...task, start, end, duration: task.duration ?? task.estimatedMinutes, flexible: task.flexible !== false, locked: false };
+  const locked = task.locked === true || task.source === "google" || task.calendarLocked === true || task.status === "completed";
+  return { ...task, start, end, duration: task.duration ?? task.estimatedMinutes, flexible: !locked && task.flexible !== false, locked };
 }
 
 export function CalendarScreens({ screenId = "calendar-day", onNavigate = () => {}, apiClient }) {
@@ -59,12 +61,22 @@ export function CalendarScreens({ screenId = "calendar-day", onNavigate = () => 
           apiClient.request(`/api/v1/calendar/day?date=${encodeURIComponent(selectedDate)}`),
           apiClient.request(`/api/v1/today?date=${encodeURIComponent(selectedDate)}&timezone=${encodeURIComponent(timezone)}`).catch(() => null),
         ]);
-        if (active) { setRemote({ ...(day ?? {}), ...(today ?? {}), slots: day?.slots ?? today?.slots ?? [], tasks: today?.tasks ?? day?.tasks ?? [] }); setRemoteState("ready"); }
+        let weekDays = [];
+        if (view === "week") {
+          const anchor = parseDate(selectedDate);
+          const dates = Array.from({ length: 7 }, (_, index) => { const date = new Date(anchor); date.setDate(date.getDate() + index); return isoDate(date); });
+          weekDays = await Promise.all(dates.map(async (date) => {
+            if (date === selectedDate) return { date, slots: day?.slots ?? [], tasks: today?.tasks ?? [] };
+            const response = await apiClient.request(`/api/v1/calendar/day?date=${encodeURIComponent(date)}`).catch(() => null);
+            return { date, slots: response?.slots ?? [], tasks: response?.tasks ?? [] };
+          }));
+        }
+        if (active) { setRemote({ ...(day ?? {}), ...(today ?? {}), slots: day?.slots ?? today?.slots ?? [], tasks: today?.tasks ?? day?.tasks ?? [], weekDays }); setRemoteState("ready"); }
       } catch { if (active) setRemoteState("error"); }
     };
     load();
     return () => { active = false; };
-  }, [apiClient, selectedDate, timezone]);
+  }, [apiClient, selectedDate, timezone, view]);
 
   const tasks = useMemo(() => (remote?.tasks?.length ? remote.tasks.map(normalizeTask) : DEMO_TASKS), [remote]);
   const busy = useMemo(() => (remote?.slots?.length ? remote.slots.map((slot) => ({ ...slot, title: "Зайнято", locked: true, source: "google", start: new Date(slot.start).toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" }), end: new Date(slot.end).toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" }) })) : DEMO_EVENTS), [remote]);
@@ -94,7 +106,7 @@ export function CalendarScreens({ screenId = "calendar-day", onNavigate = () => 
     setUndoAction(null); setPendingSync(false);
   }
 
-  if (apiClient && remoteState === "loading") return <AppFrame title="Календар" eyebrow={dateRangeLabel(selectedDate)} activeRoute="calendar-day" onNavigate={onNavigate} avatar><StateView state="loading" title="Синхронізую календар" message="Перевіряю задачі та зайняті слоти." /></AppFrame>;
+  if (apiClient && remoteState === "loading" && !remote) return <AppFrame title="Календар" eyebrow={dateRangeLabel(selectedDate)} activeRoute="calendar-day" onNavigate={onNavigate} avatar><StateView state="loading" title="Синхронізую календар" message="Перевіряю задачі та зайняті слоти." /></AppFrame>;
   if (apiClient && remoteState === "error") return <AppFrame title="Календар" eyebrow={dateRangeLabel(selectedDate)} activeRoute="calendar-day" onNavigate={onNavigate} avatar><StateView state="error" title="Календар недоступний" message="Не вдалося завантажити календар. Спробуй ще раз." action={<Button onClick={() => window.location.reload()}>Оновити</Button>} /></AppFrame>;
   return <AppFrame title="Календар" eyebrow={view === "week" ? dateRangeLabel(selectedDate) : dateLabel(selectedDate)} activeRoute="calendar-day" onNavigate={onNavigate} avatar>
     <div className="calendar-toolbar"><div className="calendar-segmented" role="group" aria-label="Режим календаря"><button type="button" aria-pressed={view === "day"} className={view === "day" ? "is-active" : ""} onClick={() => setView("day")}>День</button><button type="button" aria-label="Тиждень" aria-pressed={view === "week"} className={view === "week" ? "is-active" : ""} onClick={() => setView("week")}>Тиждень</button></div><span className="calendar-timezone">{timezone}</span></div>
@@ -105,10 +117,10 @@ export function CalendarScreens({ screenId = "calendar-day", onNavigate = () => 
     {overload ? <InlineInsight tone="warning" title="День перевантажений"><span>Частина задач не має реалістичного місця. Це не проблема — знайдемо спокійніший порядок.</span></InlineInsight> : null}
     {screenId === "calendar-conflict" ? <InlineInsight tone="warning" title="Знайдено конфлікт">Нова подія Google перекриває лист Марії. Задача потребує нового часу.</InlineInsight> : null}
     {screenId === "calendar-offline" ? <div className="sync-banner"><CloudSlash size={18} /><span><strong>Зміни очікують синхронізації</strong><small>Календар оновиться, коли повернеться інтернет.</small></span></div> : null}
-    {view === "week" ? <WeekView tasks={tasks} busySlots={busy} /> : <CalendarTimeline items={items} onSelect={setSelected} onMove={saveTime} dragMode={screenId === "calendar-drag"} />}
+    {view === "week" ? <WeekView selectedDate={selectedDate} weekDays={remote?.weekDays} /> : <CalendarTimeline items={items} onSelect={setSelected} onMove={saveTime} dragMode={screenId === "calendar-drag"} />}
     {overload ? <Button variant="secondary" icon={ArrowsClockwise} onClick={() => onNavigate("today-rescheduled")}>Знайти новий час</Button> : null}
     {screenId === "calendar-conflict" ? <Button variant="secondary" icon={ArrowsClockwise} onClick={() => onNavigate("today-rescheduled")}>Знайти новий час</Button> : null}
     {undoAction ? <div className="calendar-undo" role="status"><span>План змінився — я знайшов новий час.</span><Button variant="tertiary" onClick={undoMove}>Скасувати переміщення</Button></div> : null}
-    {selected ? <EventSheet item={selected} onClose={() => setSelected(null)} onSave={saveTime} onRetry={apiClient ? (item) => apiClient.request(`/api/v1/tasks/${encodeURIComponent(item.taskId ?? item.id)}/calendar-sync`, { method: "POST", headers: { "Idempotency-Key": `calendar:retry:${item.taskId ?? item.id}` } }) : undefined} /> : null}
+    {selected ? <EventSheet item={selected} selectedDate={selectedDate} onClose={() => setSelected(null)} onSave={saveTime} onRetry={apiClient ? (item) => apiClient.request(`/api/v1/tasks/${encodeURIComponent(item.taskId ?? item.id)}/calendar-sync`, { method: "POST", headers: { "Idempotency-Key": `calendar:retry:${item.taskId ?? item.id}` } }) : undefined} /> : null}
   </AppFrame>;
 }

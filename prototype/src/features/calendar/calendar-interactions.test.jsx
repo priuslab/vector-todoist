@@ -19,6 +19,19 @@ it("switches between day and week and reads live task data", async () => {
   expect(screen.getByRole("button", { name: "Гнучка задача" })).toHaveAttribute("data-locked", "false");
   fireEvent.click(screen.getByRole("button", { name: "Тиждень" }));
   expect(screen.getByRole("button", { name: "Тиждень" })).toHaveAttribute("aria-pressed", "true");
+  await waitFor(() => expect(apiClient.request).toHaveBeenCalledWith(expect.stringContaining("/api/v1/calendar/day?date=")));
+});
+
+it("keeps server-locked app tasks immutable and uses live week counts", async () => {
+  const apiClient = { request: vi.fn(async (path) => {
+    if (path.includes("today?")) return { ...livePayload, tasks: [{ ...livePayload.tasks[0], id: "locked-task", locked: true, source: "app" }] };
+    if (path.includes("day?")) return { ...livePayload, tasks: [{ id: "week-task", title: "Тижнева задача" }], slots: [] };
+    return { status: "disconnected" };
+  }) };
+  render(<CalendarScreens apiClient={apiClient} />);
+  await waitFor(() => expect(screen.getByRole("button", { name: "Гнучка задача" })).toHaveAttribute("draggable", "false"));
+  fireEvent.click(screen.getByRole("button", { name: "Тиждень" }));
+  await waitFor(() => expect(screen.getAllByText("1 задач").length).toBeGreaterThan(0));
 });
 
 it("does not make locked Google events draggable and exposes an accessible time form", async () => {
