@@ -59,4 +59,10 @@ describe('persistent focus sessions', () => {
     expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
     expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
   });
+  it('serializes mixed pause and finish mutations for the same version', async () => {
+    const state = setup(); const started = await state.service.start(alice, { taskId: 'task-1', durationMinutes: 25, idempotencyKey: 'focus-mixed-race-1' });
+    const results = await Promise.allSettled([state.service.pause(alice, started.id), state.service.finish(alice, started.id, {})]);
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+  });
 });

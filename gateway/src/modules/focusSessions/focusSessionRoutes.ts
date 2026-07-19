@@ -74,7 +74,9 @@ export function createFocusSessionService(deps: { repository: FocusSessionReposi
     if (!task || task.user !== user.userId) throw new FocusSessionNotFoundError();
   };
   const update = async (user: VerifiedUser, session: FocusSessionRecord, operation: string, patch: Record<string, unknown>) => {
-    const operationKey = `${operation}:${Number(session.version ?? 1)}`;
+    // The reservation is version-scoped, not operation-scoped: pause vs finish
+    // must also contend for the same state transition.
+    const operationKey = `version:${Number(session.version ?? 1)}`;
     if (repository.claimMutation && !(await repository.claimMutation(user, session.id, operationKey, Number(session.version ?? 1)))) throw new FocusSessionConflictError();
     try {
       const expected = Number(session.version ?? 1);
