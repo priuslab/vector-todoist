@@ -67,8 +67,11 @@ export function CalendarScreens({ screenId = "calendar-day", onNavigate = () => 
           const dates = Array.from({ length: 7 }, (_, index) => { const date = new Date(anchor); date.setDate(date.getDate() + index); return isoDate(date); });
           weekDays = await Promise.all(dates.map(async (date) => {
             if (date === selectedDate) return { date, slots: day?.slots ?? [], tasks: today?.tasks ?? [] };
-            const response = await apiClient.request(`/api/v1/calendar/day?date=${encodeURIComponent(date)}`).catch(() => null);
-            return { date, slots: response?.slots ?? [], tasks: response?.tasks ?? [] };
+            const [response, taskPlan] = await Promise.all([
+              apiClient.request(`/api/v1/calendar/day?date=${encodeURIComponent(date)}`).catch(() => null),
+              apiClient.request(`/api/v1/today?date=${encodeURIComponent(date)}&timezone=${encodeURIComponent(timezone)}`).catch(() => null),
+            ]);
+            return { date, slots: response?.slots ?? [], tasks: taskPlan?.tasks ?? response?.tasks ?? [] };
           }));
         }
         if (active) { setRemote({ ...(day ?? {}), ...(today ?? {}), slots: day?.slots ?? today?.slots ?? [], tasks: today?.tasks ?? day?.tasks ?? [], weekDays }); setRemoteState("ready"); }
