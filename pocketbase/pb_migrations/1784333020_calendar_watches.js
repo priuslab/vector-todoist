@@ -5,7 +5,7 @@ migrate((app) => {
     links.fields.add(new TextField({ name: 'providerVersion', required: false, max: 500 }));
     app.save(links);
   }
-  if (app.findCollectionByNameOrId('calendar_watch_channels')) return;
+  try { if (app.findCollectionByNameOrId('calendar_watch_channels')) return; } catch (_) { /* collection not created yet */ }
   const watches = new Collection({
     type: 'base', name: 'calendar_watch_channels',
     listRule: '', viewRule: '', createRule: '', updateRule: '', deleteRule: '',

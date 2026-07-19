@@ -1,5 +1,6 @@
 migrate((app) => {
-  const watches = app.findCollectionByNameOrId('calendar_watch_channels');
+  let watches;
+  try { watches = app.findCollectionByNameOrId('calendar_watch_channels'); } catch (_) { return; }
   if (!watches) return;
   const token = watches.fields.find((field) => field.name === 'channelToken');
   if (token) token.required = false;
