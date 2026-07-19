@@ -50,7 +50,7 @@ export function CalendarTimeline({ dragMode = false, onSelect, onMove, items: pr
             onDragStart={(event) => { if (!flexible) { event.preventDefault(); return; } event.dataTransfer?.setData("text/plain", item.id); }}
             onDrop={(event) => move(event, item)}
             onClick={() => onSelect?.(item)}
-          ><strong>{item.start ?? (item.plannedStart ? new Date(item.plannedStart).toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" }) : "09:00")} · {item.title}</strong><small>{locked ? <><LockSimple size={11} />Google Calendar · зафіксовано</> : <><Sparkle size={11} />AI-задача · {item.duration ?? item.estimatedMinutes ?? 30} хв</>}</small></button>;
+          ><strong>{item.start ?? (item.plannedStart ? new Date(item.plannedStart).toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" }) : "09:00")} · {item.title}</strong><small>{locked ? <><LockSimple size={11} />{item.source === "google" ? "Google Calendar · зафіксовано" : "Зафіксований блок · не можна перенести"}</> : <><Sparkle size={11} />AI-задача · {item.duration ?? item.estimatedMinutes ?? 30} хв</>}</small></button>;
         })}
       </div>
     </div>

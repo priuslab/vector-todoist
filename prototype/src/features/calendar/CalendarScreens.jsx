@@ -27,7 +27,7 @@ function DayStrip({ selectedDate, onSelect }) {
 
 function WeekView({ selectedDate, weekDays = [] }) {
   const anchor = parseDate(selectedDate);
-  const days = Array.from({ length: 5 }, (_, index) => { const date = new Date(anchor); date.setDate(date.getDate() + index); return isoDate(date); });
+  const days = Array.from({ length: 7 }, (_, index) => { const date = new Date(anchor); date.setDate(date.getDate() + index); return isoDate(date); });
   return <div className="week-view" aria-label="Тижневий огляд"><div className="week-head">{days.map((date) => { const label = dateLabel(date); return <span key={date}>{label.split(",")[0]}<b>{parseDate(date).getDate()}</b></span>; })}</div><div className="week-grid">{days.map((date) => { const day = weekDays.find((entry) => entry.date === date) ?? {}; const taskCount = day.tasks?.length ?? 0; const busyCount = day.slots?.length ?? 0; const load = Math.min(88, 18 + taskCount * 11 + busyCount * 9); return <div key={date}><span className="week-busy" style={{ height: `${load}%` }} /><small>{taskCount ? `${taskCount} задач` : busyCount ? `${busyCount} подій` : "Вільний день"}</small></div>; })}</div><div className="week-legend"><span><i />Зайнято</span><span><i />AI-задачі</span></div><InlineInsight>Найкращий вільний ранок для Deep Work — середа, 09:30–12:00.</InlineInsight></div>;
 }
 

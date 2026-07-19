@@ -32,10 +32,10 @@
 .sync-banner--error { color: var(--danger); background: var(--danger-soft); }
 .calendar-undo { position: sticky; bottom: 8px; z-index: 6; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border-default); border-radius: 14px; color: var(--text-primary); background: var(--bg-surface); box-shadow: 0 4px 16px rgb(32 35 48 / 8%); font-size: 11px; }
 .calendar-undo .button { min-height: 40px; padding-inline: 10px; }
-.week-head { display: grid; grid-template-columns: repeat(5,1fr); text-align: center; }
+.week-head { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); text-align: center; }
 .week-head span { display: flex; flex-direction: column; gap: 4px; color: var(--text-tertiary); font-size: 9px; }
 .week-head b { color: var(--text-primary); font-size: 13px; }
-.week-grid { height: 300px; margin: 16px 0; border-bottom: 1px solid var(--border-default); display: grid; grid-template-columns: repeat(5,1fr); gap: 8px; align-items: end; }
+.week-grid { height: 300px; margin: 16px 0; border-bottom: 1px solid var(--border-default); display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 5px; align-items: end; }
 .week-grid > div { height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 8px; }
 .week-busy { width: 26px; min-height: 20px; border-radius: 10px 10px 3px 3px; background: var(--brand-soft); border-top: 3px solid var(--brand-primary); }
 .week-grid small { font-size: 8px; color: var(--text-secondary); }
