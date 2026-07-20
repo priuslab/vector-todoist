@@ -18,6 +18,8 @@ export function VoiceTextComposer({
   onTranscribe,
   onSubmit,
   onSpeak,
+  submitLabel = "Відправити",
+  disabled = false,
 }) {
   const [mode, setMode] = useState(initialMode === "text" ? "text" : "voice");
   const [draft, setDraft] = useState("");
@@ -74,7 +76,7 @@ export function VoiceTextComposer({
   };
 
   const submit = () => {
-    if (!draft.trim()) return;
+    if (disabled || !draft.trim()) return;
     onSubmit(draft);
   };
 
@@ -114,7 +116,7 @@ export function VoiceTextComposer({
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
           />
-          <button className="voice-text-composer__submit" type="button" onClick={submit}>Відправити</button>
+          <button className="voice-text-composer__submit" type="button" onClick={submit} disabled={disabled}>{submitLabel}</button>
           <button className="voice-text-composer__mode-switch" type="button" onClick={() => setMode("voice")}>
             Увімкнути голосовий режим
           </button>

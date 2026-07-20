@@ -72,6 +72,28 @@ it("does not submit an empty draft and submits edited transcript text", async ()
   expect(onSubmit).toHaveBeenCalledWith("Моя відредагована відповідь");
 });
 
+it("uses a host submit label and disables the send control while submission is pending", async () => {
+  const user = userEvent.setup();
+  const onSubmit = vi.fn();
+
+  render(
+    <VoiceTextComposer
+      initialMode="text"
+      submitLabel="Відповісти"
+      disabled
+      onTranscribe={vi.fn()}
+      onSubmit={onSubmit}
+    />,
+  );
+
+  await user.type(screen.getByRole("textbox"), "Моя відповідь");
+  const submit = screen.getByRole("button", { name: "Відповісти" });
+
+  expect(submit).toBeDisabled();
+  await user.click(submit);
+  expect(onSubmit).not.toHaveBeenCalled();
+});
+
 it("uses the mobile composer control classes", () => {
   render(<VoiceTextComposer initialMode="text" onTranscribe={vi.fn()} onSubmit={vi.fn()} />);
 
