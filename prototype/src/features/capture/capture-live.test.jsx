@@ -30,6 +30,16 @@ function installFakeMediaRecorder() {
   };
 }
 
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((nextResolve, nextReject) => {
+    resolve = nextResolve;
+    reject = nextReject;
+  });
+  return { promise, resolve, reject };
+}
+
 it("persists text through the injected capture API and confirms a draft", async () => {
   const user = userEvent.setup();
   const createBrainDump = vi.fn(async () => ({ id: "dump-1", status: "draft", rawText: "Моя думка" }));
@@ -83,6 +93,42 @@ it("saves the edited voice transcript through the existing Brain Dump callback",
 
     await waitFor(() => expect(createBrainDump).toHaveBeenCalledWith(expect.objectContaining({ text: "Відредагована транскрипція" })));
     expect(apiClient.request).toHaveBeenCalledWith("/api/v1/brain-dumps/voice", expect.objectContaining({ method: "POST" }));
+  } finally {
+    restoreMediaRecorder();
+  }
+});
+
+it("submits one retry while voice transcription is pending", async () => {
+  const user = userEvent.setup();
+  const restoreMediaRecorder = installFakeMediaRecorder();
+  const firstAttempt = deferred();
+  const retryAttempt = deferred();
+  const apiClient = {
+    request: vi.fn()
+      .mockImplementationOnce(() => firstAttempt.promise)
+      .mockImplementationOnce(() => retryAttempt.promise),
+  };
+
+  try {
+    render(<CaptureFlow apiClient={apiClient} />);
+
+    await user.click(screen.getByRole("button", { name: "Почати запис" }));
+    await user.click(screen.getByRole("button", { name: "Завершити запис" }));
+    await waitFor(() => expect(apiClient.request).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("button", { name: "Почати запис" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Увімкнути текстовий режим" })).toBeDisabled();
+
+    firstAttempt.reject(new Error("offline"));
+    await screen.findByRole("button", { name: "Спробувати ще раз" });
+    apiClient.request.mockClear();
+
+    const retry = screen.getByRole("button", { name: "Спробувати ще раз" });
+    await user.click(retry);
+    await waitFor(() => expect(retry).toBeDisabled());
+    await user.click(retry);
+
+    expect(apiClient.request).toHaveBeenCalledTimes(1);
+    retryAttempt.resolve({ transcript: "Повторна транскрипція" });
   } finally {
     restoreMediaRecorder();
   }

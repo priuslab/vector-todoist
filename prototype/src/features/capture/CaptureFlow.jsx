@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppFrame } from "../../components/AppFrame";
 import { Button } from "../../components/Button";
 import { StateView } from "../../components/StateView";
@@ -24,7 +24,9 @@ export function CaptureFlow({ screenId = "capture-chooser", onBack, onNavigate =
   const [applying, setApplying] = useState(false);
   const [planError, setPlanError] = useState("");
   const [voiceError, setVoiceError] = useState("");
+  const [voiceLoading, setVoiceLoading] = useState(false);
   const [voiceBlob, setVoiceBlob] = useState(null);
+  const voiceRequestInFlight = useRef(false);
   const [idempotencyKey] = useState(() => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-brain-dump`);
 
   useEffect(() => {
@@ -53,8 +55,11 @@ export function CaptureFlow({ screenId = "capture-chooser", onBack, onNavigate =
   };
 
   const transcribeVoice = async (blob) => {
+    if (voiceRequestInFlight.current) return undefined;
+
+    voiceRequestInFlight.current = true;
     setVoiceBlob(blob);
-    setVoiceError("");
+    setVoiceError(""); setVoiceLoading(true);
     try {
       const result = apiClient
         ? await apiClient.request("/api/v1/brain-dumps/voice", { method: "POST", headers: { "Content-Type": blob.type || "audio/webm", "X-Audio-Duration": "23" }, body: blob })
@@ -65,6 +70,9 @@ export function CaptureFlow({ screenId = "capture-chooser", onBack, onNavigate =
     } catch {
       setVoiceError("Не вдалося розпізнати запис. Запис збережено для повторної спроби — або можеш написати думки текстом."); setStage("voice-retry");
       throw new Error("Voice transcription failed");
+    } finally {
+      voiceRequestInFlight.current = false;
+      setVoiceLoading(false);
     }
   };
 
@@ -109,10 +117,10 @@ export function CaptureFlow({ screenId = "capture-chooser", onBack, onNavigate =
     finally { setApplying(false); }
   };
 
-  const composer = <><VoiceTextComposer onTranscribe={transcribeVoice} onSubmit={submitComposerText} submitLabel="Зберегти чернетку" disabled={saving} />{saveError ? <p role="alert" className="soft-copy">Не вдалося зберегти. Перевір з’єднання й спробуй ще раз.</p> : null}</>;
+  const composer = <><VoiceTextComposer onTranscribe={transcribeVoice} onSubmit={submitComposerText} submitLabel="Зберегти чернетку" disabled={voiceLoading || saving} />{saveError ? <p role="alert" className="soft-copy">Не вдалося зберегти. Перевір з’єднання й спробуй ще раз.</p> : null}</>;
   const body = stage === "chooser" ? <section className="capture-chooser"><h1>Що зараз у голові?</h1><p>Говори хаотично — не треба формулювати задачі чи оцінювати час.</p>{composer}</section>
     : stage === "recording" ? composer
-    : stage === "voice-retry" ? <section className="capture-transcript"><h1>Не вдалося розпізнати запис</h1><p role="alert" className="soft-copy">{voiceError}</p><Button onClick={() => voiceBlob && transcribeVoice(voiceBlob)}>Спробувати ще раз</Button><Button variant="secondary" onClick={() => setStage("transcript")}>Написати текстом</Button></section>
+    : stage === "voice-retry" ? <section className="capture-transcript"><h1>Не вдалося розпізнати запис</h1><p role="alert" className="soft-copy">{voiceError}</p><Button loading={voiceLoading} onClick={() => voiceBlob && transcribeVoice(voiceBlob)}>Спробувати ще раз</Button><Button variant="secondary" disabled={voiceLoading} onClick={() => setStage("transcript")}>Написати текстом</Button></section>
     : stage === "voice-review" ? <section className="capture-transcript"><h1>Перевір транскрипт</h1><p className="soft-copy">Відредагуй текст перед збереженням у Brain Dump.</p><Transcript editable value={draftText} onChange={setDraftText} />{voiceError ? <p role="alert" className="soft-copy">{voiceError}</p> : null}<Button loading={saving} onClick={() => saveDraft()}>Зберегти чернетку</Button><Button variant="secondary" onClick={() => setStage("recording")}>Записати ще раз</Button></section>
     : stage === "transcript" ? <section className="capture-transcript"><h1>Твої думки</h1><Transcript editable value={draftText} onChange={setDraftText} />{saveError ? <p role="alert" className="soft-copy">Не вдалося зберегти. Перевір з’єднання й спробуй ще раз.</p> : null}<Button loading={saving} onClick={() => saveDraft()}>Зберегти чернетку</Button></section>
     : stage === "saved" ? <section className="capture-transcript"><h1>Думки збережено</h1><p role="status" className="soft-copy">Збережено як чернетку. Вектор повернеться до них, коли ти будеш готовий.</p><Transcript value={draftText} /><Button onClick={() => onNavigate("inbox-default")}>Перейти до Inbox</Button></section>
