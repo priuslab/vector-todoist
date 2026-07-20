@@ -16,6 +16,17 @@ const config = {
 };
 
 describe('GET /health', () => {
+  it('enables structured application logging in production', async () => {
+    const app = await buildApp({
+      config: { ...config, nodeEnv: 'production' },
+      services: {},
+    });
+
+    expect(app.log.level).toBe('info');
+
+    await app.close();
+  });
+
   it('returns the public gateway health payload', async () => {
     const app = await buildApp({ config, services: {} });
 

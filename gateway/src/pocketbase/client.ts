@@ -1,7 +1,30 @@
 export type PocketBaseRecord = { id: string; user?: string; [key: string]: unknown };
 export class PocketBaseClientError extends Error {
   readonly code = 'UNAVAILABLE';
-  constructor() { super('PocketBase unavailable'); this.name = 'PocketBaseClientError'; }
+  constructor(readonly status?: number, readonly details?: Record<string, unknown>) {
+    super('PocketBase unavailable');
+    this.name = 'PocketBaseClientError';
+  }
+}
+
+function safeErrorDetails(body: unknown): Record<string, unknown> | undefined {
+  if (!body || typeof body !== 'object') return undefined;
+  const value = body as { code?: unknown; message?: unknown; data?: unknown };
+  const details: Record<string, unknown> = {};
+  if (typeof value.code === 'number' || typeof value.code === 'string') details.code = value.code;
+  if (typeof value.message === 'string') details.message = value.message.slice(0, 500);
+  if (value.data && typeof value.data === 'object' && !Array.isArray(value.data)) {
+    const fields = Object.fromEntries(Object.entries(value.data).flatMap(([name, issue]) => {
+      if (!issue || typeof issue !== 'object') return [];
+      const candidate = issue as { code?: unknown; message?: unknown };
+      return [[name, {
+        ...(typeof candidate.code === 'string' ? { code: candidate.code.slice(0, 120) } : {}),
+        ...(typeof candidate.message === 'string' ? { message: candidate.message.slice(0, 500) } : {}),
+      }]];
+    }));
+    if (Object.keys(fields).length > 0) details.fields = fields;
+  }
+  return Object.keys(details).length > 0 ? details : undefined;
 }
 
 export interface PocketBaseClient {
@@ -24,10 +47,17 @@ export function createPocketBaseClient(options: { baseUrl: string; token?: strin
         ...init, signal: controller.signal,
         headers: { 'content-type': 'application/json', ...(options.token ? { authorization: `Bearer ${options.token}` } : {}), ...init.headers },
       });
-      if (!response.ok) throw new PocketBaseClientError();
+      if (!response.ok) {
+        let body: unknown;
+        try { body = await response.json(); } catch { body = undefined; }
+        throw new PocketBaseClientError(response.status, safeErrorDetails(body));
+      }
       if (response.status === 204) return undefined as T;
       try { return await response.json() as T; } catch { throw new PocketBaseClientError(); }
-    } catch { throw new PocketBaseClientError(); } finally { clearTimeout(timer); }
+    } catch (error) {
+      if (error instanceof PocketBaseClientError) throw error;
+      throw new PocketBaseClientError();
+    } finally { clearTimeout(timer); }
   }
   const client: PocketBaseClient = {
     withToken: (token) => createPocketBaseClient({ ...options, token }),

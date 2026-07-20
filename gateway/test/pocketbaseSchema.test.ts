@@ -45,6 +45,18 @@ function ruleValue(source: string, rule: string): string {
 }
 
 describe('PocketBase core schema contract', () => {
+  it('allows a newly created goal discovery session to start with no answers', async () => {
+    const source = await readFile(resolve(
+      import.meta.dirname,
+      '../../pocketbase/pb_migrations/1784560200_goal_discovery_empty_answers.js',
+    ), 'utf8').catch(() => '');
+
+    expect(source).toContain("findCollectionByNameOrId('goal_discovery_sessions')");
+    expect(source).toContain("getByName('answersJson')");
+    expect(source).toContain('answers.required = false');
+    expect(source).toContain('answers.required = true');
+  });
+
   it('makes calendar watch plaintext token optional via a reversible follow-up migration', async () => {
     const source = await readFile(resolve(import.meta.dirname, '../../pocketbase/pb_migrations/1784333030_calendar_watch_token_hash.js'), 'utf8');
     expect(source).toContain('token.required = false');

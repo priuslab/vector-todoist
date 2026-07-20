@@ -70,6 +70,7 @@ export async function buildApp({
 }: GatewayAppOptions): Promise<FastifyInstance> {
   const voiceMaxBytes = config.voiceMaxBytes ?? 15_000_000;
   const app = Fastify({
+    logger: config.nodeEnv === 'production' ? { level: 'info' } : false,
     requestIdHeader: 'x-request-id',
     trustProxy: config.trustProxy,
     // Leave room for multipart headers while remaining bounded by config.

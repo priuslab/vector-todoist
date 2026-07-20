@@ -44,6 +44,41 @@ describe('PocketBase repositories', () => {
     expect(fetcher).toHaveBeenCalledWith(expect.stringContaining('/api/collections/tasks/records?'), expect.objectContaining({ signal: expect.any(AbortSignal) }));
   });
 
+  it('retains safe PocketBase validation details for server-side diagnostics', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
+      code: 400,
+      message: 'Failed to create record.',
+      data: { startedAt: { code: 'validation_invalid_datetime', message: 'Invalid date.' } },
+    }), { status: 400, headers: { 'content-type': 'application/json' } }));
+    const pb = createPocketBaseClient({ baseUrl: 'http://pb.test', fetcher });
+
+    await expect(pb.create('goal_discovery_sessions', {})).rejects.toMatchObject({
+      status: 400,
+      details: {
+        code: 400,
+        message: 'Failed to create record.',
+        fields: { startedAt: { code: 'validation_invalid_datetime', message: 'Invalid date.' } },
+      },
+    });
+  });
+
+  it('preserves the safe PocketBase failure as the repository error cause', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
+      code: 400,
+      message: 'Failed to create record.',
+      data: { user: { code: 'validation_invalid', message: 'Invalid owner.' } },
+    }), { status: 400, headers: { 'content-type': 'application/json' } }));
+    const repository = createBrainDumpRepository(createPocketBaseClient({ baseUrl: 'http://pb.test', fetcher }));
+
+    await expect(repository.create({ ...identity, token: 'request-token' }, { rawText: 'Dump' })).rejects.toMatchObject({
+      code: 'UNAVAILABLE',
+      cause: {
+        status: 400,
+        details: { fields: { user: { code: 'validation_invalid', message: 'Invalid owner.' } } },
+      },
+    });
+  });
+
   it('propagates the verified bearer token only to the request-scoped PocketBase client', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ id: 'created' }), { status: 200 }));
     const pb = createPocketBaseClient({ baseUrl: 'http://pb.test', fetcher });
