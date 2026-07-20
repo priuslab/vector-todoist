@@ -6,6 +6,28 @@ export interface TranscriptionAdapter {
   transcribe(input: { bytes: Buffer; mimeType: string; locale: 'uk-UA' }): Promise<string>;
 }
 
+export class TranscriptionProviderError extends Error {
+  constructor(
+    readonly status?: number,
+    readonly providerCode?: string,
+    readonly providerMessage?: string,
+  ) {
+    super('Transcription provider request failed');
+    this.name = 'TranscriptionProviderError';
+  }
+}
+
+function providerFailure(response: Response, body: unknown): TranscriptionProviderError {
+  const error = body && typeof body === 'object' && 'error' in body && (body as { error?: unknown }).error && typeof (body as { error?: unknown }).error === 'object'
+    ? (body as { error: { status?: unknown; message?: unknown } }).error
+    : undefined;
+  return new TranscriptionProviderError(
+    response.status,
+    typeof error?.status === 'string' ? error.status.slice(0, 120) : undefined,
+    typeof error?.message === 'string' ? error.message.slice(0, 500) : undefined,
+  );
+}
+
 export function createGeminiTranscriptionAdapter(options: { apiKey?: string; model?: string; timeoutMs?: number; fetcher?: typeof fetch }): TranscriptionAdapter {
   const key = options.apiKey?.trim();
   const model = options.model?.trim() || 'gemini-2.5-flash';
@@ -25,8 +47,8 @@ export function createGeminiTranscriptionAdapter(options: { apiKey?: string; mod
             { text: 'Точно транскрибуй цей український аудіозапис. Поверни лише текст транскрипту без пояснень.' },
           ] }], generationConfig: { temperature: 0 } }),
         });
-        if (!response.ok) throw new Error('Transcription provider request failed');
-        const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> };
+        const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }>; error?: unknown };
+        if (!response.ok) throw providerFailure(response, body);
         const text = body.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === 'string')?.text;
         if (typeof text !== 'string' || text.length > 100_000) throw new Error('Transcription provider returned no text');
         return text;
@@ -36,7 +58,10 @@ export function createGeminiTranscriptionAdapter(options: { apiKey?: string; mod
 }
 
 export class TranscriptionValidationError extends Error { readonly code = 'INVALID_AUDIO'; }
-export class TranscriptionUnavailableError extends Error { readonly code = 'TRANSCRIPTION_UNAVAILABLE'; }
+export class TranscriptionUnavailableError extends Error {
+  readonly code = 'TRANSCRIPTION_UNAVAILABLE';
+  constructor(options?: { cause?: unknown }) { super('Transcription unavailable', options); }
+}
 export interface TranscriptionService {
   transcribe(user: VerifiedUser, input: unknown): Promise<{ transcript: string; locale: 'uk-UA' }>;
 }
@@ -64,7 +89,7 @@ export function createTranscriptionService(adapter: TranscriptionAdapter, storag
         return { transcript, locale: 'uk-UA' as const };
       } catch (error) {
         if (error instanceof TranscriptionValidationError || error instanceof TranscriptionUnavailableError) throw error;
-        throw new TranscriptionUnavailableError();
+        throw new TranscriptionUnavailableError({ cause: error });
       } finally {
         if (timeoutHandle) clearTimeout(timeoutHandle);
         if (temporary) await storage.cleanup(temporary).catch(() => undefined);

@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { TranscriptionUnavailableError, TranscriptionValidationError, type TranscriptionService } from './transcriptionService.js';
+import { TranscriptionProviderError, TranscriptionUnavailableError, TranscriptionValidationError, type TranscriptionService } from './transcriptionService.js';
 
 function bodyBytes(body: unknown): Buffer | undefined {
   if (Buffer.isBuffer(body)) return body;
@@ -21,6 +21,15 @@ function multipartAudio(body: Buffer, contentType: string): { bytes: Buffer; mim
   return { bytes: body.subarray(headerEnd + 4, end), mimeType };
 }
 
+function transcriptionFailureDetails(error: unknown): Record<string, unknown> | undefined {
+  if (!(error instanceof TranscriptionUnavailableError) || !(error.cause instanceof TranscriptionProviderError)) return undefined;
+  return {
+    status: error.cause.status,
+    code: error.cause.providerCode,
+    message: error.cause.providerMessage,
+  };
+}
+
 export async function transcriptionRoutes(app: FastifyInstance, service: TranscriptionService): Promise<void> {
   app.post('/api/v1/brain-dumps/voice', { preHandler: (request, reply) => app.requireUser(request, reply) }, async (request: FastifyRequest, reply: FastifyReply) => {
     const rawContentType = String(request.headers['content-type'] ?? '');
@@ -37,8 +46,12 @@ export async function transcriptionRoutes(app: FastifyInstance, service: Transcr
       return reply.code(200).send(await service.transcribe(request.user, { bytes, mimeType: uploadMimeType, durationSeconds }));
     } catch (error) {
       if (error instanceof TranscriptionValidationError) return reply.code(400).send({ error: 'INVALID_AUDIO' });
-      if (error instanceof TranscriptionUnavailableError) return reply.code(503).send({ error: 'TRANSCRIPTION_UNAVAILABLE' });
-      request.log.warn('Voice transcription failed');
+      request.log.error({
+        err: error,
+        provider: transcriptionFailureDetails(error),
+        mimeType: uploadMimeType,
+        bytes: bytes.length,
+      }, 'Voice transcription failed');
       return reply.code(503).send({ error: 'TRANSCRIPTION_UNAVAILABLE' });
     }
   });
