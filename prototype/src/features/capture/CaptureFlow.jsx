@@ -126,7 +126,11 @@ export function CaptureFlow({ screenId = "capture-chooser", onBack, onNavigate =
   const applyPlan = async () => {
     if (!apiClient || !preview?.changeSetId) return onNavigate("today-normal");
     setApplying(true); setPlanError("");
-    try { await applyChangeSet({ apiClient, id: preview.changeSetId, idempotencyKey }); onNavigate("today-normal"); }
+    try {
+      await applyChangeSet({ apiClient, id: preview.changeSetId, idempotencyKey });
+      const allTasksAreInInbox = preview.tasks?.length > 0 && preview.tasks.every((task) => task.status === "inbox");
+      onNavigate(allTasksAreInInbox ? "inbox-default" : "today-normal");
+    }
     catch { setPlanError("План не застосовано. Жодна задача не загубилась — спробуй ще раз."); }
     finally { setApplying(false); }
   };

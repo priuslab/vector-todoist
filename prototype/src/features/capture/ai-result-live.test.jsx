@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { AIProcessing } from "./AIProcessing";
 import { Clarification } from "./Clarification";
 import { AIResult } from "./AIResult";
@@ -80,6 +80,38 @@ it("uses the live draft and analysis APIs in production capture flow", async () 
   render(<CaptureFlow screenId="capture-transcript" apiClient={apiClient} createBrainDump={createBrainDump} analyze={analyze} />);
   await user.click(screen.getByRole("button", { name: "Зберегти чернетку" }));
   expect(await screen.findByText(analysis.summary)).toBeInTheDocument();
+});
+
+it("opens Inbox after applying a preview that has no available slot today", async () => {
+  const user = (await import("@testing-library/user-event")).default.setup();
+  const onNavigate = vi.fn();
+  const preview = {
+    changeSetId: "change-no-slot",
+    tasks: [{ ...analysis.tasks[0], id: "task-no-slot", status: "inbox" }],
+    ideas: [],
+    blocks: [],
+    unscheduledTaskIds: ["task-no-slot"],
+    warnings: ["Задача потребує нового місця в плані"],
+  };
+  const apiClient = {
+    request: vi.fn()
+      .mockResolvedValueOnce(preview)
+      .mockResolvedValueOnce({ changeSet: { id: "change-no-slot", status: "applied" }, tasks: [], ideas: [] }),
+  };
+
+  render(<CaptureFlow
+    screenId="capture-transcript"
+    apiClient={apiClient}
+    onNavigate={onNavigate}
+    createBrainDump={async () => ({ id: "dump-no-slot" })}
+    analyze={async () => ({ analysis: { ...analysis, questions: [] } })}
+  />);
+
+  await user.click(screen.getByRole("button", { name: "Зберегти чернетку" }));
+  await user.click(await screen.findByRole("button", { name: "Переглянути пропозиції" }));
+  await user.click(await screen.findByRole("button", { name: "Зберегти в Inbox" }));
+
+  expect(onNavigate).toHaveBeenCalledWith("inbox-default");
 });
 
 it("uses the answer response instead of replacing it with a stale clarification result", async () => {
