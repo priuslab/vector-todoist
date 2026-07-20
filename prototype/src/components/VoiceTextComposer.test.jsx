@@ -4,9 +4,11 @@ import { expect, it, vi } from "vitest";
 import { VoiceTextComposer } from "./VoiceTextComposer";
 
 function installFakeMediaRecorder() {
+  const stopTrack = vi.fn();
   const getUserMedia = vi.fn().mockResolvedValue({
-    getTracks: () => [{ stop: vi.fn() }],
+    getTracks: () => [{ stop: stopTrack }],
   });
+  let recorder;
 
   class FakeMediaRecorder {
     static isTypeSupported = () => true;
@@ -15,6 +17,7 @@ function installFakeMediaRecorder() {
 
     start() {
       this.state = "recording";
+      recorder = this;
     }
 
     stop() {
@@ -29,9 +32,15 @@ function installFakeMediaRecorder() {
   globalThis.MediaRecorder = FakeMediaRecorder;
   Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia } });
 
-  return () => {
-    globalThis.MediaRecorder = originalMediaRecorder;
-    Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: originalMediaDevices });
+  return {
+    emitError() {
+      recorder?.onerror?.(new Event("error"));
+    },
+    stopTrack,
+    restore() {
+      globalThis.MediaRecorder = originalMediaRecorder;
+      Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: originalMediaDevices });
+    },
   };
 }
 
@@ -71,10 +80,16 @@ it("uses the mobile composer control classes", () => {
   expect(screen.getByRole("button", { name: "Увімкнути голосовий режим" })).toHaveClass("voice-text-composer__mode-switch");
 });
 
+it("gives the microphone control a mobile touch-target class", () => {
+  render(<VoiceTextComposer onTranscribe={vi.fn()} onSubmit={vi.fn()} />);
+
+  expect(screen.getByRole("button", { name: "Почати запис" })).toHaveClass("voice-text-composer__microphone");
+});
+
 it("starts and stops recording with the same microphone control", async () => {
   const user = userEvent.setup();
   const onTranscribe = vi.fn().mockResolvedValue("Розпізнаний текст");
-  const restoreMediaRecorder = installFakeMediaRecorder();
+  const fakeMediaRecorder = installFakeMediaRecorder();
 
   try {
     render(<VoiceTextComposer onTranscribe={onTranscribe} onSubmit={vi.fn()} />);
@@ -87,13 +102,13 @@ it("starts and stops recording with the same microphone control", async () => {
 
     expect(screen.getByRole("textbox")).toHaveValue("Розпізнаний текст");
   } finally {
-    restoreMediaRecorder();
+    fakeMediaRecorder.restore();
   }
 });
 
 it("falls back to text mode when microphone access is denied", async () => {
   const user = userEvent.setup();
-  const restoreMediaRecorder = installFakeMediaRecorder();
+  const fakeMediaRecorder = installFakeMediaRecorder();
   const originalMediaDevices = navigator.mediaDevices;
   Object.defineProperty(navigator, "mediaDevices", {
     configurable: true,
@@ -109,6 +124,24 @@ it("falls back to text mode when microphone access is denied", async () => {
     expect(screen.getByRole("alert")).toHaveTextContent("мікрофон");
   } finally {
     Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: originalMediaDevices });
-    restoreMediaRecorder();
+    fakeMediaRecorder.restore();
+  }
+});
+
+it("falls back to editable text when MediaRecorder emits a runtime error", async () => {
+  const user = userEvent.setup();
+  const fakeMediaRecorder = installFakeMediaRecorder();
+
+  try {
+    render(<VoiceTextComposer onTranscribe={vi.fn()} onSubmit={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: "Почати запис" }));
+    fakeMediaRecorder.emitError();
+
+    await waitFor(() => expect(screen.getByRole("textbox")).toBeInTheDocument());
+    expect(screen.getByRole("alert")).toHaveTextContent("мікрофон");
+    expect(fakeMediaRecorder.stopTrack).toHaveBeenCalledTimes(1);
+  } finally {
+    fakeMediaRecorder.restore();
   }
 });

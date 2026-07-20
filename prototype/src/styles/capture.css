@@ -7,6 +7,10 @@
 .voice-text-composer__status { margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 18px; }
 .voice-text-composer__voice-mode,.voice-text-composer__text-mode { display: flex; flex-direction: column; gap: 12px; }
 .voice-text-composer__voice-mode > p { margin: 0; color: var(--text-primary); font-size: 15px; line-height: 22px; }
+.voice-text-composer__microphone { width: 100%; min-height: 52px; border: 0; border-radius: var(--radius-control); padding: 0 16px; color: #fff; background: var(--brand-primary); font-size: 15px; font-weight: 700; cursor: pointer; }
+.voice-text-composer__microphone:hover { background: var(--brand-pressed); }
+.voice-text-composer__microphone:active { background: var(--brand-pressed); transform: translateY(1px); }
+.voice-text-composer__microphone:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
 .voice-text-composer__label { color: var(--text-primary); font-size: 13px; font-weight: 600; line-height: 18px; }
 .voice-text-composer__draft { width: 100%; min-height: 144px; padding: 12px; border: 1px solid var(--border-default); border-radius: var(--radius-control); resize: vertical; color: var(--text-primary); background: var(--bg-surface); font-size: 15px; line-height: 22px; }
 .voice-text-composer__mode-switch,.voice-text-composer__submit { width: 100%; min-height: 44px; border-radius: var(--radius-control); padding: 0 16px; font-size: 15px; font-weight: 700; cursor: pointer; }

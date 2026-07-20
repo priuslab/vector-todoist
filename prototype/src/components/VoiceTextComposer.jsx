@@ -35,7 +35,7 @@ export function VoiceTextComposer({ initialMode = "voice", onTranscribe, onSubmi
   const recorder = useVoiceRecorder({ onComplete: completeRecording });
 
   useEffect(() => {
-    if (recorder.status !== "permission" && recorder.status !== "unsupported") return;
+    if (!["permission", "unsupported", "error"].includes(recorder.status)) return;
 
     setMode("text");
     setComposerStatus("draft");
@@ -76,7 +76,7 @@ export function VoiceTextComposer({ initialMode = "voice", onTranscribe, onSubmi
       {mode === "voice" ? (
         <div className="voice-text-composer__voice-mode">
           <p>Голосовий режим</p>
-          <button type="button" onClick={toggleRecording}>
+          <button className="voice-text-composer__microphone" type="button" onClick={toggleRecording}>
             {recorder.isRecording ? "Завершити запис" : "Почати запис"}
           </button>
           <button className="voice-text-composer__mode-switch" type="button" onClick={() => setMode("text")}>
