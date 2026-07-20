@@ -14,7 +14,7 @@ export const analyzeBrainDumpPrompt = (brainDumpText: string, answers: Array<{ i
   "ideas": [{ "text": "ідея", "summary": "коротко", "confidence": 0.0 }],
   "context": ["важливий факт"]
 }
-Правила: confidence — число від 0 до 1; максимум два questions; field: короткий ідентифікатор поля з латинських літер, цифр, _, - або .; estimatedMinutes — ціле додатне число; deadline: ISO datetime з часовим поясом або null. Допустимі priority: "low", "medium", "high", "urgent". Допустимі energy: "low", "medium", "high". Не вигадуй дедлайни — за замовчуванням null. Якщо задач чи ідей немає, поверни порожній масив. Ideas залишаються в backlog.
+Правила: confidence — число від 0 до 1; максимум одне критичне question; field: короткий ідентифікатор поля з латинських літер, цифр, _, - або .; estimatedMinutes — ціле додатне число; deadline: ISO datetime з часовим поясом або null. Допустимі priority: "low", "medium", "high", "urgent". Допустимі energy: "low", "medium", "high". Не вигадуй дедлайни — за замовчуванням null. Якщо задач чи ідей немає, поверни порожній масив. Ideas залишаються в backlog.
 
 Brain Dump:
 ${brainDumpText}${answerContext}${repairInstruction}`;

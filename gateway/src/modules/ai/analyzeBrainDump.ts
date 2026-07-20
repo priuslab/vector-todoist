@@ -72,7 +72,10 @@ export function createAnalysisService(dumpRepository: BrainDumpRepository, sessi
       await dumpRepository.update(user, brainDumpId, { status: 'failed', errorCode: 'NEEDS_ATTENTION' });
       throw new AnalysisValidationError();
     }
-    const analysis = parsed.data;
+    // A Brain Dump may ask for one critical clarification before planning.
+    // Once the user answers it, finish the analysis rather than letting the
+    // model open another loop of questions.
+    const analysis = answers.length > 0 ? { ...parsed.data, questions: [] } : parsed.data;
     const status = analysis.questions.length > 0 ? 'needs_clarification' : 'classified';
     await dumpRepository.update(user, brainDumpId, { status });
     const session = await sessionRepository.create(user, { brainDump: brainDumpId, model: aiClient.model, promptVersion: ANALYSIS_PROMPT_VERSION, confidence: analysis.confidence, resultJson: analysis, questionsJson: analysis.questions });

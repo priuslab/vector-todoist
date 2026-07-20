@@ -39,7 +39,7 @@ const linkSchema = z.object({
 export const analysisSchema = z.object({
   summary: boundedText(2_000),
   confidence,
-  questions: z.array(questionSchema).max(2),
+  questions: z.array(questionSchema).max(1),
   tasks: z.array(taskSchema).max(50),
   ideas: z.array(ideaSchema).max(50),
   context: z.array(z.string().trim().min(1).max(500)).max(20),

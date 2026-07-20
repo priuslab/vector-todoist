@@ -18,7 +18,7 @@ function repos() {
     get: vi.fn(async (user, id) => { const item = dumps.get(id); return item?.user === user.userId ? item : null; }),
   };
   const sessionRepository: AnalysisSessionRepository = {
-    create: vi.fn(async (_user, input) => { const item = { id: `session-${sessions.length + 1}`, ...input }; sessions.push(item); return item; }),
+    create: vi.fn(async (user, input) => { const item = { id: `session-${sessions.length + 1}`, user: user.userId, ...input }; sessions.push(item); return item; }),
     listForDump: vi.fn(async (user, dumpId) => sessions.filter((item) => item.user === user.userId && item.brainDump === dumpId)),
   };
   return { dumps, sessions, dumpRepository, sessionRepository };
@@ -65,12 +65,24 @@ describe('analyzeBrainDump orchestration', () => {
     expect(state.sessionRepository.create).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps low-confidence analyses in clarification state with at most two questions', async () => {
+  it('keeps low-confidence analyses in clarification state with at most one question', async () => {
     const state = repos();
     const service = createAnalysisService(state.dumpRepository, state.sessionRepository, client(lowConfidenceResult));
     const result = await service.analyze(alice, 'dump-1');
     expect(result.analysis.questions).toHaveLength(1);
     expect(state.dumpRepository.update).toHaveBeenCalledWith(alice, 'dump-1', { status: 'needs_clarification' });
+  });
+
+  it('finishes analysis after one clarification instead of opening another question loop', async () => {
+    const state = repos();
+    const ai = { model: 'test', complete: vi.fn().mockResolvedValue(lowConfidenceResult) };
+    const service = createAnalysisService(state.dumpRepository, state.sessionRepository, ai);
+    const initial = await service.analyze(alice, 'dump-1');
+
+    const result = await service.answer(alice, 'dump-1', [{ id: initial.analysis.questions[0].id, text: 'Так, дата є.' }]);
+
+    expect(result.status).toBe('classified');
+    expect(result.analysis.questions).toEqual([]);
   });
 
   it('repairs one malformed model result, then marks needs_attention without persistence on a second failure', async () => {
