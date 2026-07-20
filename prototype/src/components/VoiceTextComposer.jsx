@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useVoiceRecorder } from "../hooks/useVoiceRecorder";
 
 export const VOICE_TEXT_COMPOSER_STATUSES = [
   "idle",
@@ -13,8 +14,53 @@ export const VOICE_TEXT_COMPOSER_STATUSES = [
 export function VoiceTextComposer({ initialMode = "voice", onTranscribe, onSubmit, onSpeak }) {
   const [mode, setMode] = useState(initialMode === "text" ? "text" : "voice");
   const [draft, setDraft] = useState("");
+  const [composerStatus, setComposerStatus] = useState(initialMode === "text" ? "draft" : "idle");
+  const [voiceError, setVoiceError] = useState("");
 
-  const status = mode === "text" ? "draft" : "idle";
+  const completeRecording = useCallback(async (blob) => {
+    setComposerStatus("transcribing");
+
+    try {
+      const transcript = await onTranscribe?.(blob);
+      setDraft(transcript ?? "");
+      setMode("text");
+      setComposerStatus("draft");
+    } catch {
+      setMode("text");
+      setComposerStatus("draft");
+      setVoiceError("Не вдалося розпізнати запис. Напиши думки текстом.");
+    }
+  }, [onTranscribe]);
+
+  const recorder = useVoiceRecorder({ onComplete: completeRecording });
+
+  useEffect(() => {
+    if (recorder.status !== "permission" && recorder.status !== "unsupported") return;
+
+    setMode("text");
+    setComposerStatus("draft");
+    setVoiceError(recorder.error);
+  }, [recorder.error, recorder.status]);
+
+  const status = mode === "text" ? "draft" : composerStatus;
+  const statusLabel = {
+    idle: "Готовий до запису",
+    listening: "Слухаю",
+    transcribing: "Розпізнаю запис",
+    draft: "Чернетка готова",
+  }[status] ?? status;
+
+  const toggleRecording = async () => {
+    if (recorder.isRecording) {
+      setComposerStatus("transcribing");
+      recorder.stop();
+      return;
+    }
+
+    setVoiceError("");
+    setComposerStatus("listening");
+    await recorder.start();
+  };
 
   const submit = () => {
     if (!draft.trim()) return;
@@ -23,11 +69,16 @@ export function VoiceTextComposer({ initialMode = "voice", onTranscribe, onSubmi
 
   return (
     <section className="voice-text-composer" aria-label="Голосове або текстове введення">
-      <p className="voice-text-composer__status" aria-live="polite">Статус: {status}</p>
+      <p className="voice-text-composer__status" role="status" aria-live="polite">Статус: {statusLabel}</p>
+
+      {voiceError ? <p role="alert">{voiceError}</p> : null}
 
       {mode === "voice" ? (
         <div className="voice-text-composer__voice-mode">
           <p>Голосовий режим</p>
+          <button type="button" onClick={toggleRecording}>
+            {recorder.isRecording ? "Завершити запис" : "Почати запис"}
+          </button>
           <button className="voice-text-composer__mode-switch" type="button" onClick={() => setMode("text")}>
             Увімкнути текстовий режим
           </button>
