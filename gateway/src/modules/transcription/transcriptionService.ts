@@ -31,6 +31,9 @@ function providerFailure(response: Response, body: unknown): TranscriptionProvid
 export function createGeminiTranscriptionAdapter(options: { apiKey?: string; model?: string; timeoutMs?: number; fetcher?: typeof fetch }): TranscriptionAdapter {
   const key = options.apiKey?.trim();
   const model = options.model?.trim() || 'gemini-3.5-flash';
+  // Flash-Lite accepts audio input and is a stable, low-latency fallback for
+  // transient capacity errors from the primary multimodal model.
+  const models = [...new Set([model, 'gemini-3.1-flash-lite'])];
   const fetcher = options.fetcher ?? fetch;
   const timeoutMs = Math.min(Math.max(Math.floor(options.timeoutMs ?? 20_000), 500), 60_000);
   return {
@@ -39,19 +42,30 @@ export function createGeminiTranscriptionAdapter(options: { apiKey?: string; mod
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
-        const response = await fetcher(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-          method: 'POST', signal: controller.signal,
-          headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
-          body: JSON.stringify({ contents: [{ role: 'user', parts: [
-            { inlineData: { mimeType: input.mimeType, data: input.bytes.toString('base64') } },
-            { text: 'Точно транскрибуй цей український аудіозапис. Поверни лише текст транскрипту без пояснень.' },
-          ] }], generationConfig: { temperature: 0 } }),
-        });
-        const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }>; error?: unknown };
-        if (!response.ok) throw providerFailure(response, body);
-        const text = body.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === 'string')?.text;
-        if (typeof text !== 'string' || text.length > 100_000) throw new Error('Transcription provider returned no text');
-        return text;
+        let lastTransientError: TranscriptionProviderError | undefined;
+        for (const candidateModel of models) {
+          const response = await fetcher(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(candidateModel)}:generateContent`, {
+            method: 'POST', signal: controller.signal,
+            headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+            body: JSON.stringify({ contents: [{ role: 'user', parts: [
+              { inlineData: { mimeType: input.mimeType, data: input.bytes.toString('base64') } },
+              { text: 'Точно транскрибуй цей український аудіозапис. Поверни лише текст транскрипту без пояснень.' },
+            ] }], generationConfig: { temperature: 0 } }),
+          });
+          const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }>; error?: unknown };
+          if (!response.ok) {
+            const error = providerFailure(response, body);
+            if (error.status === 503 && candidateModel !== models.at(-1)) {
+              lastTransientError = error;
+              continue;
+            }
+            throw error;
+          }
+          const text = body.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === 'string')?.text;
+          if (typeof text !== 'string' || text.length > 100_000) throw new Error('Transcription provider returned no text');
+          return text;
+        }
+        throw lastTransientError ?? new Error('Transcription provider returned no response');
       } finally { clearTimeout(timer); }
     },
   };
