@@ -30,7 +30,7 @@ function providerFailure(response: Response, body: unknown): TranscriptionProvid
 
 export function createGeminiTranscriptionAdapter(options: { apiKey?: string; model?: string; timeoutMs?: number; fetcher?: typeof fetch }): TranscriptionAdapter {
   const key = options.apiKey?.trim();
-  const model = options.model?.trim() || 'gemini-2.5-flash';
+  const model = options.model?.trim() || 'gemini-3.5-flash';
   const fetcher = options.fetcher ?? fetch;
   const timeoutMs = Math.min(Math.max(Math.floor(options.timeoutMs ?? 20_000), 500), 60_000);
   return {

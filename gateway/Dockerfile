@@ -11,6 +11,7 @@ FROM node:20.19.4-alpine3.21 AS runtime
 
 WORKDIR /app
 ENV NODE_ENV=production
+ENV GEMINI_MODEL=gemini-3.5-flash
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY --from=build /app/dist ./dist

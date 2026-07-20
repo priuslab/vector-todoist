@@ -13,7 +13,7 @@ export interface AnalysisAiClient {
 
 export function createGeminiClient(options: { apiKey?: string; model?: string; timeoutMs?: number; fetcher?: typeof fetch }): AnalysisAiClient {
   const apiKey = options.apiKey?.trim();
-  const model = options.model?.trim() || 'gemini-2.5-flash';
+  const model = options.model?.trim() || 'gemini-3.5-flash';
   const fetcher = options.fetcher ?? fetch;
   const timeoutMs = Math.min(Math.max(Math.floor(options.timeoutMs ?? 20_000), 500), 60_000);
 

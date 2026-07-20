@@ -23,6 +23,7 @@ describe('loadConfig', () => {
       port: 8787,
       publicWebOrigin: 'https://app.vector.test',
       pocketbaseUrl: 'http://127.0.0.1:8090',
+      geminiModel: 'gemini-3.5-flash',
       trustProxy: false,
     });
   });

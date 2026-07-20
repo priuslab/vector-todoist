@@ -58,7 +58,7 @@ const configSchema = z
     VOICE_MAX_DURATION_SECONDS: z.coerce.number().int().min(1).max(600).default(180),
     VOICE_TRANSCRIPTION_TIMEOUT_MS: z.coerce.number().int().min(100).max(60_000).default(20_000),
     GEMINI_API_KEY: optionalTrimmedString,
-    GEMINI_MODEL: z.string().trim().min(1).max(100).default('gemini-2.5-flash'),
+    GEMINI_MODEL: z.string().trim().min(1).max(100).default('gemini-3.5-flash'),
     AI_TIMEOUT_MS: z.coerce.number().int().min(500).max(60_000).default(20_000),
     TRUST_PROXY: envBoolean,
     ENABLE_GOOGLE_INTEGRATION: envBoolean,
