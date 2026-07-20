@@ -16,8 +16,10 @@ export function Clarification({ number = 1, onAnswer, questions: liveQuestions, 
       <h1>{item.text}</h1>
       <p>Це впливає на розклад, тому краще уточнити. Решту Вектор визначить сам.</p>
       <div className="quick-replies">{item.replies.map((reply) => <button className={selected === reply ? "is-selected" : ""} key={reply} onClick={() => deferSubmit ? setSelected(reply) : onAnswer(reply)}>{reply}</button>)}</div>
-      <Button variant="secondary" icon={Microphone}>Відповісти голосом</Button>
-      <button className="button button--primary" type="button" disabled={!selected} onClick={() => onAnswer?.(selected)}>Продовжити</button>
+      <div className="clarification__actions">
+        <Button variant="secondary" icon={Microphone}>Відповісти голосом</Button>
+        <button className="button button--primary" type="button" disabled={!selected} onClick={() => onAnswer?.(selected)}>Продовжити</button>
+      </div>
     </section>
   );
 }

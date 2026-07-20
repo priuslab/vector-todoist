@@ -23,7 +23,10 @@ it("shows a Ukrainian processing error without claiming a plan was created", () 
 it("renders at most two clarification questions and a continue action", () => {
   render(<Clarification questions={analysis.questions} onAnswer={() => {}} />);
   expect(screen.getByText(analysis.questions[0].text)).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Продовжити" })).toBeInTheDocument();
+  const continueButton = screen.getByRole("button", { name: "Продовжити" });
+  expect(continueButton).toBeInTheDocument();
+  expect(continueButton.parentElement).toHaveClass("clarification__actions");
+  expect(screen.getByRole("button", { name: "Відповісти голосом" }).parentElement).toBe(continueButton.parentElement);
 });
 
 it("renders an analysis preview with confidence and does not claim tasks were added to Today", () => {

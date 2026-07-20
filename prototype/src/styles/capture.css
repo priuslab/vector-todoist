@@ -54,6 +54,7 @@
 .clarification > p { margin: 0; color: var(--text-secondary); font-size: 14px; line-height: 1.55; }
 .quick-replies { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0; }
 .quick-replies button { min-height: 44px; border: 1px solid var(--border-default); border-radius: 999px; padding: 0 15px; color: var(--text-primary); background: var(--bg-surface); font-size: 13px; font-weight: 700; }
+.clarification__actions { display: flex; flex-direction: column; gap: 12px; }
 .ai-result { position: relative; min-height: 650px; padding-bottom: 74px; }
 .ai-result .undo-snackbar { bottom: 8px; }
 .result-hero { display: grid; grid-template-columns: 44px 1fr; gap: 12px; padding: 14px 0 18px; color: var(--brand-primary); }
