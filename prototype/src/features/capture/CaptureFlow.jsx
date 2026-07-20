@@ -87,6 +87,18 @@ export function CaptureFlow({ screenId = "capture-chooser", onBack, onNavigate =
     return saveDraft(text);
   };
 
+  const transcribeClarificationAnswer = async (blob) => {
+    if (!apiClient) throw new Error("Voice transcription is unavailable");
+    const result = await apiClient.request("/api/v1/brain-dumps/voice", {
+      method: "POST",
+      headers: { "Content-Type": blob.type || "audio/webm", "X-Audio-Duration": "23" },
+      body: blob,
+    });
+    const transcript = typeof result?.transcript === "string" ? result.transcript.trim() : "";
+    if (!transcript) throw new Error("Voice transcription returned no text");
+    return transcript;
+  };
+
   const submitAnswer = async (answerText) => {
     if (!analysis?.questions?.[0] || !answerText) return;
     setAnalysisError(""); setStage("processing");
@@ -133,7 +145,7 @@ export function CaptureFlow({ screenId = "capture-chooser", onBack, onNavigate =
     : stage === "processing" ? <AIProcessing error={analysisError} onRetry={retryAnalysis} />
     : stage === "question-1" ? <Clarification number={1} onAnswer={() => setStage("question-2")} />
     : stage === "question-2" ? <Clarification number={2} onAnswer={() => setStage("result")} />
-    : stage === "clarification" ? <Clarification questions={analysis?.questions} deferSubmit onAnswer={submitAnswer} />
+    : stage === "clarification" ? <Clarification questions={analysis?.questions} deferSubmit onTranscribe={transcribeClarificationAnswer} onAnswer={submitAnswer} />
     : stage === "result" ? <AIResult analysis={analysis} preview={preview} applying={applying} error={planError} onViewDay={openPlanPreview} onApply={applyPlan} onUndo={() => setStage("chooser")} />
     : stage === "review" ? <section className="capture-transcript"><h1>Перевір транскрипт</h1><p className="soft-copy">Аудіо було тихим у кількох місцях. Відредагуй текст або запиши ще раз.</p><Transcript editable /><Button onClick={() => setStage("processing")}>Повторити обробку</Button></section>
     : <StateView state="error" title="Не вдалося опрацювати" message={`Brain Dump збережено в Inbox: «${DEMO_BRAIN_DUMP.slice(0, 58)}…»`} action={<Button onClick={() => setStage("processing")}>Спробувати ще раз</Button>} />;
