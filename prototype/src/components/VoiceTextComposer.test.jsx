@@ -30,3 +30,11 @@ it("does not submit an empty draft and submits edited transcript text", async ()
 
   expect(onSubmit).toHaveBeenCalledWith("Моя відредагована відповідь");
 });
+
+it("uses the mobile composer control classes", () => {
+  render(<VoiceTextComposer initialMode="text" onTranscribe={vi.fn()} onSubmit={vi.fn()} />);
+
+  expect(screen.getByRole("textbox")).toHaveClass("voice-text-composer__draft");
+  expect(screen.getByRole("button", { name: "Відправити" })).toHaveClass("voice-text-composer__submit");
+  expect(screen.getByRole("button", { name: "Увімкнути голосовий режим" })).toHaveClass("voice-text-composer__mode-switch");
+});
