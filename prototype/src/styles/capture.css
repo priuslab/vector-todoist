@@ -5,6 +5,7 @@
 .capture-options { width: 100%; display: flex; flex-direction: column; gap: 10px; margin-top: 34px; }
 .voice-text-composer { width: 100%; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
 .voice-text-composer__status { margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 18px; }
+.voice-text-composer__ai-surface--hero .voice-text-composer__status { text-align: center; }
 .voice-text-composer__voice-mode,.voice-text-composer__text-mode { display: flex; flex-direction: column; gap: 12px; }
 .voice-text-composer__voice-mode > p { margin: 0; color: var(--text-primary); font-size: 15px; line-height: 22px; }
 .voice-text-composer__microphone { width: 100%; min-height: 52px; border: 0; border-radius: var(--radius-control); padding: 0 16px; color: #fff; background: var(--brand-primary); font-size: 15px; font-weight: 700; cursor: pointer; }

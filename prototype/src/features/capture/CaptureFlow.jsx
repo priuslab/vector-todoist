@@ -14,7 +14,8 @@ import { previewBrainDumpPlan, applyChangeSet } from "../today/todayApi";
 export function CaptureFlow({ screenId = "capture-chooser", onBack, onNavigate = () => {}, processingDelayMs = 1400, apiClient, createBrainDump = createTextBrainDump, analyze = analyzeBrainDump, answer = answerBrainDump, fetchResult = getBrainDumpResult }) {
   const initial = screenId.replace("capture-", "");
   const [stage, setStage] = useState(initial === "chooser" ? "chooser" : initial);
-  const [draftText, setDraftText] = useState(DEMO_BRAIN_DUMP);
+  const [draftText, setDraftText] = useState("");
+  const [isDemoTranscript, setIsDemoTranscript] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [analysis, setAnalysis] = useState(null);
@@ -64,10 +65,14 @@ export function CaptureFlow({ screenId = "capture-chooser", onBack, onNavigate =
       const result = apiClient
         ? await apiClient.request("/api/v1/brain-dumps/voice", { method: "POST", headers: { "Content-Type": blob.type || "audio/webm", "X-Audio-Duration": "23" }, body: blob })
         : { transcript: DEMO_BRAIN_DUMP };
-      const transcript = result.transcript ?? "";
-      setDraftText(transcript); setStage("voice-review");
+      const transcript = typeof result?.transcript === "string" ? result.transcript.trim() : "";
+      if (!transcript) throw new Error("Voice transcription returned no text");
+      setDraftText(transcript);
+      setIsDemoTranscript(!apiClient);
+      setStage("voice-review");
       return transcript;
     } catch {
+      setIsDemoTranscript(false);
       setVoiceError("Не вдалося розпізнати запис. Запис збережено для повторної спроби — або можеш написати думки текстом."); setStage("voice-retry");
       throw new Error("Voice transcription failed");
     } finally {
@@ -121,7 +126,7 @@ export function CaptureFlow({ screenId = "capture-chooser", onBack, onNavigate =
   const body = stage === "chooser" ? <section className="capture-chooser"><h1>Що зараз у голові?</h1><p>Говори хаотично — не треба формулювати задачі чи оцінювати час.</p>{composer}</section>
     : stage === "recording" ? composer
     : stage === "voice-retry" ? <section className="capture-transcript"><h1>Не вдалося розпізнати запис</h1><p role="alert" className="soft-copy">{voiceError}</p><Button loading={voiceLoading} onClick={() => voiceBlob && transcribeVoice(voiceBlob)}>Спробувати ще раз</Button><Button variant="secondary" disabled={voiceLoading} onClick={() => setStage("transcript")}>Написати текстом</Button></section>
-    : stage === "voice-review" ? <section className="capture-transcript"><h1>Перевір транскрипт</h1><p className="soft-copy">Відредагуй текст перед збереженням у Brain Dump.</p><Transcript editable value={draftText} onChange={setDraftText} />{voiceError ? <p role="alert" className="soft-copy">{voiceError}</p> : null}<Button loading={saving} onClick={() => saveDraft()}>Зберегти чернетку</Button><Button variant="secondary" onClick={() => setStage("recording")}>Записати ще раз</Button></section>
+    : stage === "voice-review" ? <section className="capture-transcript"><h1>Перевір транскрипт</h1><p className="soft-copy">Відредагуй текст перед збереженням у Brain Dump.</p>{isDemoTranscript ? <p className="soft-copy" role="status">Демо-транскрипт: це приклад для перевірки сценарію, а не розпізнаний запис.</p> : null}<Transcript editable value={draftText} onChange={setDraftText} />{voiceError ? <p role="alert" className="soft-copy">{voiceError}</p> : null}<Button loading={saving} onClick={() => saveDraft()}>Зберегти чернетку</Button><Button variant="secondary" onClick={() => setStage("recording")}>Записати ще раз</Button></section>
     : stage === "transcript" ? <section className="capture-transcript"><h1>Твої думки</h1><Transcript editable value={draftText} onChange={setDraftText} />{saveError ? <p role="alert" className="soft-copy">Не вдалося зберегти. Перевір з’єднання й спробуй ще раз.</p> : null}<Button loading={saving} onClick={() => saveDraft()}>Зберегти чернетку</Button></section>
     : stage === "saved" ? <section className="capture-transcript"><h1>Думки збережено</h1><p role="status" className="soft-copy">Збережено як чернетку. Вектор повернеться до них, коли ти будеш готовий.</p><Transcript value={draftText} /><Button onClick={() => onNavigate("inbox-default")}>Перейти до Inbox</Button></section>
     : stage === "processing" ? <AIProcessing error={analysisError} onRetry={retryAnalysis} />

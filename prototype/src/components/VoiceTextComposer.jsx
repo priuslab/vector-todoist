@@ -86,8 +86,8 @@ export function VoiceTextComposer({
 
   return (
     <section className="voice-text-composer" aria-label="Голосове або текстове введення">
-      <div className="voice-text-composer__ai-surface">
-        <div className={`voice-composer__orb is-${status}`} data-testid="ai-orb" aria-hidden="true" />
+      <div className={`voice-text-composer__ai-surface${mode === "voice" ? " voice-text-composer__ai-surface--hero" : ""}`}>
+        <div className={`voice-composer__orb is-${status}${mode === "voice" ? " voice-composer__orb--hero" : ""}`} data-testid="ai-orb" aria-hidden="true" />
         <div className="voice-text-composer__ai-copy">
           <p className="voice-text-composer__status" role="status" aria-live="polite">Статус: {statusLabel}</p>
           {responseText ? <p className="voice-text-composer__response">{responseText}</p> : null}

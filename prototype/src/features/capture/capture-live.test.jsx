@@ -87,12 +87,32 @@ it("saves the edited voice transcript through the existing Brain Dump callback",
     await user.click(screen.getByRole("button", { name: "Завершити запис" }));
 
     const transcript = await screen.findByRole("textbox", { name: "Редагувати транскрипт" });
+    expect(transcript).toHaveValue("Початкова транскрипція");
+    expect(screen.queryByText("Демо-транскрипт")).not.toBeInTheDocument();
     await user.clear(transcript);
     await user.type(transcript, "Відредагована транскрипція");
     await user.click(screen.getByRole("button", { name: "Зберегти чернетку" }));
 
     await waitFor(() => expect(createBrainDump).toHaveBeenCalledWith(expect.objectContaining({ text: "Відредагована транскрипція" })));
     expect(apiClient.request).toHaveBeenCalledWith("/api/v1/brain-dumps/voice", expect.objectContaining({ method: "POST" }));
+  } finally {
+    restoreMediaRecorder();
+  }
+});
+
+it("shows a retry instead of an empty transcript when the voice API returns no text", async () => {
+  const user = userEvent.setup();
+  const restoreMediaRecorder = installFakeMediaRecorder();
+  const apiClient = { request: vi.fn(async () => ({ locale: "uk-UA" })) };
+
+  try {
+    render(<CaptureFlow apiClient={apiClient} />);
+
+    await user.click(screen.getByRole("button", { name: "Почати запис" }));
+    await user.click(screen.getByRole("button", { name: "Завершити запис" }));
+
+    expect(await screen.findByRole("button", { name: "Спробувати ще раз" })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Редагувати транскрипт" })).not.toBeInTheDocument();
   } finally {
     restoreMediaRecorder();
   }

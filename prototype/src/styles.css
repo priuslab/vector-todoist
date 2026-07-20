@@ -15,6 +15,14 @@
   gap: 12px;
 }
 
+.voice-text-composer__ai-surface--hero {
+  align-items: center;
+  flex-direction: column;
+  gap: 20px;
+  margin: 20px 0 8px;
+  text-align: center;
+}
+
 .voice-composer__orb {
   width: 52px;
   height: 52px;
@@ -23,6 +31,12 @@
   background: var(--brand-primary);
   box-shadow: 0 0 0 8px rgb(36 107 94 / 10%), inset 0 0 0 12px rgb(255 255 255 / 14%);
   animation: voice-composer-idle 2.8s ease-in-out infinite;
+}
+
+.voice-composer__orb--hero {
+  width: clamp(164px, 52vw, 212px);
+  height: clamp(164px, 52vw, 212px);
+  box-shadow: 0 0 0 14px rgb(36 107 94 / 8%), inset 0 0 0 28px rgb(255 255 255 / 14%);
 }
 
 .voice-composer__orb.is-listening {
@@ -46,6 +60,10 @@
 
 .voice-text-composer__ai-copy {
   min-width: 0;
+}
+
+.voice-text-composer__ai-surface--hero .voice-text-composer__ai-copy {
+  max-width: 300px;
 }
 
 .voice-text-composer__response {

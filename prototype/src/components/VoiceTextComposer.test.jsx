@@ -134,6 +134,13 @@ it("renders a status-specific AI surface and a response playback action", () => 
   expect(onSpeak).toHaveBeenCalledWith("Готово");
 });
 
+it("uses a large centered AI surface while the voice mode is active", () => {
+  render(<VoiceTextComposer onTranscribe={vi.fn()} onSubmit={vi.fn()} />);
+
+  expect(screen.getByTestId("ai-orb")).toHaveClass("voice-composer__orb--hero");
+  expect(screen.getByTestId("ai-orb").parentElement).toHaveClass("voice-text-composer__ai-surface--hero");
+});
+
 it("starts and stops recording with the same microphone control", async () => {
   const user = userEvent.setup();
   const onTranscribe = vi.fn().mockResolvedValue("Розпізнаний текст");
