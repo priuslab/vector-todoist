@@ -17,6 +17,7 @@ import { SettingsScreens } from "../features/settings/SettingsScreens";
 import { SystemScreens } from "../features/system/SystemScreens";
 import { SCREEN_MAP } from "./screenRegistry";
 import { AuthCallback } from "../auth/AuthCallback";
+import { isQaEnvironment } from "../navigation/routeAccess";
 import { useCallback, useEffect, useState } from "react";
 
 const ONBOARDING_NEXT = {
@@ -55,7 +56,7 @@ export function ScreenRouter({ route, onNavigate, onGoogleLogin, onAuthComplete,
     return <EntryCarousel initialIndex={{ "entry-chaos": 0, "entry-voice": 1, "entry-path": 2 }[route]} onContinue={requestGoogleLogin} />;
   }
   if (screen.group === "Onboarding") {
-    if (route.startsWith("goal-")) return <GoalSetup screenId={route} onBack={back} onRoute={onNavigate} onNext={() => onNavigate("telegram-connect")} apiClient={apiClient} />;
+    if (route.startsWith("goal-")) return <GoalSetup screenId={route} onBack={back} onRoute={onNavigate} onNext={() => onNavigate("telegram-connect")} apiClient={apiClient} demoMode={isQaEnvironment()} />;
     if (route.startsWith("telegram-") || route === "first-brain-dump") return <TelegramSetup screenId={route} onBack={back} apiClient={apiClient} onNext={() => onNavigate(route === "telegram-connect" ? "telegram-success" : route === "telegram-success" ? "first-brain-dump" : "capture-chooser")} />;
     const nextOnboarding = () => onNavigate(ONBOARDING_NEXT[route] ?? "goal-choice");
     const connectCalendar = async () => {
