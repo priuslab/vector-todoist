@@ -17,7 +17,9 @@ export interface AnalysisSessionRepository {
 export function createAnalysisSessionRepository(client: PocketBaseClient): AnalysisSessionRepository {
   return {
     create: (user, input) => createOwned<AnalysisSessionRecord>(client, 'ai_sessions', user, input),
-    listForDump: async (user, brainDumpId) => (await listOwned<AnalysisSessionRecord>(client, 'ai_sessions', user)).filter((record) => record.brainDump === brainDumpId),
+    listForDump: async (user, brainDumpId) => (await listOwned<AnalysisSessionRecord>(client, 'ai_sessions', user))
+      .filter((record) => record.brainDump === brainDumpId)
+      .sort((left, right) => String(left.created ?? left.updated ?? '').localeCompare(String(right.created ?? right.updated ?? ''))),
   };
 }
 

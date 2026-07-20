@@ -43,9 +43,7 @@ export function CaptureFlow({ screenId = "capture-chooser", onBack, onNavigate =
       if (!apiClient) { setStage("saved"); return; }
       setAnalysisError(""); setStage("processing");
       const result = await analyze({ apiClient, id: draft.id });
-      const persisted = await fetchResult({ apiClient, id: draft.id });
-      const liveResult = persisted?.analysis ? persisted : result;
-      setAnalysis(liveResult.analysis); setStage(liveResult.analysis.questions?.length ? "clarification" : "result");
+      setAnalysis(result.analysis); setStage(result.analysis.questions?.length ? "clarification" : "result");
     } catch {
       if (apiClient) { setAnalysisError("Не вдалося завершити аналіз. Чернетку збережено — спробуй ще раз."); setStage("processing"); }
       else setSaveError(true);
@@ -104,9 +102,7 @@ export function CaptureFlow({ screenId = "capture-chooser", onBack, onNavigate =
     setAnalysisError(""); setStage("processing");
     try {
       const result = await answer({ apiClient, id: draftId, answers: [{ id: analysis.questions[0].id, text: answerText }] });
-      const persisted = await fetchResult({ apiClient, id: draftId });
-      const liveResult = persisted?.analysis ? persisted : result;
-      setAnalysis(liveResult.analysis); setStage(liveResult.analysis.questions?.length ? "clarification" : "result");
+      setAnalysis(result.analysis); setStage(result.analysis.questions?.length ? "clarification" : "result");
     } catch { setAnalysisError("Не вдалося зберегти уточнення. Спробуй ще раз."); setStage("clarification"); }
   };
 

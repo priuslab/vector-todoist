@@ -63,6 +63,32 @@ it("uses the live draft and analysis APIs in production capture flow", async () 
   expect(await screen.findByText(analysis.summary)).toBeInTheDocument();
 });
 
+it("uses the answer response instead of replacing it with a stale clarification result", async () => {
+  const user = (await import("@testing-library/user-event")).default.setup();
+  const clarification = { ...analysis, questions: [analysis.questions[0]] };
+  const completed = { ...analysis, summary: "План після уточнення готовий", questions: [] };
+  const createBrainDump = async () => ({ id: "dump-answer" });
+  const answer = async () => ({ analysis: completed });
+
+  render(<CaptureFlow
+    screenId="capture-transcript"
+    apiClient={{ request: async () => ({}) }}
+    createBrainDump={createBrainDump}
+    analyze={async () => ({ analysis: clarification })}
+    answer={answer}
+    fetchResult={async () => ({ analysis: clarification })}
+  />);
+
+  await user.click(screen.getByRole("button", { name: "Зберегти чернетку" }));
+  await user.click(await screen.findByRole("button", { name: "Написати відповідь" }));
+  const response = screen.getByRole("textbox", { name: "Твоя думка" });
+  await user.type(response, "Сайт майже готовий");
+  await user.click(screen.getByRole("button", { name: "Продовжити" }));
+
+  expect(await screen.findByText("План після уточнення готовий")).toBeInTheDocument();
+  expect(screen.queryByText(clarification.questions[0].text)).not.toBeInTheDocument();
+});
+
 it("does not submit an empty clarification answer", () => {
   render(<Clarification deferSubmit onAnswer={() => {}} />);
   expect(screen.getByRole("button", { name: "Продовжити" })).toBeDisabled();
