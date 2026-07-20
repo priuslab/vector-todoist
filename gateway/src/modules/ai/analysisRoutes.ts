@@ -10,14 +10,20 @@ const safeError = (error: unknown) => {
   return { status: 503, body: { error: 'AI_UNAVAILABLE', retryable: true } };
 };
 
+function sendAnalysisError(request: FastifyRequest, reply: FastifyReply, error: unknown) {
+  const mapped = safeError(error);
+  if (mapped.status >= 500) request.log.error({ err: error, analysisError: mapped.body.error }, 'Brain Dump analysis failed');
+  return reply.code(mapped.status).send(mapped.body);
+}
+
 export async function analysisRoutes(app: FastifyInstance, service: AnalysisService): Promise<void> {
   app.post('/api/v1/brain-dumps/:id/analyze', { preHandler: (request, reply) => app.requireUser(request, reply) }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-    try { return reply.code(200).send(await service.analyze(request.user, request.params.id)); } catch (error) { const mapped = safeError(error); return reply.code(mapped.status).send(mapped.body); }
+    try { return reply.code(200).send(await service.analyze(request.user, request.params.id)); } catch (error) { return sendAnalysisError(request, reply, error); }
   });
   app.post('/api/v1/brain-dumps/:id/answers', { preHandler: (request, reply) => app.requireUser(request, reply) }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-    try { return reply.code(200).send(await service.answer(request.user, request.params.id, request.body)); } catch (error) { const mapped = safeError(error); return reply.code(mapped.status).send(mapped.body); }
+    try { return reply.code(200).send(await service.answer(request.user, request.params.id, request.body)); } catch (error) { return sendAnalysisError(request, reply, error); }
   });
   app.get('/api/v1/brain-dumps/:id/result', { preHandler: (request, reply) => app.requireUser(request, reply) }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-    try { const result = await service.result(request.user, request.params.id); return result ? reply.code(200).send(result) : reply.code(404).send({ error: 'NOT_FOUND' }); } catch (error) { const mapped = safeError(error); return reply.code(mapped.status).send(mapped.body); }
+    try { const result = await service.result(request.user, request.params.id); return result ? reply.code(200).send(result) : reply.code(404).send({ error: 'NOT_FOUND' }); } catch (error) { return sendAnalysisError(request, reply, error); }
   });
 }

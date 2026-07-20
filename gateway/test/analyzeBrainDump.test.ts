@@ -93,7 +93,10 @@ describe('analyzeBrainDump orchestration', () => {
     const state = repos();
     const ai = { complete: vi.fn(async () => { throw new Error('network secret'); }) };
     const service = createAnalysisService(state.dumpRepository, state.sessionRepository, ai);
-    await expect(service.analyze(alice, 'dump-1')).rejects.toBeInstanceOf(AiRetryableError);
+    await expect(service.analyze(alice, 'dump-1')).rejects.toMatchObject({
+      code: 'AI_UNAVAILABLE',
+      cause: { message: 'network secret' },
+    });
     expect(state.sessionRepository.create).not.toHaveBeenCalled();
     expect(state.dumpRepository.update).toHaveBeenCalledWith(alice, 'dump-1', { status: 'failed', errorCode: 'AI_UNAVAILABLE' });
   });

@@ -23,7 +23,10 @@ export function createAnalysisSessionRepository(client: PocketBaseClient): Analy
 
 export class AnalysisNotFoundError extends Error { readonly code = 'NOT_FOUND'; }
 export class AnalysisValidationError extends Error { readonly code = 'NEEDS_ATTENTION'; }
-export class AiRetryableError extends Error { readonly code = 'AI_UNAVAILABLE'; }
+export class AiRetryableError extends Error {
+  readonly code = 'AI_UNAVAILABLE';
+  constructor(options?: { cause?: unknown }) { super('AI analysis unavailable', options); }
+}
 export class AnalysisAnswersError extends Error { readonly code = 'INVALID_ANSWERS'; }
 
 export type AnalysisResult = { id: string; status: 'classified' | 'needs_clarification' | 'needs_attention'; analysis: BrainDumpAnalysis };
@@ -59,10 +62,10 @@ export function createAnalysisService(dumpRepository: BrainDumpRepository, sessi
     }
     const input: AiCompletionInput = { brainDumpText: text, ...(answers.length ? { answers } : {}) };
     let raw: unknown;
-    try { raw = await aiClient.complete(input); } catch { await dumpRepository.update(user, brainDumpId, { status: 'failed', errorCode: 'AI_UNAVAILABLE' }); throw new AiRetryableError(); }
+    try { raw = await aiClient.complete(input); } catch (error) { await dumpRepository.update(user, brainDumpId, { status: 'failed', errorCode: 'AI_UNAVAILABLE' }); throw new AiRetryableError({ cause: error }); }
     let parsed = analysisSchema.safeParse(raw);
     if (!parsed.success) {
-      try { raw = await aiClient.complete({ ...input, repair: true }); } catch { await dumpRepository.update(user, brainDumpId, { status: 'failed', errorCode: 'AI_UNAVAILABLE' }); throw new AiRetryableError(); }
+      try { raw = await aiClient.complete({ ...input, repair: true }); } catch (error) { await dumpRepository.update(user, brainDumpId, { status: 'failed', errorCode: 'AI_UNAVAILABLE' }); throw new AiRetryableError({ cause: error }); }
       parsed = analysisSchema.safeParse(raw);
     }
     if (!parsed.success) {
