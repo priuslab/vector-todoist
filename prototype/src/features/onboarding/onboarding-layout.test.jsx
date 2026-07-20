@@ -36,12 +36,41 @@ it("centers the goal-test result heading without centering manual goal forms", (
 });
 
 it("opens custom time pickers and updates work hours", () => {
+  window.localStorage.clear();
   render(<OnboardingFlow screenId="work-rhythm" onNext={vi.fn()} />);
 
+  expect(screen.queryByRole("button", { name: "Власні" })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Початок 09:00" }));
   expect(screen.getByRole("dialog", { name: "Вибери час початку" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("option", { name: "10:00" }));
   expect(screen.getByRole("button", { name: "Початок 10:00" })).toBeInTheDocument();
+});
+
+it("restores onboarding values after the screen is remounted", () => {
+  window.localStorage.clear();
+  const first = render(<OnboardingFlow screenId="work-rhythm" onNext={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "Початок 09:00" }));
+  fireEvent.click(screen.getByRole("option", { name: "10:00" }));
+  first.unmount();
+
+  render(<OnboardingFlow screenId="work-rhythm" onNext={vi.fn()} />);
+  expect(screen.getByRole("button", { name: "Початок 10:00" })).toBeInTheDocument();
+});
+
+it("marks the current onboarding step in the progress indicator", () => {
+  const { container } = render(<OnboardingFlow screenId="energy-peak" onNext={vi.fn()} />);
+
+  expect(container.querySelectorAll(".onboarding-progress .is-active")).toHaveLength(3);
+});
+
+it("updates the energy window when a different energy period is selected", () => {
+  window.localStorage.clear();
+  render(<OnboardingFlow screenId="energy-peak" onNext={vi.fn()} />);
+
+  fireEvent.click(screen.getByRole("button", { name: "Вечір" }));
+
+  expect(screen.getByText("17:00–20:00")).toBeInTheDocument();
+  expect(screen.getByText("Вечірній фокус плануватиметься тут")).toBeInTheDocument();
 });
 
 it("makes quiet hours and focus settings editable", () => {

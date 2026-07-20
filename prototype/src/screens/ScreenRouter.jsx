@@ -21,12 +21,12 @@ import { isQaEnvironment } from "../navigation/routeAccess";
 import { useCallback, useEffect, useState } from "react";
 
 const ONBOARDING_NEXT = {
-  "onboarding-welcome": "calendar-permission", "calendar-permission": "work-rhythm", "work-rhythm": "quiet-hours",
-  "quiet-hours": "energy-peak", "energy-peak": "focus-settings", "focus-settings": "goal-choice",
+  "onboarding-welcome": "calendar-permission", "calendar-permission": "work-rhythm", "work-rhythm": "energy-peak",
+  "energy-peak": "focus-settings", "focus-settings": "goal-choice",
 };
 const ONBOARDING_BACK = {
   "onboarding-welcome": "auth-loading", "calendar-permission": "onboarding-welcome", "work-rhythm": "calendar-permission",
-  "quiet-hours": "work-rhythm", "energy-peak": "quiet-hours", "focus-settings": "energy-peak", "goal-choice": "focus-settings",
+  "quiet-hours": "work-rhythm", "energy-peak": "work-rhythm", "focus-settings": "energy-peak", "goal-choice": "focus-settings",
   "goal-manual": "goal-choice", "goal-test-start": "goal-choice", "goal-test-question": "goal-test-start", "goal-test-result": "goal-test-start", "goal-skip-warning": "goal-choice",
   "telegram-connect": "goal-choice", "telegram-success": "telegram-connect", "first-brain-dump": "telegram-success",
 };

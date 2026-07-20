@@ -24,6 +24,16 @@ it("shows a stable Ukrainian error when Google login cannot start", async () => 
   errorLogger.mockRestore();
 });
 
+it("skips quiet hours in the primary onboarding path", async () => {
+  const user = userEvent.setup();
+  const onNavigate = vi.fn();
+  render(<ScreenRouter route="work-rhythm" onNavigate={onNavigate} />);
+
+  await user.click(screen.getByRole("button", { name: "Продовжити" }));
+
+  expect(onNavigate).toHaveBeenCalledWith("energy-peak");
+});
+
 it("starts a pending OAuth callback exchange only once across parent rerenders", async () => {
   window.history.pushState({}, "", "/auth/callback?code=code&state=expected");
   window.sessionStorage.setItem("google_oauth_state", "expected");
