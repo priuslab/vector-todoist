@@ -103,7 +103,7 @@ export function VoiceTextComposer({
 
       {mode === "voice" ? (
         <div className="voice-text-composer__voice-mode">
-          <p>Голосовий режим</p>
+          <p className="voice-text-composer__mode-label">Голосовий режим</p>
           <button className="voice-text-composer__microphone" type="button" onClick={toggleRecording} disabled={disabled || recorder.isStarting}>
             {recorder.isRecording ? "Завершити запис" : "Почати запис"}
           </button>

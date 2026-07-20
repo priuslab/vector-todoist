@@ -118,6 +118,25 @@ it("shows a retry instead of an empty transcript when the voice API returns no t
   }
 });
 
+it("does not present demo prose as a local voice transcription", async () => {
+  const user = userEvent.setup();
+  const restoreMediaRecorder = installFakeMediaRecorder();
+
+  try {
+    render(<CaptureFlow />);
+
+    await user.click(screen.getByRole("button", { name: "Почати запис" }));
+    await user.click(screen.getByRole("button", { name: "Завершити запис" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("підключеному застосунку");
+    expect(screen.getByRole("button", { name: "Написати текстом" })).toBeInTheDocument();
+    expect(screen.queryByText("Мені треба підготувати перший випуск подкасту", { exact: false })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Редагувати транскрипт" })).not.toBeInTheDocument();
+  } finally {
+    restoreMediaRecorder();
+  }
+});
+
 it("submits one retry while voice transcription is pending", async () => {
   const user = userEvent.setup();
   const restoreMediaRecorder = installFakeMediaRecorder();

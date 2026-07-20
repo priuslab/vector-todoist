@@ -50,6 +50,7 @@ it("opens in voice mode and switches to editable text mode", async () => {
   render(<VoiceTextComposer onTranscribe={vi.fn()} onSubmit={vi.fn()} />);
 
   expect(screen.getByRole("button", { name: "Увімкнути текстовий режим" })).toBeInTheDocument();
+  expect(screen.getByText("Голосовий режим")).toHaveClass("voice-text-composer__mode-label");
 
   await user.click(screen.getByRole("button", { name: "Увімкнути текстовий режим" }));
 
