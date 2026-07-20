@@ -53,6 +53,25 @@ it("renders an analysis preview with confidence and does not claim tasks were ad
   expect(screen.queryByText(/додано до сьогодні/iu)).not.toBeInTheDocument();
 });
 
+it("offers to save an unscheduled proposal to Inbox instead of promising a Today plan", () => {
+  render(<AIResult
+    analysis={analysis}
+    preview={{
+      changeSetId: "change-no-slot",
+      tasks: [{ ...analysis.tasks[0], id: "task-no-slot", status: "inbox" }],
+      ideas: [],
+      blocks: [],
+      unscheduledTaskIds: ["task-no-slot"],
+      warnings: ["Задача потребує нового місця в плані"],
+    }}
+    onApply={() => {}}
+    onUndo={() => {}}
+  />);
+
+  expect(screen.getByRole("button", { name: "Зберегти в Inbox" })).toBeInTheDocument();
+  expect(screen.getByText("60 хв · high · Inbox")).toBeInTheDocument();
+});
+
 it("uses the live draft and analysis APIs in production capture flow", async () => {
   const user = (await import("@testing-library/user-event")).default.setup();
   const apiClient = { request: async () => ({}) };

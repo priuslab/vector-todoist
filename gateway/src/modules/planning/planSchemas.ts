@@ -24,7 +24,7 @@ export const applyBodySchema = z.object({ idempotencyKey: z.string().min(8).max(
 export const todayQuerySchema = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), timezone: z.string().min(1).max(80).default('Europe/Warsaw') }).strict();
 
 export const proposalTaskSchema = z.object({
-  id: z.string().min(1), title: z.string().min(1).max(500), description: z.string().max(10_000), status: z.literal('scheduled'), priority: z.enum(['low', 'medium', 'high', 'urgent']),
+  id: z.string().min(1), title: z.string().min(1).max(500), description: z.string().max(10_000), status: z.enum(['inbox', 'scheduled']), priority: z.enum(['low', 'medium', 'high', 'urgent']),
   deadline: iso.nullable(), plannedStart: iso.nullable(), plannedEnd: iso.nullable(), estimatedMinutes: z.number().int().positive().max(1440), energy: z.enum(['low', 'medium', 'high']), flexible: z.boolean(), locked: z.boolean(), sourceDump: z.string(),
 });
 export const proposalIdeaSchema = z.object({ id: z.string().min(1), text: z.string().min(1).max(20_000), summary: z.string().max(2_000), status: z.literal('backlog'), sourceDump: z.string() });

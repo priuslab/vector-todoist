@@ -38,4 +38,14 @@ describe('Brain Dump → Today vertical slice', () => {
     const service = createPlanService(r); const preview = await service.preview(user, 'dump-1', { idempotencyKey: 'plan-snapshot-1' });
     expect(r.changes[0].beforeJson.tasks).toEqual([expect.objectContaining({ id: 'old-task' })]); expect(r.changes[0].beforeJson.ideas).toEqual([expect.objectContaining({ id: 'old-idea' })]); expect(preview.changeSetId).toBe(r.changes[0].id);
   });
+  it('saves a task to Inbox when there is no remaining slot today instead of applying an invalid scheduled task', async () => {
+    const r = repos(); const service = createPlanService(r);
+    const preview = await service.preview(user, 'dump-1', { now: '2026-07-18T19:00:00+02:00', idempotencyKey: 'plan-no-slot-123' });
+
+    expect(preview.unscheduledTaskIds).toHaveLength(1);
+    expect(preview.tasks[0]).toMatchObject({ status: 'inbox', plannedStart: null, plannedEnd: null });
+
+    const applied = await service.apply(user, preview.changeSetId, {});
+    expect(applied.tasks[0]).toMatchObject({ status: 'inbox', plannedStart: null, plannedEnd: null });
+  });
 });
