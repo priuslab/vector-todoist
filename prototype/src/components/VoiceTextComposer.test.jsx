@@ -160,7 +160,11 @@ it("falls back to text mode when microphone access is denied", async () => {
   const originalMediaDevices = navigator.mediaDevices;
   Object.defineProperty(navigator, "mediaDevices", {
     configurable: true,
-    value: { getUserMedia: vi.fn().mockRejectedValue(new DOMException("denied", "NotAllowedError")) },
+    value: {
+      getUserMedia: vi.fn(() => new Promise((_, reject) => {
+        setTimeout(() => reject(new DOMException("denied", "NotAllowedError")), 50);
+      })),
+    },
   });
 
   try {
@@ -168,7 +172,8 @@ it("falls back to text mode when microphone access is denied", async () => {
 
     await user.click(screen.getByRole("button", { name: "Почати запис" }));
 
-    expect(screen.getByRole("textbox")).toBeInTheDocument();
+    const input = await screen.findByRole("textbox");
+    expect(input).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("мікрофон");
     expect(screen.getByRole("status")).toHaveTextContent("Потрібна твоя увага");
     expect(screen.getByTestId("ai-orb")).toHaveClass("is-error");
