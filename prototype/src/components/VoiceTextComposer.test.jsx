@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { VoiceTextComposer } from "./VoiceTextComposer";
@@ -84,6 +84,27 @@ it("gives the microphone control a mobile touch-target class", () => {
   render(<VoiceTextComposer onTranscribe={vi.fn()} onSubmit={vi.fn()} />);
 
   expect(screen.getByRole("button", { name: "Почати запис" })).toHaveClass("voice-text-composer__microphone");
+});
+
+it("renders a status-specific AI surface and a response playback action", () => {
+  const onSpeak = vi.fn();
+
+  render(
+    <VoiceTextComposer
+      status="responding"
+      responseText="Готово"
+      onTranscribe={vi.fn()}
+      onSubmit={vi.fn()}
+      onSpeak={onSpeak}
+    />,
+  );
+
+  expect(screen.getByTestId("ai-orb")).toHaveClass("is-responding");
+  expect(screen.getByText("Готово")).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Прослухати відповідь" }));
+
+  expect(onSpeak).toHaveBeenCalledWith("Готово");
 });
 
 it("starts and stops recording with the same microphone control", async () => {

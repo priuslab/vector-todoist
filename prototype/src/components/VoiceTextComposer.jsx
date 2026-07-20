@@ -11,7 +11,14 @@ export const VOICE_TEXT_COMPOSER_STATUSES = [
   "error",
 ];
 
-export function VoiceTextComposer({ initialMode = "voice", onTranscribe, onSubmit, onSpeak }) {
+export function VoiceTextComposer({
+  initialMode = "voice",
+  status: externalStatus,
+  responseText,
+  onTranscribe,
+  onSubmit,
+  onSpeak,
+}) {
   const [mode, setMode] = useState(initialMode === "text" ? "text" : "voice");
   const [draft, setDraft] = useState("");
   const [composerStatus, setComposerStatus] = useState(initialMode === "text" ? "draft" : "idle");
@@ -42,12 +49,16 @@ export function VoiceTextComposer({ initialMode = "voice", onTranscribe, onSubmi
     setVoiceError(recorder.error);
   }, [recorder.error, recorder.status]);
 
-  const status = mode === "text" ? "draft" : composerStatus;
+  const localStatus = mode === "text" ? "draft" : composerStatus;
+  const status = externalStatus ?? localStatus;
   const statusLabel = {
     idle: "Готовий до запису",
     listening: "Слухаю",
     transcribing: "Розпізнаю запис",
     draft: "Чернетка готова",
+    submitting: "Надсилаю думку",
+    responding: "Готую відповідь",
+    error: "Потрібна твоя увага",
   }[status] ?? status;
 
   const toggleRecording = async () => {
@@ -69,7 +80,18 @@ export function VoiceTextComposer({ initialMode = "voice", onTranscribe, onSubmi
 
   return (
     <section className="voice-text-composer" aria-label="Голосове або текстове введення">
-      <p className="voice-text-composer__status" role="status" aria-live="polite">Статус: {statusLabel}</p>
+      <div className="voice-text-composer__ai-surface">
+        <div className={`voice-composer__orb is-${status}`} data-testid="ai-orb" aria-hidden="true" />
+        <div className="voice-text-composer__ai-copy">
+          <p className="voice-text-composer__status" role="status" aria-live="polite">Статус: {statusLabel}</p>
+          {responseText ? <p className="voice-text-composer__response">{responseText}</p> : null}
+          {responseText && onSpeak ? (
+            <button className="voice-text-composer__speak" type="button" onClick={() => onSpeak(responseText)}>
+              Прослухати відповідь
+            </button>
+          ) : null}
+        </div>
+      </div>
 
       {voiceError ? <p role="alert">{voiceError}</p> : null}
 

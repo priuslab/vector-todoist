@@ -8,3 +8,91 @@
 @import "./styles/oracle.css";
 @import "./styles/settings.css";
 @import "./styles/catalog.css";
+
+.voice-text-composer__ai-surface {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.voice-composer__orb {
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--brand-primary);
+  box-shadow: 0 0 0 8px rgb(36 107 94 / 10%), inset 0 0 0 12px rgb(255 255 255 / 14%);
+  animation: voice-composer-idle 2.8s ease-in-out infinite;
+}
+
+.voice-composer__orb.is-listening {
+  background: var(--accent-teal);
+  animation: voice-composer-listening 1.1s ease-in-out infinite alternate;
+}
+
+.voice-composer__orb.is-transcribing {
+  animation: voice-composer-transcribing 1.4s linear infinite;
+}
+
+.voice-composer__orb.is-responding {
+  background: var(--success);
+  animation: voice-composer-responding 1.7s ease-in-out infinite;
+}
+
+.voice-composer__orb.is-error {
+  background: var(--danger);
+  animation: none;
+}
+
+.voice-text-composer__ai-copy {
+  min-width: 0;
+}
+
+.voice-text-composer__response {
+  margin: 4px 0 0;
+  color: var(--text-primary);
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.voice-text-composer__speak {
+  min-height: 44px;
+  margin-top: 8px;
+  border: 0;
+  padding: 0;
+  color: var(--brand-primary);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.voice-text-composer__speak:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@keyframes voice-composer-idle {
+  50% { transform: scale(1.05); box-shadow: 0 0 0 11px rgb(36 107 94 / 6%), inset 0 0 0 12px rgb(255 255 255 / 14%); }
+}
+
+@keyframes voice-composer-listening {
+  to { transform: scale(1.1); box-shadow: 0 0 0 14px rgb(23 143 131 / 10%), inset 0 0 0 12px rgb(255 255 255 / 18%); }
+}
+
+@keyframes voice-composer-transcribing {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes voice-composer-responding {
+  50% { transform: scale(1.08); box-shadow: 0 0 0 12px rgb(46 139 87 / 10%), inset 0 0 0 12px rgb(255 255 255 / 18%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-composer__orb,
+  .voice-composer__orb.is-listening,
+  .voice-composer__orb.is-transcribing,
+  .voice-composer__orb.is-responding {
+    animation: none;
+  }
+}
