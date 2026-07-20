@@ -59,3 +59,12 @@ it("does not submit an empty clarification answer", () => {
   render(<Clarification questions={analysis.questions} deferSubmit onAnswer={() => {}} />);
   expect(screen.getByRole("button", { name: "Продовжити" })).toBeDisabled();
 });
+
+it("shows the selected quick reply as pressed", async () => {
+  const user = (await import("@testing-library/user-event")).default.setup();
+  render(<Clarification questions={analysis.questions} deferSubmit onAnswer={() => {}} />);
+
+  await user.click(screen.getByRole("button", { name: "Ні" }));
+  expect(screen.getByRole("button", { name: "Ні" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("button", { name: "Так" })).toHaveAttribute("aria-pressed", "false");
+});
