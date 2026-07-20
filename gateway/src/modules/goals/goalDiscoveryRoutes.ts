@@ -10,7 +10,18 @@ const map = (error: unknown) => {
   if (error instanceof GoalDiscoveryConflictError) return { status: 409, body: { error: 'GOAL_DISCOVERY_CONFLICT', retryable: true } };
   return { status: 503, body: { error: 'GOAL_DISCOVERY_UNAVAILABLE', retryable: true } };
 };
-const safe = (fn: (request: any) => Promise<unknown>) => async (request: any, reply: FastifyReply) => { try { return reply.code(200).send(await fn(request)); } catch (error) { const mapped = map(error); return reply.code(mapped.status).send(mapped.body); } };
+const safe = (fn: (request: any) => Promise<unknown>) => async (request: any, reply: FastifyReply) => {
+  try {
+    return reply.code(200).send(await fn(request));
+  } catch (error) {
+    const mapped = map(error);
+    // The public response stays deliberately generic, but retain the original
+    // failure in the protected gateway log to diagnose PocketBase schema/rule
+    // errors without ever logging the user's bearer token.
+    request.log.error({ err: error, goalDiscoveryError: mapped.body.error }, 'Goal discovery request failed');
+    return reply.code(mapped.status).send(mapped.body);
+  }
+};
 
 export async function goalDiscoveryRoutes(app: FastifyInstance, service: GoalDiscoveryService): Promise<void> {
   app.get('/api/v1/goals/discovery/protocol', safe(() => Promise.resolve(service.protocol())));
