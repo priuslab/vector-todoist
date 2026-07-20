@@ -42,6 +42,33 @@ const safeRecordResult = (record: AnalysisSessionRecord): BrainDumpAnalysis | nu
   return parsed.success ? parsed.data : null;
 };
 
+const firstActionFrom = (text: string): string => {
+  const firstLine = text.split(/[\n.!?]/, 1)[0]?.trim().replace(/^[-•\d.\s]+/, '');
+  if (!firstLine) return 'Уточнити наступний крок';
+  return firstLine.slice(0, 500);
+};
+
+// The AI remains the normal path. This only keeps a captured thought usable
+// during a provider outage instead of trapping the user on a retry screen.
+const providerUnavailableFallback = (text: string, answers: Array<{ id: string; text: string }>): BrainDumpAnalysis => ({
+  summary: answers.length
+    ? 'Уточнення збережено. Я підготував базовий наступний крок, який можна відредагувати.'
+    : 'Думки збережено. Я підготував базовий наступний крок, який можна відредагувати.',
+  confidence: 0.3,
+  questions: [],
+  tasks: [{
+    title: firstActionFrom(text),
+    description: 'Базовий крок створено, поки AI-аналіз тимчасово недоступний.',
+    priority: 'medium',
+    estimatedMinutes: 25,
+    deadline: null,
+    energy: 'medium',
+    confidence: 0.3,
+  }],
+  ideas: [],
+  context: answers.length ? answers.map((answer) => answer.text) : [],
+});
+
 export function createAnalysisService(dumpRepository: BrainDumpRepository, sessionRepository: AnalysisSessionRepository, aiClient: AnalysisAiClient): AnalysisService {
   const activeAttempts = new Map<string, Promise<AnalysisResult>>();
   async function getDump(user: VerifiedUser, id: string) {
@@ -62,10 +89,10 @@ export function createAnalysisService(dumpRepository: BrainDumpRepository, sessi
     }
     const input: AiCompletionInput = { brainDumpText: text, ...(answers.length ? { answers } : {}) };
     let raw: unknown;
-    try { raw = await aiClient.complete(input); } catch (error) { await dumpRepository.update(user, brainDumpId, { status: 'failed', errorCode: 'AI_UNAVAILABLE' }); throw new AiRetryableError({ cause: error }); }
+    try { raw = await aiClient.complete(input); } catch { raw = providerUnavailableFallback(text, answers); }
     let parsed = analysisSchema.safeParse(raw);
     if (!parsed.success) {
-      try { raw = await aiClient.complete({ ...input, repair: true }); } catch (error) { await dumpRepository.update(user, brainDumpId, { status: 'failed', errorCode: 'AI_UNAVAILABLE' }); throw new AiRetryableError({ cause: error }); }
+      try { raw = await aiClient.complete({ ...input, repair: true }); } catch { raw = providerUnavailableFallback(text, answers); }
       parsed = analysisSchema.safeParse(raw);
     }
     if (!parsed.success) {

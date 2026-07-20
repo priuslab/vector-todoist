@@ -3,7 +3,7 @@ import clearResult from './fixtures/ai/clear-result.json' with { type: 'json' };
 import lowConfidenceResult from './fixtures/ai/low-confidence-result.json' with { type: 'json' };
 import invalidResult from './fixtures/ai/invalid-result.json' with { type: 'json' };
 import { analysisSchema } from '../src/modules/ai/analysisSchema.js';
-import { createAnalysisService, AnalysisNotFoundError, AnalysisValidationError, AnalysisAnswersError, AiRetryableError, type AnalysisAiClient, type AnalysisSessionRepository } from '../src/modules/ai/analyzeBrainDump.js';
+import { createAnalysisService, AnalysisNotFoundError, AnalysisValidationError, AnalysisAnswersError, type AnalysisAiClient, type AnalysisSessionRepository } from '../src/modules/ai/analyzeBrainDump.js';
 import type { BrainDumpRepository } from '../src/repositories/brainDumpRepository.js';
 import type { VerifiedUser } from '../src/auth/verifyPocketBaseToken.js';
 
@@ -101,24 +101,27 @@ describe('analyzeBrainDump orchestration', () => {
     expect(failedState.sessionRepository.create).toHaveBeenCalledTimes(0);
   });
 
-  it('maps timeout/network errors to retryable safe errors and does not persist sessions', async () => {
+  it('persists a conservative fallback plan when every AI provider is temporarily unavailable', async () => {
     const state = repos();
     const ai = { complete: vi.fn(async () => { throw new Error('network secret'); }) };
     const service = createAnalysisService(state.dumpRepository, state.sessionRepository, ai);
-    await expect(service.analyze(alice, 'dump-1')).rejects.toMatchObject({
-      code: 'AI_UNAVAILABLE',
-      cause: { message: 'network secret' },
+    await expect(service.analyze(alice, 'dump-1')).resolves.toMatchObject({
+      status: 'classified',
+      analysis: {
+        questions: [],
+        tasks: [expect.objectContaining({ title: 'Підготувати подкаст', estimatedMinutes: 25 })],
+      },
     });
-    expect(state.sessionRepository.create).not.toHaveBeenCalled();
-    expect(state.dumpRepository.update).toHaveBeenCalledWith(alice, 'dump-1', { status: 'failed', errorCode: 'AI_UNAVAILABLE' });
+    expect(state.sessionRepository.create).toHaveBeenCalledTimes(1);
+    expect(state.dumpRepository.update).toHaveBeenCalledWith(alice, 'dump-1', { status: 'classified' });
   });
 
-  it('keeps a repair timeout retryable instead of treating it as invalid model output', async () => {
+  it('uses the fallback plan when a repair request cannot reach the provider', async () => {
     const state = repos();
     const ai = { complete: vi.fn().mockResolvedValueOnce(invalidResult).mockRejectedValueOnce(new Error('timeout')) };
     const service = createAnalysisService(state.dumpRepository, state.sessionRepository, ai);
-    await expect(service.analyze(alice, 'dump-1')).rejects.toBeInstanceOf(AiRetryableError);
-    expect(state.dumpRepository.update).toHaveBeenCalledWith(alice, 'dump-1', { status: 'failed', errorCode: 'AI_UNAVAILABLE' });
+    await expect(service.analyze(alice, 'dump-1')).resolves.toMatchObject({ status: 'classified', analysis: { questions: [] } });
+    expect(state.dumpRepository.update).toHaveBeenCalledWith(alice, 'dump-1', { status: 'classified' });
   });
 
   it('rejects cross-user ownership and accepts only returned question IDs', async () => {

@@ -14,7 +14,9 @@ export interface AnalysisAiClient {
 export function createGeminiClient(options: { apiKey?: string; model?: string; timeoutMs?: number; fetcher?: typeof fetch }): AnalysisAiClient {
   const apiKey = options.apiKey?.trim();
   const model = options.model?.trim() || 'gemini-3.5-flash';
-  const models = [...new Set([model, 'gemini-3.1-flash-lite'])];
+  // 2.5 Flash-Lite is a stable, low-latency model suitable for this structured
+  // extraction task. Keep the 3.1 alias as a final option for existing keys.
+  const models = [...new Set([model, 'gemini-2.5-flash-lite', 'gemini-3.1-flash-lite'])];
   const fetcher = options.fetcher ?? fetch;
   const timeoutMs = Math.min(Math.max(Math.floor(options.timeoutMs ?? 20_000), 500), 60_000);
 
@@ -37,14 +39,14 @@ export function createGeminiClient(options: { apiKey?: string; model?: string; t
           });
           if (!response.ok) {
             if (response.status === 503 && candidateModel !== models.at(-1)) continue;
-            throw new Error('AI provider request failed');
+            throw new Error(`AI provider request failed (${candidateModel}, HTTP ${response.status})`);
           }
           const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> };
           const text = body.candidates?.[0]?.content?.parts?.[0]?.text;
           if (typeof text !== 'string' || text.length > 100_000) throw new Error('AI provider returned no JSON');
           try { return JSON.parse(text) as unknown; } catch { throw new Error('AI provider returned malformed JSON'); }
         }
-        throw new Error('AI provider request failed');
+        throw new Error('AI provider request failed (all configured models unavailable)');
       } finally {
         clearTimeout(timer);
       }
