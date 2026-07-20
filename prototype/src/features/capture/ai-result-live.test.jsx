@@ -20,13 +20,13 @@ it("shows a Ukrainian processing error without claiming a plan was created", () 
   expect(screen.queryByText("План готовий")).not.toBeInTheDocument();
 });
 
-it("renders at most two clarification questions and a continue action", () => {
+it("renders a relevant voice or text answer action for a live clarification", () => {
   render(<Clarification questions={analysis.questions} onAnswer={() => {}} onTranscribe={async () => "Так"} />);
   expect(screen.getByText(analysis.questions[0].text)).toBeInTheDocument();
-  const continueButton = screen.getByRole("button", { name: "Продовжити" });
-  expect(continueButton).toBeInTheDocument();
-  expect(continueButton.parentElement).toHaveClass("clarification__actions");
-  expect(screen.getByRole("button", { name: "Відповісти голосом" }).parentElement).toBe(continueButton.parentElement);
+  expect(screen.getByRole("button", { name: "Відповісти голосом" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Написати відповідь" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Так" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Ні" })).not.toBeInTheDocument();
 });
 
 it("opens a voice composer for a clarification answer", async () => {
@@ -36,6 +36,14 @@ it("opens a voice composer for a clarification answer", async () => {
   await user.click(screen.getByRole("button", { name: "Відповісти голосом" }));
   expect(screen.getByRole("button", { name: "Почати запис" })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Відповісти голосом" })).not.toBeInTheDocument();
+});
+
+it("opens an editable text answer for a live clarification", async () => {
+  const user = (await import("@testing-library/user-event")).default.setup();
+  render(<Clarification questions={analysis.questions} onAnswer={() => {}} onTranscribe={async () => "Так"} />);
+
+  await user.click(screen.getByRole("button", { name: "Написати відповідь" }));
+  expect(screen.getByRole("textbox", { name: "Твоя думка" })).toBeInTheDocument();
 });
 
 it("renders an analysis preview with confidence and does not claim tasks were added to Today", () => {
@@ -56,15 +64,15 @@ it("uses the live draft and analysis APIs in production capture flow", async () 
 });
 
 it("does not submit an empty clarification answer", () => {
-  render(<Clarification questions={analysis.questions} deferSubmit onAnswer={() => {}} />);
+  render(<Clarification deferSubmit onAnswer={() => {}} />);
   expect(screen.getByRole("button", { name: "Продовжити" })).toBeDisabled();
 });
 
 it("shows the selected quick reply as pressed", async () => {
   const user = (await import("@testing-library/user-event")).default.setup();
-  render(<Clarification questions={analysis.questions} deferSubmit onAnswer={() => {}} />);
+  render(<Clarification deferSubmit onAnswer={() => {}} />);
 
-  await user.click(screen.getByRole("button", { name: "Ні" }));
-  expect(screen.getByRole("button", { name: "Ні" })).toHaveAttribute("aria-pressed", "true");
-  expect(screen.getByRole("button", { name: "Так" })).toHaveAttribute("aria-pressed", "false");
+  await user.click(screen.getByRole("button", { name: "До кінця тижня" }));
+  expect(screen.getByRole("button", { name: "До кінця тижня" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("button", { name: "До четверга" })).toHaveAttribute("aria-pressed", "false");
 });

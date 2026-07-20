@@ -9,18 +9,40 @@ const questions = {
 };
 
 export function Clarification({ number = 1, onAnswer, onTranscribe, questions: liveQuestions, deferSubmit = false }) {
-  const item = liveQuestions?.[0] ? { text: liveQuestions[0].text, replies: ["Так", "Ні"] } : questions[number];
+  const isLiveQuestion = Boolean(liveQuestions?.[0]);
+  const item = isLiveQuestion ? { text: liveQuestions[0].text } : questions[number];
   const [selected, setSelected] = useState("");
-  const [voiceMode, setVoiceMode] = useState(false);
+  const [answerMode, setAnswerMode] = useState(null);
   return (
     <section className="clarification">
       <span className="clarification__badge"><Sparkle size={17} weight="fill" />Уточнення {number} з {liveQuestions?.length || 2}</span>
       <h1>{item.text}</h1>
       <p>Це впливає на розклад, тому краще уточнити. Решту Вектор визначить сам.</p>
-      {voiceMode ? <div className="clarification__voice-answer"><VoiceTextComposer onTranscribe={onTranscribe} onSubmit={onAnswer} submitLabel="Продовжити" /><button className="text-action" type="button" onClick={() => setVoiceMode(false)}>Обрати коротку відповідь</button></div> : <><div className="quick-replies">{item.replies.map((reply) => <button aria-pressed={selected === reply} className={selected === reply ? "is-selected" : ""} key={reply} type="button" onClick={() => deferSubmit ? setSelected(reply) : onAnswer(reply)}>{reply}</button>)}</div><div className="clarification__actions">
-        {onTranscribe ? <Button variant="secondary" icon={Microphone} onClick={() => setVoiceMode(true)}>Відповісти голосом</Button> : null}
-        <button className="button button--primary" type="button" disabled={!selected} onClick={() => onAnswer?.(selected)}>Продовжити</button>
-      </div></>}
+      {answerMode ? (
+        <div className="clarification__voice-answer">
+          <VoiceTextComposer
+            key={answerMode}
+            initialMode={answerMode}
+            onTranscribe={onTranscribe}
+            onSubmit={onAnswer}
+            submitLabel="Продовжити"
+          />
+          <button className="text-action" type="button" onClick={() => setAnswerMode(null)}>Повернутися до способів відповіді</button>
+        </div>
+      ) : isLiveQuestion ? (
+        <div className="clarification__actions">
+          <Button variant="secondary" icon={Microphone} onClick={() => setAnswerMode("voice")}>Відповісти голосом</Button>
+          <Button variant="tertiary" onClick={() => setAnswerMode("text")}>Написати відповідь</Button>
+        </div>
+      ) : (
+        <>
+          <div className="quick-replies">{item.replies.map((reply) => <button aria-pressed={selected === reply} className={selected === reply ? "is-selected" : ""} key={reply} type="button" onClick={() => deferSubmit ? setSelected(reply) : onAnswer(reply)}>{reply}</button>)}</div>
+          <div className="clarification__actions">
+            {onTranscribe ? <Button variant="secondary" icon={Microphone} onClick={() => setAnswerMode("voice")}>Відповісти голосом</Button> : null}
+            <button className="button button--primary" type="button" disabled={!selected} onClick={() => onAnswer?.(selected)}>Продовжити</button>
+          </div>
+        </>
+      )}
     </section>
   );
 }
