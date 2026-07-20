@@ -15,7 +15,11 @@ export function makeRequireUser(verifier: PocketBaseTokenVerifier) {
       request.user = { ...user };
       if (token) Object.defineProperty(request.user, 'token', { value: token, enumerable: false, configurable: true });
     } catch (error) {
-      if (!(error instanceof AuthError)) request.log.warn('Authentication failed');
+      request.log.warn({
+        authError: error instanceof AuthError ? error.code : 'AUTH_VERIFICATION_FAILED',
+        path: request.routeOptions.url,
+        hasAuthorization: Boolean(request.headers.authorization),
+      }, 'Authentication failed');
       return reply.code(401).send({ error: 'UNAUTHORIZED' });
     }
   };
