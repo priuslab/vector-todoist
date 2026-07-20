@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { buildApp } from '../src/app.js';
 import { createGeminiTranscriptionAdapter, createTranscriptionService, type TranscriptionAdapter } from '../src/modules/transcription/transcriptionService.js';
 import { createAudioStorage } from '../src/modules/transcription/audioStorage.js';
@@ -17,6 +19,14 @@ function adapter(result = 'Мені треба підготувати випус
 }
 
 describe('transcription service safety', () => {
+  it('uses an OS-writable directory for ephemeral audio by default', async () => {
+    const storage = createAudioStorage();
+    const file = await storage.save(Buffer.from('audio'), 'audio/webm');
+
+    expect(file.path.startsWith(`${join(tmpdir(), 'vector-transcription')}/`)).toBe(true);
+    await storage.cleanup(file);
+  });
+
   it('retains a safe Gemini status and error code when transcription is rejected', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
       error: { code: 429, status: 'RESOURCE_EXHAUSTED', message: 'Quota exceeded for this project.' },
