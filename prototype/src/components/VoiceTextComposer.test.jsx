@@ -56,18 +56,21 @@ it("opens in voice mode and switches to editable text mode", async () => {
   expect(screen.getByRole("textbox")).toBeInTheDocument();
 });
 
-it("does not submit an empty draft and submits edited transcript text", async () => {
+it("disables submit for an empty draft and enables it after editing", async () => {
   const user = userEvent.setup();
   const onSubmit = vi.fn();
 
   render(<VoiceTextComposer initialMode="text" onTranscribe={vi.fn()} onSubmit={onSubmit} />);
 
   const input = screen.getByRole("textbox");
-  await user.click(screen.getByRole("button", { name: "Відправити" }));
+  const submit = screen.getByRole("button", { name: "Відправити" });
+  expect(submit).toBeDisabled();
+  await user.click(submit);
   expect(onSubmit).not.toHaveBeenCalled();
 
   await user.type(input, "Моя відредагована відповідь");
-  await user.click(screen.getByRole("button", { name: "Відправити" }));
+  expect(submit).toBeEnabled();
+  await user.click(submit);
 
   expect(onSubmit).toHaveBeenCalledWith("Моя відредагована відповідь");
 });
@@ -167,6 +170,77 @@ it("falls back to text mode when microphone access is denied", async () => {
 
     expect(screen.getByRole("textbox")).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("мікрофон");
+    expect(screen.getByRole("status")).toHaveTextContent("Потрібна твоя увага");
+    expect(screen.getByTestId("ai-orb")).toHaveClass("is-error");
+  } finally {
+    Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: originalMediaDevices });
+    fakeMediaRecorder.restore();
+  }
+});
+
+it("keeps the error state while transcription falls back to editable text", async () => {
+  const user = userEvent.setup();
+  const fakeMediaRecorder = installFakeMediaRecorder();
+
+  try {
+    render(<VoiceTextComposer onTranscribe={vi.fn().mockRejectedValue(new Error("transcription failed"))} onSubmit={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: "Почати запис" }));
+    await user.click(screen.getByRole("button", { name: "Завершити запис" }));
+
+    await waitFor(() => expect(screen.getByRole("textbox")).toBeInTheDocument());
+    expect(screen.getByRole("alert")).toHaveTextContent("розпізнати");
+    expect(screen.getByRole("status")).toHaveTextContent("Потрібна твоя увага");
+    expect(screen.getByTestId("ai-orb")).toHaveClass("is-error");
+  } finally {
+    fakeMediaRecorder.restore();
+  }
+});
+
+it("keeps the voice controls disabled while microphone access is pending", async () => {
+  const user = userEvent.setup();
+  const fakeMediaRecorder = installFakeMediaRecorder();
+  let resolveMicrophone;
+  const originalMediaDevices = navigator.mediaDevices;
+  Object.defineProperty(navigator, "mediaDevices", {
+    configurable: true,
+    value: { getUserMedia: vi.fn(() => new Promise((resolve) => { resolveMicrophone = resolve; })) },
+  });
+
+  try {
+    render(<VoiceTextComposer onTranscribe={vi.fn()} onSubmit={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: "Почати запис" }));
+
+    expect(screen.getByRole("button", { name: "Почати запис" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Увімкнути текстовий режим" })).toBeDisabled();
+  } finally {
+    resolveMicrophone?.({ getTracks: () => [{ stop: vi.fn() }] });
+    Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: originalMediaDevices });
+    fakeMediaRecorder.restore();
+  }
+});
+
+it("changes an error fallback to a draft only after the user edits it", async () => {
+  const user = userEvent.setup();
+  const fakeMediaRecorder = installFakeMediaRecorder();
+  const originalMediaDevices = navigator.mediaDevices;
+  Object.defineProperty(navigator, "mediaDevices", {
+    configurable: true,
+    value: { getUserMedia: vi.fn().mockRejectedValue(new DOMException("denied", "NotAllowedError")) },
+  });
+
+  try {
+    render(<VoiceTextComposer onTranscribe={vi.fn()} onSubmit={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Почати запис" }));
+
+    const input = await screen.findByRole("textbox");
+    expect(screen.getByTestId("ai-orb")).toHaveClass("is-error");
+    await user.type(input, "Запишу це текстом");
+
+    expect(screen.getByRole("status")).toHaveTextContent("Чернетка готова");
+    expect(screen.getByTestId("ai-orb")).toHaveClass("is-draft");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   } finally {
     Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: originalMediaDevices });
     fakeMediaRecorder.restore();

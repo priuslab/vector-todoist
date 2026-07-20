@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { VoiceRecorder } from "./VoiceRecorder";
@@ -41,4 +41,47 @@ it("cancelling an active recorder discards chunks without completing", async () 
   await user.click(screen.getByRole("button", { name: "start" })); await user.click(screen.getByRole("button", { name: "cancel" }));
   expect(onComplete).not.toHaveBeenCalled();
   globalThis.MediaRecorder = previousMedia; Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: previousDevices });
+});
+
+it("guards a pending microphone request and releases a stream that resolves after cancellation", async () => {
+  let resolveMicrophone;
+  const stopTrack = vi.fn();
+  const stream = { getTracks: () => [{ stop: stopTrack }] };
+  const getUserMedia = vi.fn(() => new Promise((resolve) => { resolveMicrophone = resolve; }));
+  const previousMedia = globalThis.MediaRecorder;
+  const previousDevices = navigator.mediaDevices;
+  const recorderStart = vi.fn();
+
+  class FakeMediaRecorder {
+    static isTypeSupported = () => true;
+    state = "inactive";
+    constructor() { this.start = recorderStart; }
+  }
+
+  globalThis.MediaRecorder = FakeMediaRecorder;
+  Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia } });
+  function Harness() {
+    const recorder = useVoiceRecorder({ onComplete: vi.fn() });
+    return <><button onClick={recorder.start}>start</button><button onClick={recorder.cancel}>cancel</button></>;
+  }
+
+  try {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "start" }));
+    fireEvent.click(screen.getByRole("button", { name: "start" }));
+
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "cancel" }));
+    resolveMicrophone(stream);
+
+    await waitFor(() => expect(stopTrack).toHaveBeenCalledTimes(1));
+    expect(recorderStart).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "start" }));
+    expect(getUserMedia).toHaveBeenCalledTimes(2);
+  } finally {
+    globalThis.MediaRecorder = previousMedia;
+    Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: previousDevices });
+  }
 });

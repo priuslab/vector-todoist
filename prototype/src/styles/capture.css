@@ -3,7 +3,7 @@
 .capture-chooser h1 { margin: 26px 0 8px; font-size: 28px; }
 .capture-chooser p { max-width: 300px; margin: 0; color: var(--text-secondary); font-size: 14px; line-height: 1.55; }
 .capture-options { width: 100%; display: flex; flex-direction: column; gap: 10px; margin-top: 34px; }
-.voice-text-composer { display: flex; flex-direction: column; gap: 12px; }
+.voice-text-composer { width: 100%; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
 .voice-text-composer__status { margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 18px; }
 .voice-text-composer__voice-mode,.voice-text-composer__text-mode { display: flex; flex-direction: column; gap: 12px; }
 .voice-text-composer__voice-mode > p { margin: 0; color: var(--text-primary); font-size: 15px; line-height: 22px; }

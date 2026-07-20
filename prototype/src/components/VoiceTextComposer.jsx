@@ -31,12 +31,14 @@ export function VoiceTextComposer({
 
     try {
       const transcript = await onTranscribe?.(blob);
-      setDraft(transcript ?? "");
+      if (!transcript?.trim()) throw new Error("empty transcript");
+      setDraft(transcript);
       setMode("text");
+      setVoiceError("");
       setComposerStatus("draft");
     } catch {
       setMode("text");
-      setComposerStatus("draft");
+      setComposerStatus("error");
       setVoiceError("Не вдалося розпізнати запис. Напиши думки текстом.");
     }
   }, [onTranscribe]);
@@ -47,11 +49,11 @@ export function VoiceTextComposer({
     if (!["permission", "unsupported", "error"].includes(recorder.status)) return;
 
     setMode("text");
-    setComposerStatus("draft");
+    setComposerStatus("error");
     setVoiceError(recorder.error);
   }, [recorder.error, recorder.status]);
 
-  const localStatus = mode === "text" ? "draft" : composerStatus;
+  const localStatus = composerStatus;
   const status = externalStatus ?? localStatus;
   const statusLabel = {
     idle: "Готовий до запису",
@@ -64,7 +66,7 @@ export function VoiceTextComposer({
   }[status] ?? status;
 
   const toggleRecording = async () => {
-    if (disabled) return;
+    if (disabled || recorder.isStarting) return;
 
     if (recorder.isRecording) {
       setComposerStatus("transcribing");
@@ -102,10 +104,10 @@ export function VoiceTextComposer({
       {mode === "voice" ? (
         <div className="voice-text-composer__voice-mode">
           <p>Голосовий режим</p>
-          <button className="voice-text-composer__microphone" type="button" onClick={toggleRecording} disabled={disabled}>
+          <button className="voice-text-composer__microphone" type="button" onClick={toggleRecording} disabled={disabled || recorder.isStarting}>
             {recorder.isRecording ? "Завершити запис" : "Почати запис"}
           </button>
-          <button className="voice-text-composer__mode-switch" type="button" onClick={() => setMode("text")} disabled={disabled}>
+          <button className="voice-text-composer__mode-switch" type="button" onClick={() => setMode("text")} disabled={disabled || recorder.isStarting}>
             Увімкнути текстовий режим
           </button>
         </div>
@@ -116,10 +118,16 @@ export function VoiceTextComposer({
             className="voice-text-composer__draft"
             id="voice-text-composer-draft"
             value={draft}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              if (composerStatus === "error") {
+                setVoiceError("");
+                setComposerStatus("draft");
+              }
+            }}
             disabled={disabled}
           />
-          <button className="voice-text-composer__submit" type="button" onClick={submit} disabled={disabled}>{submitLabel}</button>
+          <button className="voice-text-composer__submit" type="button" onClick={submit} disabled={disabled || !draft.trim()}>{submitLabel}</button>
           <button className="voice-text-composer__mode-switch" type="button" onClick={() => setMode("voice")} disabled={disabled}>
             Увімкнути голосовий режим
           </button>

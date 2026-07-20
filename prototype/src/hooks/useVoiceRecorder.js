@@ -6,55 +6,148 @@ export function useVoiceRecorder({ onComplete } = {}) {
   const chunksRef = useRef([]);
   const cancelledRef = useRef(false);
   const failedRef = useRef(false);
+  const requestVersionRef = useRef(0);
+  const startInFlightRef = useRef(false);
+  const mountedRef = useRef(true);
   const [status, setStatus] = useState("idle");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [error, setError] = useState("");
+  const [isStarting, setIsStarting] = useState(false);
+
+  const setStateIfMounted = useCallback((setter, value) => {
+    if (mountedRef.current) setter(value);
+  }, []);
+
+  const releaseStream = useCallback((stream) => {
+    if (!stream) return;
+    stream.getTracks().forEach((track) => track.stop());
+    if (streamRef.current === stream) streamRef.current = null;
+  }, []);
 
   const start = useCallback(async () => {
+    if (startInFlightRef.current || recorderRef.current?.state === "recording" || recorderRef.current?.state === "paused") return;
     if (!globalThis.MediaRecorder || !navigator?.mediaDevices?.getUserMedia) {
-      setStatus("unsupported"); setError("Цей браузер не підтримує запис голосу. Напиши думки текстом."); return;
+      setStateIfMounted(setStatus, "unsupported");
+      setStateIfMounted(setError, "Цей браузер не підтримує запис голосу. Напиши думки текстом.");
+      return;
     }
+
+    const requestVersion = ++requestVersionRef.current;
+    let stream;
+    startInFlightRef.current = true;
+    setStateIfMounted(setIsStarting, true);
+
     try {
-      setError("");
+      setStateIfMounted(setError, "");
       cancelledRef.current = false;
       failedRef.current = false;
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      if (!mountedRef.current || cancelledRef.current || requestVersion !== requestVersionRef.current) {
+        releaseStream(stream);
+        return;
+      }
+
       streamRef.current = stream;
       const recorderOptions = MediaRecorder.isTypeSupported?.("audio/webm") ? { mimeType: "audio/webm" } : undefined;
       const recorder = new MediaRecorder(stream, recorderOptions);
-      chunksRef.current = []; setElapsedSeconds(0);
-      recorder.ondataavailable = (event) => { if (event.data?.size) chunksRef.current.push(event.data); };
+      chunksRef.current = [];
+      setStateIfMounted(setElapsedSeconds, 0);
+      recorder.ondataavailable = (event) => {
+        if (event.data?.size) chunksRef.current.push(event.data);
+      };
       recorder.onstop = () => {
-        streamRef.current?.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-        if (failedRef.current) return;
-        if (cancelledRef.current) { chunksRef.current = []; setStatus("idle"); return; }
+        releaseStream(stream);
+        if (recorderRef.current === recorder) recorderRef.current = null;
+        if (failedRef.current || !mountedRef.current) return;
+        if (cancelledRef.current) {
+          chunksRef.current = [];
+          setStatus("idle");
+          return;
+        }
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
-        setStatus("idle"); onComplete?.(blob);
+        setStatus("idle");
+        onComplete?.(blob);
       };
       recorder.onerror = () => {
         cancelledRef.current = true;
         failedRef.current = true;
         chunksRef.current = [];
-        streamRef.current?.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-        recorderRef.current = null;
-        setError("Сталася помилка мікрофона. Спробуй ще раз або напиши думки текстом.");
-        setStatus("error");
+        releaseStream(stream);
+        if (recorderRef.current === recorder) recorderRef.current = null;
+        setStateIfMounted(setError, "Сталася помилка мікрофона. Спробуй ще раз або напиши думки текстом.");
+        setStateIfMounted(setStatus, "error");
       };
-      recorderRef.current = recorder; recorder.start(); setStatus("recording");
-    } catch { setStatus("permission"); setError("Не вдалося отримати доступ до мікрофона. Дозволь запис або напиши думки текстом."); }
-  }, [onComplete]);
+      recorderRef.current = recorder;
+      recorder.start();
+      setStateIfMounted(setStatus, "recording");
+    } catch {
+      releaseStream(stream);
+      if (mountedRef.current && !cancelledRef.current && requestVersion === requestVersionRef.current) {
+        setStatus("permission");
+        setError("Не вдалося отримати доступ до мікрофона. Дозволь запис або напиши думки текстом.");
+      }
+    } finally {
+      startInFlightRef.current = false;
+      setStateIfMounted(setIsStarting, false);
+    }
+  }, [onComplete, releaseStream, setStateIfMounted]);
 
-  const stop = useCallback(() => { if (recorderRef.current && recorderRef.current.state !== "inactive") { setStatus("uploading"); recorderRef.current.stop(); recorderRef.current = null; } }, []);
-  const cancel = useCallback(() => { cancelledRef.current = true; if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop(); streamRef.current?.getTracks().forEach((track) => track.stop()); streamRef.current = null; recorderRef.current = null; chunksRef.current = []; setStatus("idle"); }, []);
-  const pause = useCallback(() => { if (recorderRef.current?.state === "recording") { recorderRef.current.pause(); setStatus("paused"); } else if (recorderRef.current?.state === "paused") { recorderRef.current.resume(); setStatus("recording"); } }, []);
+  const stop = useCallback(() => {
+    if (recorderRef.current && recorderRef.current.state !== "inactive") {
+      setStateIfMounted(setStatus, "uploading");
+      const recorder = recorderRef.current;
+      recorderRef.current = null;
+      recorder.stop();
+    }
+  }, [setStateIfMounted]);
+
+  const cancel = useCallback(() => {
+    cancelledRef.current = true;
+    requestVersionRef.current += 1;
+    const recorder = recorderRef.current;
+    recorderRef.current = null;
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+    releaseStream(streamRef.current);
+    chunksRef.current = [];
+    setStateIfMounted(setStatus, "idle");
+  }, [releaseStream, setStateIfMounted]);
+
+  const pause = useCallback(() => {
+    if (recorderRef.current?.state === "recording") {
+      recorderRef.current.pause();
+      setStateIfMounted(setStatus, "paused");
+    } else if (recorderRef.current?.state === "paused") {
+      recorderRef.current.resume();
+      setStateIfMounted(setStatus, "recording");
+    }
+  }, [setStateIfMounted]);
+
   useEffect(() => {
     if (status !== "recording") return undefined;
     const startedAt = Date.now() - elapsedSeconds * 1000;
     const timer = setInterval(() => setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000)), 1_000);
     return () => clearInterval(timer);
   }, [status]);
-  useEffect(() => () => cancel(), [cancel]);
-  return { status, error, elapsedSeconds, start, stop, cancel, pause, isRecording: status === "recording", isPaused: status === "paused" };
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      cancel();
+    };
+  }, [cancel]);
+
+  return {
+    status,
+    error,
+    elapsedSeconds,
+    start,
+    stop,
+    cancel,
+    pause,
+    isStarting,
+    isRecording: status === "recording",
+    isPaused: status === "paused",
+  };
 }
