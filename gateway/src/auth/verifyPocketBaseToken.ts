@@ -53,7 +53,12 @@ export function createPocketBaseTokenVerifier(options: {
         const userId = (record as { id?: unknown }).id;
         const email = (record as { email?: unknown }).email;
         if (typeof userId !== 'string' || !userId || typeof email !== 'string' || !email) throw new AuthError();
-        const user = { userId, email };
+        // Repositories must forward the same verified bearer token to PocketBase so
+        // its per-user collection rules can authorize the request. Keep it
+        // non-enumerable so a handler cannot accidentally serialize it in a
+        // response or structured log.
+        const user = { userId, email } as VerifiedUser;
+        Object.defineProperty(user, 'token', { value: token, enumerable: false });
         if (cacheTtlMs > 0) {
           if (cache.size >= maxCacheEntries && !cache.has(key)) cache.delete(cache.keys().next().value as string);
           cache.set(key, { user, expiresAt: Date.now() + cacheTtlMs });

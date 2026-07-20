@@ -30,7 +30,7 @@ describe('PocketBase token verification', () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
-  it('returns only verified identity and caches by a one-way token hash with a capped TTL', async () => {
+  it('keeps the verified bearer token available for request-scoped repositories without serializing it', async () => {
     const fetcher = vi.fn<PocketBaseFetch>().mockResolvedValue(response({
       token: 'new-token',
       record: { id: 'user-1', email: 'olena@example.test', password: 'never-return' },
@@ -41,6 +41,8 @@ describe('PocketBase token verification', () => {
     const second = await verifier.verify('Bearer secret-token');
 
     expect(first).toEqual({ userId: 'user-1', email: 'olena@example.test' });
+    expect(first.token).toBe('secret-token');
+    expect(JSON.stringify(first)).not.toContain('secret-token');
     expect(second).toEqual(first);
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(fetcher.mock.calls[0][1]?.headers).toMatchObject({ authorization: 'Bearer secret-token' });
