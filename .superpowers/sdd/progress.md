@@ -103,3 +103,5 @@ S3 (strip-down plan): complete (97cd625..3da1355, review PASS). DraftPlanReview 
 S4 (strip-down plan): complete (659909f..c9ef40a, review PASS). previewLoading on plan-preview button, composer submitting spinner, undo indicator+guard, TaskScreens loading props, goal-free loading copy. Minor for final review: TaskScreens "Повторити синхронізацію" still disabled= not loading=. 160/160 tests.
 
 S5a (strip-down plan): complete (8fae2a8..6cdcc2d, review PASS). TaskTimeSheet bottom sheet: tap card -> time picker -> optimistic PATCH plannedStart/plannedEnd with rollback/CONFLICT refresh/aria-live. Minors for final review: localDate helper duplicated in TaskTimeSheet; CONFLICT refetch failure silently swallowed. 162/162 tests.
+
+S6 (strip-down plan): complete (0088900..2ae17b7, review r2 PASS). Live Today shows real date/totals/progress/times; demo event, break card and demo header copy preserved only in demo mode. Minor for final review: now-card 60-min hardcoded duration fallback (pre-existing). 164/164 tests.
