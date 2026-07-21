@@ -9,14 +9,14 @@ function repos({ goals = [] as any[] }: { goals?: any[] } = {}) {
   return {
     dumpRepository: { get: vi.fn(async () => dumps[0]), list: vi.fn(async () => dumps), update: vi.fn(async (_u: VerifiedUser, id: string, input: any) => { const dump = dumps.find((item) => item.id === id); Object.assign(dump, input); return dump; }) } as any,
     analysisService: { result: vi.fn(async () => analysis) } as any,
-    taskRepository: { create: vi.fn(async (_u: VerifiedUser, input: any) => { const item = { id: `task-${++sequence}`, user: 'alice', collectionName: 'tasks', created: 'now', updated: 'now', ...input }; tasks.push(item); return item; }), list: vi.fn(async () => tasks), get: vi.fn(async (_u: VerifiedUser, id: string) => tasks.find((x) => x.id === id) ?? null), delete: vi.fn(async (_u: VerifiedUser, id: string) => { const index = tasks.findIndex((x) => x.id === id); if (index >= 0) tasks.splice(index, 1); }) } as any,
-    ideaRepository: { create: vi.fn(async (_u: VerifiedUser, input: any) => { const item = { id: `idea-${++sequence}`, user: 'alice', collectionName: 'ideas', created: 'now', updated: 'now', ...input }; ideas.push(item); return item; }), list: vi.fn(async () => ideas), delete: vi.fn(async (_u: VerifiedUser, id: string) => { const index = ideas.findIndex((x) => x.id === id); if (index >= 0) ideas.splice(index, 1); }) } as any,
-    changeSetRepository: { create: vi.fn(async (_u: VerifiedUser, input: any) => { const item = { id: `change-${++sequence}`, user: 'alice', ...input }; changes.push(item); return item; }), get: vi.fn(async (_u: VerifiedUser, id: string) => changes.find((x) => x.id === id) ?? null), list: vi.fn(async () => changes), update: vi.fn(async (_u: VerifiedUser, id: string, input: any) => { const item = changes.find((x) => x.id === id); Object.assign(item, input); return item; }) } as any,
+    taskRepository: { create: vi.fn(async (_u: VerifiedUser, input: any) => { const item = { id: `task-${++sequence}`, user: 'alice', collectionName: 'tasks', created: 'now', updated: 'now', ...input }; tasks.push(item); return item; }), update: vi.fn(async (_u: VerifiedUser, id: string, input: any) => { const item = tasks.find((x) => x.id === id); Object.assign(item, input); return item; }), list: vi.fn(async () => tasks), get: vi.fn(async (_u: VerifiedUser, id: string) => tasks.find((x) => x.id === id) ?? null), delete: vi.fn(async (_u: VerifiedUser, id: string) => { const index = tasks.findIndex((x) => x.id === id); if (index >= 0) tasks.splice(index, 1); }) } as any,
+    ideaRepository: { create: vi.fn(async (_u: VerifiedUser, input: any) => { const item = { id: `idea-${++sequence}`, user: 'alice', collectionName: 'ideas', created: 'now', updated: 'now', ...input }; ideas.push(item); return item; }), update: vi.fn(async (_u: VerifiedUser, id: string, input: any) => { const item = ideas.find((x) => x.id === id); Object.assign(item, input); return item; }), list: vi.fn(async () => ideas), delete: vi.fn(async (_u: VerifiedUser, id: string) => { const index = ideas.findIndex((x) => x.id === id); if (index >= 0) ideas.splice(index, 1); }) } as any,
+    changeSetRepository: { create: vi.fn(async (_u: VerifiedUser, input: any) => { if (changes.some((item) => item.idempotencyKey === input.idempotencyKey)) throw new Error('duplicate idempotency key'); const item = { id: `change-${++sequence}`, user: 'alice', ...input }; changes.push(item); return item; }), get: vi.fn(async (_u: VerifiedUser, id: string) => changes.find((x) => x.id === id) ?? null), list: vi.fn(async () => changes), update: vi.fn(async (_u: VerifiedUser, id: string, input: any) => { const item = changes.find((x) => x.id === id); Object.assign(item, input); return item; }), delete: vi.fn(async (_u: VerifiedUser, id: string) => { const index = changes.findIndex((item) => item.id === id); if (index >= 0) changes.splice(index, 1); }) } as any,
     goalGraphRepository: {
       goals: { get: vi.fn(async (u: VerifiedUser, id: string) => goals.find((goal) => goal.id === id && goal.user === u.userId) ?? null) },
       edges: { create: vi.fn(async (_u: VerifiedUser, input: any) => { const item = { id: `edge-${++sequence}`, user: 'alice', ...input }; edges.push(item); return item; }), list: vi.fn(async () => edges), delete: vi.fn(async (_u: VerifiedUser, id: string) => { const index = edges.findIndex((edge) => edge.id === id); if (index >= 0) edges.splice(index, 1); }) },
     } as any,
-    dumps, tasks, ideas, changes, edges,
+    dumps, tasks, ideas, changes, edges, goals,
   };
 }
 
@@ -100,5 +100,114 @@ describe('Brain Dump → Today vertical slice', () => {
     expect(r.tasks).toHaveLength(0);
     expect(r.ideas).toHaveLength(0);
     expect(r.changes[0].status).toBe('failed');
+  });
+  it('rejects malformed stored proposal payloads before persistence', async () => {
+    const r = repos(); const service = createPlanService(r);
+    const preview = await service.preview(user, 'dump-1', { idempotencyKey: 'plan-malformed-payload' });
+    r.changes[0].afterJson.tasks[0].estimatedMinutes = 'sixty';
+
+    await expect(service.apply(user, preview.changeSetId, {})).rejects.toMatchObject({ code: 'INVALID_PLAN' });
+    expect(r.tasks).toHaveLength(0);
+    expect(r.ideas).toHaveLength(0);
+  });
+  it('revalidates stored goals immediately before applying', async () => {
+    const r = repos({ goals: [{ id: 'goal-1', user: 'alice', title: 'Запустити застосунок', status: 'active' }] });
+    const service = createPlanService(r);
+    const preview = await service.preview(user, 'dump-1', { goalId: 'goal-1', idempotencyKey: 'plan-goal-revalidate' });
+    r.goals[0].status = 'archived';
+
+    await expect(service.apply(user, preview.changeSetId, {})).rejects.toMatchObject({ code: 'INVALID_PLAN' });
+    expect(r.tasks).toHaveLength(0);
+    expect(r.edges).toHaveLength(0);
+  });
+  it('updates reused records with the confirmed goal before linking them', async () => {
+    const r = repos({ goals: [{ id: 'goal-1', user: 'alice', title: 'Запустити застосунок', status: 'active' }] });
+    r.tasks.push({ id: 'existing-task', user: 'alice', sourceDump: 'dump-1', title: 'Підготувати структуру', status: 'inbox', goalId: null });
+    r.ideas.push({ id: 'existing-idea', user: 'alice', sourceDump: 'dump-1', text: 'Епізод про синдром самозванця', status: 'backlog', goalId: null });
+    const service = createPlanService(r);
+    const preview = await service.preview(user, 'dump-1', { goalId: 'goal-1', idempotencyKey: 'plan-reuse-goal' });
+
+    await service.apply(user, preview.changeSetId, {});
+
+    expect(r.tasks).toEqual([expect.objectContaining({ id: 'existing-task', goalId: 'goal-1', sourceDump: 'dump-1' })]);
+    expect(r.ideas).toEqual([expect.objectContaining({ id: 'existing-idea', goalId: 'goal-1', sourceDump: 'dump-1' })]);
+    expect(r.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({ fromId: 'existing-task', toId: 'goal-1' }),
+      expect.objectContaining({ fromId: 'existing-idea', toId: 'goal-1' }),
+    ]));
+  });
+  it('restores reused records when a later linked-edge write fails', async () => {
+    const r = repos({ goals: [{ id: 'goal-1', user: 'alice', title: 'Запустити застосунок', status: 'active' }] });
+    r.tasks.push({ id: 'existing-task', user: 'alice', sourceDump: 'dump-1', title: 'Підготувати структуру', status: 'inbox', goalId: null });
+    r.ideas.push({ id: 'existing-idea', user: 'alice', sourceDump: 'dump-1', text: 'Епізод про синдром самозванця', status: 'backlog', goalId: null });
+    r.goalGraphRepository.edges.create = vi.fn(async (_u: VerifiedUser, input: any) => {
+      if (r.edges.length === 1) throw new Error('injected edge failure');
+      const edge = { id: `edge-${r.edges.length + 1}`, user: 'alice', ...input }; r.edges.push(edge); return edge;
+    });
+    const service = createPlanService(r);
+    const preview = await service.preview(user, 'dump-1', { goalId: 'goal-1', idempotencyKey: 'plan-reuse-rollback' });
+
+    await expect(service.apply(user, preview.changeSetId, {})).rejects.toMatchObject({ code: 'CONFLICT' });
+
+    expect(r.tasks).toEqual([expect.objectContaining({ id: 'existing-task', goalId: null })]);
+    expect(r.ideas).toEqual([expect.objectContaining({ id: 'existing-idea', goalId: null })]);
+    expect(r.edges).toHaveLength(0);
+  });
+  it('deduplicates edges for duplicate proposals within one apply', async () => {
+    const r = repos({ goals: [{ id: 'goal-1', user: 'alice', title: 'Запустити застосунок', status: 'active' }] });
+    r.analysisService.result = vi.fn(async () => ({
+      ...analysis,
+      analysis: { ...analysis.analysis, tasks: [analysis.analysis.tasks[0], analysis.analysis.tasks[0]], ideas: [analysis.analysis.ideas[0], analysis.analysis.ideas[0]] },
+    }));
+    const service = createPlanService(r);
+    const preview = await service.preview(user, 'dump-1', { goalId: 'goal-1', idempotencyKey: 'plan-duplicate-proposals' });
+
+    await service.apply(user, preview.changeSetId, {});
+
+    expect(r.tasks).toHaveLength(1);
+    expect(r.ideas).toHaveLength(1);
+    expect(r.edges).toHaveLength(2);
+  });
+  it('serializes concurrent applies through a durable Change Set reservation', async () => {
+    const r = repos({ goals: [{ id: 'goal-1', user: 'alice', title: 'Запустити застосунок', status: 'active' }] });
+    const firstService = createPlanService(r); const secondService = createPlanService(r);
+    const preview = await firstService.preview(user, 'dump-1', { goalId: 'goal-1', idempotencyKey: 'plan-concurrent-apply' });
+
+    const results = await Promise.allSettled([
+      firstService.apply(user, preview.changeSetId, {}),
+      secondService.apply(user, preview.changeSetId, {}),
+    ]);
+
+    expect(results.every((result) => result.status === 'fulfilled')).toBe(true);
+    expect(r.tasks).toHaveLength(1);
+    expect(r.ideas).toHaveLength(1);
+    expect(r.edges).toHaveLength(2);
+    expect(r.changes).toContainEqual(expect.objectContaining({ mutationKey: `plan-apply:${preview.changeSetId}`, status: 'applied' }));
+  });
+  it('rejects reuse of an idempotency key with a different goal', async () => {
+    const r = repos({ goals: [
+      { id: 'goal-1', user: 'alice', title: 'Перша мета', status: 'active' },
+      { id: 'goal-2', user: 'alice', title: 'Друга мета', status: 'active' },
+    ] });
+    const service = createPlanService(r);
+    const first = await service.preview(user, 'dump-1', { goalId: 'goal-1', idempotencyKey: 'plan-goal-conflict' });
+
+    await expect(service.preview(user, 'dump-1', { goalId: 'goal-2', idempotencyKey: 'plan-goal-conflict' }))
+      .rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(r.changes[0].afterJson.tasks[0].goalId).toBe('goal-1');
+    expect(first.tasks[0].goalId).toBe('goal-1');
+  });
+  it('applies legacy no-goal payloads that predate goalId fields', async () => {
+    const r = repos(); const service = createPlanService(r);
+    const preview = await service.preview(user, 'dump-1', { idempotencyKey: 'plan-legacy-no-goal' });
+    delete r.changes[0].afterJson.goalId;
+    for (const task of r.changes[0].afterJson.tasks) delete task.goalId;
+    for (const idea of r.changes[0].afterJson.ideas) delete idea.goalId;
+
+    const applied = await service.apply(user, preview.changeSetId, {});
+
+    expect(applied.tasks).toEqual([expect.objectContaining({ goalId: null })]);
+    expect(applied.ideas).toEqual([expect.objectContaining({ goalId: null })]);
+    expect(r.edges).toHaveLength(0);
   });
 });

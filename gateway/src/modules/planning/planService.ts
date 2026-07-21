@@ -2,13 +2,13 @@ import type { VerifiedUser } from '../../auth/verifyPocketBaseToken.js';
 import { RepositoryError } from '../../repositories/base.js';
 import type { BrainDumpRepository } from '../../repositories/brainDumpRepository.js';
 import type { TaskRepository, TaskRecord } from '../../repositories/taskRepository.js';
-import type { IdeaRepository } from '../../repositories/ideaRepository.js';
+import type { IdeaRepository, IdeaRecord } from '../../repositories/ideaRepository.js';
 import type { GoalGraphRepository, GraphEdgeRecord } from '../../repositories/goalGraphRepository.js';
 import type { ChangeSetRepository, ChangeSetRecord } from '../../repositories/changeSetRepository.js';
 import type { AnalysisService } from '../ai/analyzeBrainDump.js';
 import { buildDailyPlan } from '../scheduler/buildDailyPlan.js';
 import type { SchedulerBusySlot, SchedulerTask, SchedulerProfile } from '../scheduler/types.js';
-import { applyBodySchema, applyResponseSchema, inboxResponseSchema, ideaResponseShape, planPreviewBodySchema, planPreviewSchema, taskResponseSchema, todayResponseSchema, type ChangeSetResponse, type PlanPreviewBody, type PlanPreview, type TaskResponse, type IdeaResponse, type DraftResponse } from './planSchemas.js';
+import { applyBodySchema, applyResponseSchema, inboxResponseSchema, ideaResponseShape, planChangeSetPayloadSchema, planPreviewBodySchema, planPreviewSchema, taskResponseSchema, todayResponseSchema, type ChangeSetResponse, type PlanChangeSetPayload, type PlanPreviewBody, type PlanPreview, type TaskResponse, type IdeaResponse, type DraftResponse } from './planSchemas.js';
 import type { BusySlotService } from '../calendar/busySlotService.js';
 import type { CalendarEventService } from '../calendar/calendarEventService.js';
 import type { AdaptationService } from '../adaptation/adaptationService.js';
@@ -39,6 +39,16 @@ const publicDraft = (draft: Record<string, unknown>): DraftResponse => ({
   ...(typeof draft.created === 'string' ? { created: draft.created } : {}),
 });
 const publicChangeSet = (changeSet: ChangeSetRecord): ChangeSetResponse => ({ id: changeSet.id, status: String(changeSet.status ?? ''), ...(changeSet.kind ? { kind: changeSet.kind } : {}), ...(typeof changeSet.idempotencyKey === 'string' ? { idempotencyKey: changeSet.idempotencyKey } : {}), ...(changeSet.beforeJson !== undefined ? { beforeJson: changeSet.beforeJson } : {}), ...(changeSet.afterJson !== undefined ? { afterJson: changeSet.afterJson } : {}) });
+const parsePayload = (value: unknown): PlanChangeSetPayload => {
+  const parsed = planChangeSetPayloadSchema.safeParse(value);
+  if (!parsed.success) throw new PlanValidationError();
+  return parsed.data;
+};
+const payloadGoalId = (payload: PlanChangeSetPayload): string | null => {
+  const entityGoalIds = new Set([...payload.tasks, ...payload.ideas].flatMap((item) => item.goalId ? [item.goalId] : []));
+  if (entityGoalIds.size > 1 || (payload.goalId && entityGoalIds.size === 1 && !entityGoalIds.has(payload.goalId))) throw new PlanValidationError();
+  return payload.goalId ?? entityGoalIds.values().next().value ?? null;
+};
 
 export function createPlanService(deps: {
   dumpRepository: BrainDumpRepository;
@@ -52,6 +62,16 @@ export function createPlanService(deps: {
   adaptationService?: AdaptationService;
 }): PlanService {
   const { dumpRepository, analysisService, taskRepository, ideaRepository, changeSetRepository, goalGraphRepository, calendarService, calendarEventService, adaptationService } = deps;
+  const applyLocks = new Map<string, Promise<unknown>>();
+  async function withApplyLock<T>(key: string, operation: () => Promise<T>): Promise<T> {
+    const previous = applyLocks.get(key) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => { release = resolve; });
+    const queued = previous.then(() => current);
+    applyLocks.set(key, queued);
+    await previous;
+    try { return await operation(); } finally { release(); if (applyLocks.get(key) === queued) applyLocks.delete(key); }
+  }
 
   async function preview(user: VerifiedUser, dumpId: string, input: unknown): Promise<PlanPreview> {
     const dump = await dumpRepository.get(user, dumpId);
@@ -86,42 +106,75 @@ export function createPlanService(deps: {
     const ideas = analysis.ideas.map((idea, index) => ({ id: `proposal-${result.id}-i-${index + 1}`, text: idea.text, summary: idea.summary, status: 'backlog' as const, sourceDump: dumpId, goalId: goal?.id ?? null }));
     const idempotencyKey = body.idempotencyKey ?? `plan:${user.userId}:${dumpId}:${result.id}`;
     const existing = (await changeSetRepository.list(user)).find((record) => record.idempotencyKey === idempotencyKey);
-    if (existing?.status === 'applied') return { changeSetId: existing.id, tasks: proposedTasks, ideas, blocks: plan.blocks, unscheduledTaskIds: plan.unscheduledTaskIds, warnings: plan.warnings, reasons: plan.reasons };
+    if (existing && payloadGoalId(parsePayload(existing.afterJson)) !== (body.goalId ?? null)) throw new PlanConflictError();
     let changeSet = existing;
     if (!changeSet) {
       const currentTasks = (await taskRepository.list(user)).filter((task) => task.sourceDump === dumpId);
       const currentIdeas = (await ideaRepository.list(user)).filter((idea) => idea.sourceDump === dumpId);
-      try { changeSet = await changeSetRepository.create(user, { kind: 'ai_classification', status: 'pending', beforeJson: { tasks: currentTasks, ideas: currentIdeas }, afterJson: { dumpId, tasks: proposedTasks, ideas, ...(calendarWarning ? { calendarStale: true } : {}) }, idempotencyKey }); }
+      try { changeSet = await changeSetRepository.create(user, { kind: 'ai_classification', status: 'pending', beforeJson: { tasks: currentTasks, ideas: currentIdeas }, afterJson: { dumpId, goalId: goal?.id ?? null, tasks: proposedTasks, ideas, ...(calendarWarning ? { calendarStale: true } : {}) }, idempotencyKey }); }
       catch { changeSet = (await changeSetRepository.list(user)).find((record) => record.idempotencyKey === idempotencyKey); if (!changeSet) throw new RepositoryError('UNAVAILABLE'); }
     }
+    if (payloadGoalId(parsePayload(changeSet.afterJson)) !== (body.goalId ?? null)) throw new PlanConflictError();
     return planPreviewSchema.parse({ changeSetId: changeSet.id, tasks: proposedTasks, ideas, blocks: plan.blocks, unscheduledTaskIds: plan.unscheduledTaskIds, warnings: calendarWarning ? [...plan.warnings, calendarWarning] : plan.warnings, reasons: plan.reasons });
   }
 
-  async function apply(user: VerifiedUser, changeSetId: string, input: unknown) {
+  async function appliedResult(user: VerifiedUser, changeSet: ChangeSetRecord, payload: PlanChangeSetPayload) {
+    const appliedTaskIds = new Set(payload.appliedTaskIds ?? []);
+    const appliedIdeaIds = new Set(payload.appliedIdeaIds ?? []);
+    if (typeof payload.dumpId === 'string') { try { await dumpRepository.update(user, payload.dumpId, { status: 'applied' }); } catch { /* a repeated idempotent apply retries this final owned-draft update */ } }
+    return applyResponseSchema.parse({ changeSet: publicChangeSet(changeSet), tasks: (await taskRepository.list(user)).filter((task) => appliedTaskIds.has(task.id)).map(publicTask), ideas: (await ideaRepository.list(user)).filter((idea) => appliedIdeaIds.has(idea.id)).map(publicIdea) });
+  }
+  async function waitForConcurrentApply(user: VerifiedUser, changeSetId: string) {
+    const deadline = Date.now() + 2_000;
+    do {
+      const latest = await changeSetRepository.get(user, changeSetId);
+      if (latest?.status === 'applied') return appliedResult(user, latest, parsePayload(latest.afterJson));
+      if (!latest || latest.status === 'failed') break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    } while (Date.now() < deadline);
+    throw new PlanConflictError();
+  }
+
+  async function applyOnce(user: VerifiedUser, changeSetId: string, input: unknown) {
     const changeSet = await changeSetRepository.get(user, changeSetId);
     if (!changeSet || changeSet.user !== user.userId) throw new PlanNotFoundError();
     const applyInput = applyBodySchema.safeParse(input ?? {});
     if (!applyInput.success || (applyInput.data.idempotencyKey && applyInput.data.idempotencyKey !== changeSet.idempotencyKey)) throw new PlanValidationError();
-    if (changeSet.status === 'applied') {
-      const payload = (changeSet.afterJson && typeof changeSet.afterJson === 'object') ? changeSet.afterJson as { dumpId?: string; tasks?: Array<Record<string, unknown>>; ideas?: Array<Record<string, unknown>> } : {};
-      const appliedTaskIds = new Set((payload as { appliedTaskIds?: string[] }).appliedTaskIds ?? []); const appliedIdeaIds = new Set((payload as { appliedIdeaIds?: string[] }).appliedIdeaIds ?? []);
-      if (typeof payload.dumpId === 'string') { try { await dumpRepository.update(user, payload.dumpId, { status: 'applied' }); } catch { /* a repeated idempotent apply retries this final owned-draft update */ } }
-      return applyResponseSchema.parse({ changeSet: publicChangeSet(changeSet), tasks: (await taskRepository.list(user)).filter((task) => appliedTaskIds.has(task.id)).map(publicTask), ideas: (await ideaRepository.list(user)).filter((idea) => appliedIdeaIds.has(idea.id)).map(publicIdea) });
-    }
-    const payload = (changeSet.afterJson && typeof changeSet.afterJson === 'object') ? changeSet.afterJson as { dumpId?: string; tasks?: unknown[]; ideas?: unknown[]; calendarStale?: boolean } : {};
+    const payload = parsePayload(changeSet.afterJson);
+    if (changeSet.status === 'applied') return appliedResult(user, changeSet, payload);
     if (payload.calendarStale === true && applyInput.data.confirmCalendarConflicts !== true) throw new PlanValidationError();
-    const proposedTasks = Array.isArray(payload.tasks) ? payload.tasks : [];
-    const proposedIdeas = Array.isArray(payload.ideas) ? payload.ideas : [];
-    const persistedTasks: TaskRecord[] = []; const persistedIdeas: Awaited<ReturnType<IdeaRepository['list']>> = []; const createdTasks: TaskRecord[] = []; const createdIdeas: Awaited<ReturnType<IdeaRepository['list']>> = []; const persistedEdges: GraphEdgeRecord[] = []; const createdEdges: GraphEdgeRecord[] = [];
+    const storedGoalId = payloadGoalId(payload);
+    const goalIds = new Set([...payload.tasks, ...payload.ideas].flatMap((item) => item.goalId ? [item.goalId] : []));
+    if (storedGoalId) goalIds.add(storedGoalId);
+    for (const goalId of goalIds) {
+      const goal = goalGraphRepository ? await goalGraphRepository.goals.get(user, goalId) : null;
+      if (!goal || goal.user !== user.userId || goal.status !== 'active') throw new PlanValidationError();
+    }
+    const reservationKey = `plan-apply:${changeSetId}`;
+    const previousReservation = (await changeSetRepository.list(user)).find((record) => record.idempotencyKey === reservationKey || record.mutationKey === reservationKey);
+    if (previousReservation?.status === 'failed') {
+      try { await changeSetRepository.delete(user, previousReservation.id); } catch { throw new PlanConflictError(); }
+    } else if (previousReservation) return waitForConcurrentApply(user, changeSetId);
+    let reservation: ChangeSetRecord;
     try {
-      for (const proposed of proposedTasks) { const value = proposed as Record<string, unknown>; const { id: _id, ...input } = value; const existing = (await taskRepository.list(user)).find((task) => task.id === value.id || (task.sourceDump === value.sourceDump && task.title === value.title)); const task = existing ?? await taskRepository.create(user, input as never); persistedTasks.push(task); if (!existing) createdTasks.push(task); }
-      for (const proposed of proposedIdeas) { const value = proposed as Record<string, unknown>; const { id: _id, ...input } = value; const existing = (await ideaRepository.list(user)).find((idea) => idea.id === value.id || (idea.sourceDump === value.sourceDump && idea.text === value.text)); const idea = existing ?? await ideaRepository.create(user, input as never); persistedIdeas.push(idea); if (!existing) createdIdeas.push(idea); }
+      reservation = await changeSetRepository.create(user, { kind: 'ai_classification', status: 'pending', beforeJson: { changeSetId }, afterJson: { changeSetId }, idempotencyKey: reservationKey, mutationKey: reservationKey });
+    } catch {
+      return waitForConcurrentApply(user, changeSetId);
+    }
+    const persistedTasks: TaskRecord[] = []; const persistedIdeas: IdeaRecord[] = []; const createdTasks: TaskRecord[] = []; const createdIdeas: IdeaRecord[] = []; const updatedTasks: Array<{ before: TaskRecord }> = []; const updatedIdeas: Array<{ before: IdeaRecord }> = []; const persistedEdges: GraphEdgeRecord[] = []; const createdEdges: GraphEdgeRecord[] = [];
+    try {
+      for (const proposed of payload.tasks) { const { id: _id, ...recordInput } = proposed; const existing = (await taskRepository.list(user)).find((task) => task.id === proposed.id || (task.sourceDump === proposed.sourceDump && task.title === proposed.title)); const before = existing ? { ...existing } : null; const task = existing ? await taskRepository.update(user, existing.id, recordInput) : await taskRepository.create(user, recordInput); persistedTasks.push(task); if (before) updatedTasks.push({ before }); else createdTasks.push(task); }
+      for (const proposed of payload.ideas) { const { id: _id, ...recordInput } = proposed; const existing = (await ideaRepository.list(user)).find((idea) => idea.id === proposed.id || (idea.sourceDump === proposed.sourceDump && idea.text === proposed.text)); const before = existing ? { ...existing } : null; const idea = existing ? await ideaRepository.update(user, existing.id, recordInput) : await ideaRepository.create(user, recordInput); persistedIdeas.push(idea); if (before) updatedIdeas.push({ before }); else createdIdeas.push(idea); }
       if (goalGraphRepository) {
         const existingEdges = await goalGraphRepository.edges.list(user);
+        const edgesByKey = new Map(existingEdges.filter((edge) => edge.status === 'confirmed').map((edge) => [`${edge.fromType}:${edge.fromId}:goal:${edge.toId}`, edge]));
+        const persistedEdgeIds = new Set<string>();
         for (const [entityType, entities] of [['task', persistedTasks], ['idea', persistedIdeas]] as const) for (const entity of entities) if (entity.goalId) {
-          const duplicate = existingEdges.find((edge) => edge.fromType === entityType && edge.fromId === entity.id && edge.toType === 'goal' && edge.toId === entity.goalId && edge.status === 'confirmed');
-          if (duplicate) persistedEdges.push(duplicate);
-          else { const edge = await goalGraphRepository.edges.create(user, { fromType: entityType, fromId: entity.id, toType: 'goal', toId: String(entity.goalId), actor: 'ai', status: 'confirmed', confirmedBy: user.userId, confidence: 1, rationale: 'Підтверджено користувачем під час розбору Brain Dump.' }); createdEdges.push(edge); persistedEdges.push(edge); }
+          const key = `${entityType}:${entity.id}:goal:${entity.goalId}`;
+          const existingEdge = edgesByKey.get(key);
+          if (existingEdge) { if (!persistedEdgeIds.has(existingEdge.id)) { persistedEdges.push(existingEdge); persistedEdgeIds.add(existingEdge.id); } continue; }
+          const edge = await goalGraphRepository.edges.create(user, { fromType: entityType, fromId: entity.id, toType: 'goal', toId: String(entity.goalId), actor: 'ai', status: 'confirmed', confirmedBy: user.userId, confidence: 1, rationale: 'Підтверджено користувачем під час розбору Brain Dump.' });
+          createdEdges.push(edge); persistedEdges.push(edge); persistedEdgeIds.add(edge.id); edgesByKey.set(key, edge);
         }
       }
       if (calendarEventService) {
@@ -129,18 +182,24 @@ export function createPlanService(deps: {
           try { await calendarEventService.syncTask(user, task.id); } catch { /* local task remains valid with sync_pending and an outbox job */ }
         }));
       }
-      const updated = await changeSetRepository.update(user, changeSetId, { status: 'applied', afterJson: { ...payload, appliedTaskIds: persistedTasks.map((task) => task.id), appliedIdeaIds: persistedIdeas.map((idea) => idea.id), appliedEdgeIds: persistedEdges.map((edge) => edge.id) } });
+      const updated = await changeSetRepository.update(user, changeSetId, { status: 'applied', afterJson: { ...payload, appliedTaskIds: [...new Set(persistedTasks.map((task) => task.id))], appliedIdeaIds: [...new Set(persistedIdeas.map((idea) => idea.id))], appliedEdgeIds: [...new Set(persistedEdges.map((edge) => edge.id))] } });
+      try { await changeSetRepository.update(user, reservation.id, { status: 'applied' }); } catch { /* the applied source Change Set remains the idempotency authority */ }
       if (typeof payload.dumpId === 'string') { try { await dumpRepository.update(user, payload.dumpId, { status: 'applied' }); } catch { /* a repeated idempotent apply retries this final owned-draft update */ } }
-      return applyResponseSchema.parse({ changeSet: publicChangeSet(updated), tasks: persistedTasks.map(publicTask), ideas: persistedIdeas.map(publicIdea) });
+      return applyResponseSchema.parse({ changeSet: publicChangeSet(updated), tasks: [...new Map(persistedTasks.map((task) => [task.id, task])).values()].map(publicTask), ideas: [...new Map(persistedIdeas.map((idea) => [idea.id, idea])).values()].map(publicIdea) });
     } catch (error) {
       for (const edge of createdEdges) { try { if (edge.id) await goalGraphRepository?.edges.delete(user, edge.id); } catch { /* retain failed change set for safe retry */ } }
       for (const task of createdTasks) { try { if (task.id) await taskRepository.delete(user, task.id); } catch { try { if (task.id) await taskRepository.update(user, task.id, { status: 'cancelled' }); } catch { /* explicit failed change set remains retryable */ } } }
       for (const idea of createdIdeas) { try { if (idea.id) await ideaRepository.delete(user, idea.id); } catch { try { if (idea.id) await ideaRepository.update(user, idea.id, { status: 'archived' }); } catch { /* explicit failed change set remains retryable */ } } }
+      for (const { before } of updatedTasks.reverse()) { try { await taskRepository.update(user, before.id, pick(before, ['title', 'description', 'status', 'priority', 'deadline', 'plannedStart', 'plannedEnd', 'estimatedMinutes', 'actualMinutes', 'energy', 'flexible', 'locked', 'sourceDump', 'goalId', 'rescheduleCount', 'version'])); } catch { /* explicit failed change set retains the snapshot for diagnosis */ } }
+      for (const { before } of updatedIdeas.reverse()) { try { await ideaRepository.update(user, before.id, pick(before, ['text', 'summary', 'status', 'sourceDump', 'goalId', 'projectId'])); } catch { /* explicit failed change set retains the snapshot for diagnosis */ } }
       try { await changeSetRepository.update(user, changeSetId, { status: 'failed' }); } catch { /* retain retryable pending state */ }
+      try { await changeSetRepository.update(user, reservation.id, { status: 'failed' }); } catch { /* preserve the durable reservation when status cannot be recorded */ }
       if (error instanceof RepositoryError) throw error;
       throw new PlanConflictError();
     }
   }
+
+  const apply = (user: VerifiedUser, changeSetId: string, input: unknown) => withApplyLock(`${user.userId}:${changeSetId}`, () => applyOnce(user, changeSetId, input));
 
   async function today(user: VerifiedUser, date: string, timezone: string) {
     const tasks = (await taskRepository.list(user)).filter((task) => String(task.plannedStart ?? '').startsWith(date) && task.status === 'scheduled');
