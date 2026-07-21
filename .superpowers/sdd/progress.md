@@ -89,3 +89,5 @@ Task 29: complete (`f69ad5a..7bccd0e`, review final PASS). Security/failure/acce
 Task 30: complete (`7bccd0e..7ed673b`, review PASS). Full verification/demo package: core/full demo runbooks, final release report, known limitations, production full-flow fixture-gated spec, and honest external prerequisite tracking. Gateway 193/193; prototype 99/99; typecheck/build, E2E collection (17 expected skips), rules and diff-check pass.
 
 Task 1 (voice-and-brain-dump-save-fixes plan): complete (4cd71c1..2289f5f, review clean). CaptureFlow.jsx saveDraft now reports a real error instead of a false "Чернетку збережено" when the draft POST itself fails; dead retry button fixed. Frontend 156/156 tests pass.
+
+Task 2 (voice-and-brain-dump-save-fixes plan): complete (ad7ca32..7ebf205, review clean). Gemini fallback in transcriptionService.ts and geminiClient.ts now retries the Flash-Lite model on HTTP 404 (model not found) in addition to 503; 429 still throws immediately. Gateway 233/233 tests pass.
