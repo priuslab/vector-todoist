@@ -37,6 +37,7 @@ export function TodayScreens({ screenId = "today-normal", onNavigate = () => {},
   const [remoteError, setRemoteError] = useState("");
   const [localTasks, setLocalTasks] = useState(null);
   const [undoChange, setUndoChange] = useState(null);
+  const [undoing, setUndoing] = useState(false);
   const [mutationError, setMutationError] = useState("");
   const [reschedulePreview, setReschedulePreview] = useState(null);
   const [rescheduleLoading, setRescheduleLoading] = useState(false);
@@ -63,11 +64,19 @@ export function TodayScreens({ screenId = "today-normal", onNavigate = () => {},
     catch { setLocalTasks(previous); setMutationError("Не вдалося виконати задачу. План повернуто до попереднього стану."); }
   };
   const undo = async () => {
+    if (undoing) return;
     const current = undoChange;
-    setUndoChange(null); setMutationError("");
     if (!current) return;
-    if (apiClient && current.id) { try { const result = await undoChangeSet({ apiClient, id: current.id }); setLocalTasks((tasks) => result.tasks?.length ? tasks?.map((task) => result.tasks.find((restored) => restored.id === task.id) ?? task) : tasks?.map((task) => task.id === result.task?.id ? result.task : task)); setRescheduleApplied(false); const fresh = await getToday({ apiClient, date: rescheduleInput().date, timezone: rescheduleInput().timezone }); setRemote(fresh); setLocalTasks(fresh.tasks ?? []); } catch { setMutationError("Не вдалося скасувати зміни. Онови план."); } }
-    else setLocalTasks(current.previous);
+    setUndoing(true);
+    setUndoChange(null); setMutationError("");
+    if (apiClient && current.id) {
+      try { const result = await undoChangeSet({ apiClient, id: current.id }); setLocalTasks((tasks) => result.tasks?.length ? tasks?.map((task) => result.tasks.find((restored) => restored.id === task.id) ?? task) : tasks?.map((task) => task.id === result.task?.id ? result.task : task)); setRescheduleApplied(false); const fresh = await getToday({ apiClient, date: rescheduleInput().date, timezone: rescheduleInput().timezone }); setRemote(fresh); setLocalTasks(fresh.tasks ?? []); }
+      catch { setMutationError("Не вдалося скасувати зміни. Онови план."); }
+      finally { setUndoing(false); }
+    } else {
+      setLocalTasks(current.previous);
+      setUndoing(false);
+    }
   };
   const rescheduleInput = () => ({ date: localDate(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", now: new Date().toISOString(), profile: { timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", workHours: { start: "09:00", end: "18:00" }, energyPeak: { start: "09:30", end: "12:30" }, focusBlockMinutes: 50, breakMinutes: 10, dailyLimitMinutes: 360 }, idempotencyKey: `reschedule-${localDate(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC")}` });
   const previewReschedulePlan = async () => {
@@ -94,6 +103,7 @@ export function TodayScreens({ screenId = "today-normal", onNavigate = () => {},
       {screenId === "today-rescheduled" && showUndo ? <InlineInsight title="План змінився — я знайшов новий час.">Командний синк змістився. Лист Марії перенесено з 12:00 на 12:30.</InlineInsight> : null}
       {rescheduleApplied ? <InlineInsight title="План змінився — я знайшов новий час.">Гнучкі задачі отримали нові слоти. Якщо це не підходить, зміни можна скасувати.</InlineInsight> : null}
       {mutationError ? <InlineInsight tone="warning" title="План не змінився">{mutationError}</InlineInsight> : null}
+      {undoing ? <InlineInsight title="Скасовую зміни…">Зачекай, поки Вектор поверне попередній стан плану.</InlineInsight> : null}
       <DayPlan active={screenId === "today-active"} onNavigate={onNavigate} tasks={visibleTasks} onComplete={complete} />
       <div className="break-card"><Coffee size={20} /><span><strong>10:30 · Перерва</strong><small>10 хв без задач</small></span><Clock size={17} /></div>
       {screenId === "today-overload" ? <Button variant="secondary" onClick={previewReschedulePlan} disabled={rescheduleLoading}>{rescheduleLoading ? "Готую новий план…" : "Переглянути новий план"}</Button> : null}

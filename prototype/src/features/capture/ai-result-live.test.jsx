@@ -114,6 +114,39 @@ it("opens Inbox after applying a preview that has no available slot today", asyn
   expect(onNavigate).toHaveBeenCalledWith("inbox-default");
 });
 
+it("shows a disabled loading button while the plan preview request is pending, then renders the preview", async () => {
+  const user = (await import("@testing-library/user-event")).default.setup();
+  let resolveRequest;
+  const preview = {
+    changeSetId: "change-preview-pending",
+    tasks: [{ ...analysis.tasks[0], id: "task-preview-pending", status: "scheduled" }],
+    ideas: [],
+    blocks: [],
+    unscheduledTaskIds: [],
+    warnings: [],
+  };
+  const apiClient = {
+    request: vi.fn(() => new Promise((resolve) => { resolveRequest = resolve; })),
+  };
+
+  render(<CaptureFlow
+    screenId="capture-transcript"
+    apiClient={apiClient}
+    createBrainDump={async () => ({ id: "dump-preview-pending" })}
+    analyze={async () => ({ analysis: { ...analysis, questions: [] } })}
+  />);
+
+  await user.click(screen.getByRole("button", { name: "Зберегти чернетку" }));
+  const previewButton = await screen.findByRole("button", { name: "Переглянути пропозиції" });
+  await user.click(previewButton);
+
+  expect(previewButton).toBeDisabled();
+
+  resolveRequest(preview);
+
+  expect(await screen.findByText("План готовий до застосування")).toBeInTheDocument();
+});
+
 it("uses the answer response instead of replacing it with a stale clarification result", async () => {
   const user = (await import("@testing-library/user-event")).default.setup();
   const clarification = { ...analysis, questions: [analysis.questions[0]] };

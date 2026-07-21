@@ -22,6 +22,7 @@ export function CaptureFlow({ screenId = "capture-chooser", onBack, onNavigate =
   const [draftId, setDraftId] = useState("");
   const [preview, setPreview] = useState(null);
   const [applying, setApplying] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [planError, setPlanError] = useState("");
   const [voiceError, setVoiceError] = useState("");
   const [voiceLoading, setVoiceLoading] = useState(false);
@@ -122,11 +123,12 @@ export function CaptureFlow({ screenId = "capture-chooser", onBack, onNavigate =
 
   const openPlanPreview = async () => {
     if (!apiClient || !draftId) return onNavigate("today-normal");
-    setPlanError("");
+    setPlanError(""); setPreviewLoading(true);
     try {
       const result = await previewBrainDumpPlan({ apiClient, id: draftId, idempotencyKey });
       setPreview(result);
     } catch { setPlanError("Не вдалося підготувати план. Дані збережено — спробуй ще раз."); }
+    finally { setPreviewLoading(false); }
   };
   const applyPlan = async () => {
     if (!apiClient || !preview?.changeSetId) return onNavigate("today-normal");
@@ -140,7 +142,7 @@ export function CaptureFlow({ screenId = "capture-chooser", onBack, onNavigate =
     finally { setApplying(false); }
   };
 
-  const composer = <><VoiceTextComposer onTranscribe={transcribeVoice} onSubmit={submitComposerText} submitLabel="Зберегти чернетку" disabled={voiceLoading || saving} />{saveError ? <p role="alert" className="soft-copy">Не вдалося зберегти. Перевір з’єднання й спробуй ще раз.</p> : null}</>;
+  const composer = <><VoiceTextComposer onTranscribe={transcribeVoice} onSubmit={submitComposerText} submitLabel="Зберегти чернетку" status={saving ? "submitting" : undefined} disabled={voiceLoading || saving} />{saveError ? <p role="alert" className="soft-copy">Не вдалося зберегти. Перевір з’єднання й спробуй ще раз.</p> : null}</>;
   const body = stage === "chooser" ? <section className="capture-chooser"><h1>Що зараз у голові?</h1><p>Говори хаотично — не треба формулювати задачі чи оцінювати час.</p>{composer}</section>
     : stage === "recording" ? composer
     : stage === "voice-retry" ? <section className="capture-transcript"><h1>Не вдалося розпізнати запис</h1><p role="alert" className="soft-copy">{voiceError}</p><Button loading={voiceLoading} onClick={() => voiceBlob && transcribeVoice(voiceBlob)}>Спробувати ще раз</Button><Button variant="secondary" disabled={voiceLoading} onClick={() => setStage("transcript")}>Написати текстом</Button></section>
@@ -151,7 +153,7 @@ export function CaptureFlow({ screenId = "capture-chooser", onBack, onNavigate =
     : stage === "question-1" ? <Clarification number={1} onAnswer={() => setStage("question-2")} />
     : stage === "question-2" ? <Clarification number={2} onAnswer={() => setStage("result")} />
     : stage === "clarification" ? <Clarification questions={analysis?.questions} deferSubmit onTranscribe={transcribeClarificationAnswer} onAnswer={submitAnswer} />
-    : stage === "result" ? <AIResult analysis={analysis} preview={preview} applying={applying} error={planError} onViewDay={openPlanPreview} onApply={applyPlan} onUndo={() => setStage("chooser")} />
+    : stage === "result" ? <AIResult analysis={analysis} preview={preview} applying={applying} previewLoading={previewLoading} error={planError} onViewDay={openPlanPreview} onApply={applyPlan} onUndo={() => setStage("chooser")} />
     : stage === "review" ? <section className="capture-transcript"><h1>Перевір транскрипт</h1><p className="soft-copy">Аудіо було тихим у кількох місцях. Відредагуй текст або запиши ще раз.</p><Transcript editable /><Button onClick={() => setStage("processing")}>Повторити обробку</Button></section>
     : <StateView state="error" title="Не вдалося опрацювати" message={`Brain Dump збережено в Inbox: «${DEMO_BRAIN_DUMP.slice(0, 58)}…»`} action={<Button onClick={() => setStage("processing")}>Спробувати ще раз</Button>} />;
 

@@ -101,7 +101,7 @@ export function DraftPlanReview({ draftId, apiClient, onNavigate = () => {} }) {
   };
 
   const content = result ? <StateView state="success" title="Пропозиції збережено" message={savedCountMessage(result.tasks?.length ?? 0, result.ideas?.length ?? 0)} action={<div className="detail-actions"><Button onClick={() => onNavigate("today-normal")}>До плану на сьогодні</Button><Button variant="secondary" onClick={() => onNavigate("inbox-default")}>В Inbox</Button></div>} />
-    : state === "loading" ? <StateView state="loading" title="Готую пропозиції" message="Перевіряю одну збережену чернетку та її зв’язок із головною метою." />
+    : state === "loading" ? <StateView state="loading" title="Готую пропозиції" message="Перевіряю збережену чернетку та готую пропозиції." />
       : state === "unavailable" ? <StateView state="error" title="Потрібне підключення" message="Відкрий цю чернетку у підключеному застосунку, щоб підготувати реальні пропозиції." action={<Button onClick={() => onNavigate("inbox-drafts")}>В Inbox</Button>} />
         : state === "missing" ? <StateView state="error" title="Чернетку не знайдено" message="Повернись до Inbox і вибери збережений Brain Dump." action={<Button onClick={() => onNavigate("inbox-drafts")}>В Inbox</Button>} />
           : state === "needs-clarification" ? <StateView state="warning" title="Потрібне уточнення" message={analysis?.questions?.[0]?.prompt ?? "Для цієї чернетки AI ще чекає на одне уточнення."} action={<Button onClick={() => onNavigate("inbox-drafts")}>В Inbox</Button>} />
