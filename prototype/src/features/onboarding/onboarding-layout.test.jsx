@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -35,6 +36,51 @@ it("centers the goal-test result heading without centering manual goal forms", (
 
   const manual = render(<GoalSetup screenId="goal-manual" onNext={vi.fn()} onRoute={vi.fn()} />);
   expect(manual.container.querySelector(".goal-test-result-content")).not.toBeInTheDocument();
+});
+
+it("posts the suggested goal before advancing from the AI result", async () => {
+  const user = userEvent.setup();
+  const request = vi.fn().mockResolvedValue({ id: "goal-1", title: "Запустити перший сезон подкасту" });
+  const onNext = vi.fn();
+
+  render(
+    <GoalSetup
+      screenId="goal-test-result"
+      apiClient={{ request }}
+      demoMode
+      onNext={onNext}
+      onRoute={vi.fn()}
+    />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "Підтвердити мету" }));
+
+  expect(request).toHaveBeenCalledWith(
+    "/api/v1/goals",
+    expect.objectContaining({ method: "POST" }),
+  );
+  expect(onNext).toHaveBeenCalledOnce();
+});
+
+it("does not advance with a demo suggestion outside demo mode", async () => {
+  const user = userEvent.setup();
+  const request = vi.fn();
+  const onNext = vi.fn();
+
+  render(
+    <GoalSetup
+      screenId="goal-test-result"
+      apiClient={{ request }}
+      onNext={onNext}
+      onRoute={vi.fn()}
+    />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "Підтвердити мету" }));
+
+  expect(request).not.toHaveBeenCalled();
+  expect(onNext).not.toHaveBeenCalled();
+  expect(screen.getByRole("alert")).toHaveTextContent("Сформулюй мету, щоб продовжити.");
 });
 
 it("opens custom time pickers and updates work hours", () => {

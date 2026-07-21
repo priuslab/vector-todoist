@@ -4,6 +4,24 @@ import { useState } from "react";
 import { expect, it, vi } from "vitest";
 import { GoalSetup } from "./GoalSetup";
 
+it("posts a manual goal before advancing", async () => {
+  const user = userEvent.setup();
+  const request = vi.fn().mockResolvedValue({ id: "goal-1", title: "Запустити застосунок" });
+  const onNext = vi.fn();
+
+  render(<GoalSetup screenId="goal-manual" apiClient={{ request }} onNext={onNext} onRoute={vi.fn()} />);
+
+  await user.clear(screen.getByLabelText("Головна мета"));
+  await user.type(screen.getByLabelText("Головна мета"), "Запустити застосунок");
+  await user.click(screen.getByRole("button", { name: "Зберегти мету" }));
+
+  expect(request).toHaveBeenCalledWith(
+    "/api/v1/goals",
+    expect.objectContaining({ method: "POST" }),
+  );
+  expect(onNext).toHaveBeenCalledOnce();
+});
+
 function GoalDiscoveryHarness({ apiClient }) {
   const [route, setRoute] = useState("goal-test-start");
 
