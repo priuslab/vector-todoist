@@ -74,10 +74,12 @@ it("centers short content safely when it fits", () => {
   expect(componentsCss).toMatch(/justify-content:\s*safe center/);
 });
 
-it("keeps core Calendar and Oracle navigation visible in production", () => {
+it("keeps only Today, Brain Dump and Inbox navigation visible in production", () => {
   render(<BottomNav active="today-normal" onNavigate={vi.fn()} env={{ DEV: false }} />);
 
-  expect(screen.getByRole("button", { name: "Календар" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Oracle" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Календар" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Oracle" })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Сьогодні" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Brain Dump" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Inbox" })).toBeInTheDocument();
 });

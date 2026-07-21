@@ -46,7 +46,7 @@ it("keeps the saved result and its actions visible after confirming a draft prop
   expect(screen.getByText("Збережено 1 задача і 1 ідея.")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "До плану на сьогодні" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "В Inbox" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "В Oracle" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "В Oracle" })).not.toBeInTheDocument();
   expect(onNavigate).not.toHaveBeenCalled();
   expect(request).toHaveBeenNthCalledWith(3, "/api/v1/brain-dumps/dump-1/plan-preview", expect.objectContaining({ method: "POST" }));
 });
