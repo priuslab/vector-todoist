@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx watch --env-file=.env src/server.ts",
     "build": "tsc -p tsconfig.json && mkdir -p dist/modules/ai/prompts && cp src/modules/ai/prompts/goalDiscovery.protocol.json dist/modules/ai/prompts/goalDiscovery.protocol.json",
     "start": "node dist/server.js",
     "worker": "node dist/worker.js",
