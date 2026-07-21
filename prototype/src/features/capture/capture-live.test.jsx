@@ -66,6 +66,22 @@ it("keeps the text and offers a retry after a network failure", async () => {
   expect(screen.getByRole("button", { name: "Зберегти чернетку" })).toBeInTheDocument();
 });
 
+it("shows a real save error instead of a false 'saved' message when the draft POST fails with a connected API client", async () => {
+  const user = userEvent.setup();
+  const createBrainDump = vi.fn().mockRejectedValue(new Error("offline"));
+  const apiClient = { request: vi.fn() };
+  render(<CaptureFlow apiClient={apiClient} createBrainDump={createBrainDump} />);
+  await user.click(screen.getByRole("button", { name: "Увімкнути текстовий режим" }));
+  const textarea = screen.getByRole("textbox", { name: "Твоя думка" });
+  await user.clear(textarea);
+  await user.type(textarea, "Ідея, яку я хочу зберегти");
+  await user.click(screen.getByRole("button", { name: "Зберегти чернетку" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent("Не вдалося зберегти");
+  expect(screen.queryByText("Думки вже збережені", { exact: false })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Зберегти чернетку" })).toBeEnabled();
+});
+
 it("saves the edited voice transcript through the existing Brain Dump callback", async () => {
   const user = userEvent.setup();
   const restoreMediaRecorder = installFakeMediaRecorder();

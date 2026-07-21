@@ -37,16 +37,21 @@ export function CaptureFlow({ screenId = "capture-chooser", onBack, onNavigate =
 
   const saveDraft = async (text = draftText) => {
     setSaveError(false); setSaving(true);
+    let draft;
     try {
-      const draft = await createBrainDump({ apiClient, text, idempotencyKey });
-      setDraftId(draft.id);
-      if (!apiClient) { setStage("saved"); return; }
-      setAnalysisError(""); setStage("processing");
+      draft = await createBrainDump({ apiClient, text, idempotencyKey });
+    } catch {
+      setSaveError(true); setSaving(false);
+      return;
+    }
+    setDraftId(draft.id);
+    if (!apiClient) { setSaving(false); setStage("saved"); return; }
+    setAnalysisError(""); setStage("processing");
+    try {
       const result = await analyze({ apiClient, id: draft.id });
       setAnalysis(result.analysis); setStage(result.analysis.questions?.length ? "clarification" : "result");
     } catch {
-      if (apiClient) { setAnalysisError("Не вдалося завершити аналіз. Чернетку збережено — спробуй ще раз."); setStage("processing"); }
-      else setSaveError(true);
+      setAnalysisError("Не вдалося завершити аналіз. Чернетку збережено — спробуй ще раз.");
     } finally {
       setSaving(false);
     }
