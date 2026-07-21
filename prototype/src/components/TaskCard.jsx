@@ -1,9 +1,10 @@
+import { forwardRef } from "react";
 import { CalendarBlank, Check, Clock, LockSimple } from "@phosphor-icons/react";
 
-export function TaskCard({ task, state = "scheduled", onClick, onComplete }) {
+export const TaskCard = forwardRef(function TaskCard({ task, state = "scheduled", onClick, onComplete, className = "", ...dragProps }, ref) {
   const complete = state === "completed";
   return (
-    <article className={`task-card task-card--${state}`} onClick={onClick}>
+    <article ref={ref} className={`task-card task-card--${state}${className ? ` ${className}` : ""}`} onClick={onClick} {...dragProps}>
       <button
         className="task-card__check"
         aria-label={complete ? "Задачу виконано" : `Виконати: ${task.title}`}
@@ -21,4 +22,4 @@ export function TaskCard({ task, state = "scheduled", onClick, onComplete }) {
       {task.alignment ? <span className="alignment">{task.alignment}%</span> : null}
     </article>
   );
-}
+});
