@@ -91,3 +91,5 @@ Task 30: complete (`7bccd0e..7ed673b`, review PASS). Full verification/demo pack
 Task 1 (voice-and-brain-dump-save-fixes plan): complete (4cd71c1..2289f5f, review clean). CaptureFlow.jsx saveDraft now reports a real error instead of a false "Чернетку збережено" when the draft POST itself fails; dead retry button fixed. Frontend 156/156 tests pass.
 
 Task 2 (voice-and-brain-dump-save-fixes plan): complete (ad7ca32..7ebf205, review clean). Gemini fallback in transcriptionService.ts and geminiClient.ts now retries the Flash-Lite model on HTTP 404 (model not found) in addition to 503; 429 still throws immediately. Gateway 233/233 tests pass.
+
+Task 3 (voice-and-brain-dump-save-fixes plan): complete (7ebf205..af0ac6e, review clean, one Minor note: verification report used a JSON-parse check instead of the brief's literal `tsx watch --env-file` reproduction command — low risk, tsx 4.19.3 already supports Node flag pass-through). gateway/package.json "dev" script now loads .env via --env-file; "start"/"worker"/"build" untouched.
