@@ -28,6 +28,7 @@ export const proposalTaskSchema = z.object({
   deadline: iso.nullable(), plannedStart: iso.nullable(), plannedEnd: iso.nullable(), estimatedMinutes: z.number().int().positive().max(1440), energy: z.enum(['low', 'medium', 'high']), flexible: z.boolean(), locked: z.boolean(), sourceDump: z.string(),
 });
 export const proposalIdeaSchema = z.object({ id: z.string().min(1), text: z.string().min(1).max(20_000), summary: z.string().max(2_000), status: z.literal('backlog'), sourceDump: z.string() });
+export const draftResponseShape = z.object({ id: z.string(), text: z.string(), status: z.string().optional(), source: z.string().optional(), kind: z.string().optional(), created: z.string().optional() }).strict();
 export const planPreviewSchema = z.object({
   changeSetId: z.string().min(1), tasks: z.array(proposalTaskSchema), ideas: z.array(proposalIdeaSchema), blocks: z.array(z.object({ id: z.string(), kind: z.enum(['busy', 'task', 'break']), title: z.string(), start: iso, end: iso, locked: z.boolean(), taskId: z.string().optional() })), unscheduledTaskIds: z.array(z.string()), warnings: z.array(z.object({ code: z.string(), message: z.string(), taskId: z.string().optional() })), reasons: z.record(z.string(), z.array(z.object({ code: z.string(), message: z.string() }))),
 }).strict();
@@ -35,10 +36,11 @@ const taskResponseShape = z.object({ id: z.string(), title: z.string().optional(
 export const ideaResponseShape = z.object({ id: z.string(), text: z.string().optional(), summary: z.string().optional(), status: z.string().optional(), sourceDump: z.string().optional() }).strict();
 export const applyResponseSchema = z.object({ changeSet: z.object({ id: z.string(), status: z.string(), kind: z.string().optional(), idempotencyKey: z.string().optional(), beforeJson: z.unknown().optional(), afterJson: z.unknown().optional() }).passthrough(), tasks: z.array(taskResponseShape), ideas: z.array(ideaResponseShape) }).strict();
 export const todayResponseSchema = z.object({ date: z.string(), timezone: z.string(), tasks: z.array(taskResponseShape), blocks: z.array(taskResponseShape), warnings: z.array(z.unknown()) }).strict();
-export const inboxResponseSchema = z.object({ ideas: z.array(ideaResponseShape), tasks: z.array(taskResponseShape) }).strict();
+export const inboxResponseSchema = z.object({ ideas: z.array(ideaResponseShape), tasks: z.array(taskResponseShape), drafts: z.array(draftResponseShape) }).strict();
 export const taskResponseSchema = taskResponseShape;
 export type TaskResponse = z.infer<typeof taskResponseShape>;
 export type IdeaResponse = z.infer<typeof ideaResponseShape>;
+export type DraftResponse = z.infer<typeof draftResponseShape>;
 export type ChangeSetResponse = z.infer<typeof applyResponseSchema>['changeSet'];
 export type PlanPreviewBody = z.infer<typeof planPreviewBodySchema>;
 export type PlanPreview = z.infer<typeof planPreviewSchema>;

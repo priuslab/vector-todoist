@@ -29,6 +29,11 @@ describe('isFeatureEnabled', () => {
     expect(isFeatureEnabled('VITE_FEATURE_TELEGRAM', { VITE_FEATURE_TELEGRAM: 'true' })).toBe(true)
   })
 
+  it('keeps Calendar and Oracle reachable by default in the shipped app', () => {
+    expect(isFeatureEnabled(FEATURES.calendar, {})).toBe(true)
+    expect(isFeatureEnabled(FEATURES.oracle, {})).toBe(true)
+  })
+
   it.each([true, null, 'TRUE'])('keeps malformed flag value %p disabled', (value) => {
     expect(isFeatureEnabled('VITE_FEATURE_TELEGRAM', { VITE_FEATURE_TELEGRAM: value })).toBe(false)
   })

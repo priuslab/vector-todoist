@@ -9,5 +9,6 @@ export const FEATURES = Object.freeze({
 })
 
 export function isFeatureEnabled(name, env = import.meta.env) {
+  if ([FEATURES.calendar, FEATURES.oracle].includes(name)) return env?.[name] !== 'false'
   return env?.[name] === 'true'
 }

@@ -5,9 +5,9 @@ import type { VerifiedUser } from '../src/auth/verifyPocketBaseToken.js';
 const user: VerifiedUser = { userId: 'alice', email: 'alice@example.test' };
 const analysis = { id: 'session-1', status: 'classified' as const, analysis: { summary: 'Готово', confidence: .95, questions: [], context: [], tasks: [{ title: 'Підготувати структуру', description: 'Тези', priority: 'high' as const, estimatedMinutes: 60, deadline: null, energy: 'high' as const, confidence: .95 }], ideas: [{ text: 'Епізод про синдром самозванця', summary: 'Можлива тема', confidence: .9 }] } };
 function repos() {
-  let sequence = 0; const dumps = [{ id: 'dump-1', user: 'alice', rawText: 'думки' }]; const tasks: any[] = []; const ideas: any[] = []; const changes: any[] = [];
+  let sequence = 0; const dumps = [{ id: 'dump-1', user: 'alice', rawText: 'думки', source: 'web', kind: 'text', status: 'classified', created: '2026-07-18 08:00:00' }]; const tasks: any[] = []; const ideas: any[] = []; const changes: any[] = [];
   return {
-    dumpRepository: { get: vi.fn(async () => dumps[0]) } as any,
+    dumpRepository: { get: vi.fn(async () => dumps[0]), list: vi.fn(async () => dumps) } as any,
     analysisService: { result: vi.fn(async () => analysis) } as any,
     taskRepository: { create: vi.fn(async (_u: VerifiedUser, input: any) => { const item = { id: `task-${++sequence}`, user: 'alice', collectionName: 'tasks', created: 'now', updated: 'now', ...input }; tasks.push(item); return item; }), list: vi.fn(async () => tasks), get: vi.fn(async (_u: VerifiedUser, id: string) => tasks.find((x) => x.id === id) ?? null), delete: vi.fn(async (_u: VerifiedUser, id: string) => { const index = tasks.findIndex((x) => x.id === id); if (index >= 0) tasks.splice(index, 1); }) } as any,
     ideaRepository: { create: vi.fn(async (_u: VerifiedUser, input: any) => { const item = { id: `idea-${++sequence}`, user: 'alice', collectionName: 'ideas', created: 'now', updated: 'now', ...input }; ideas.push(item); return item; }), list: vi.fn(async () => ideas), delete: vi.fn(async (_u: VerifiedUser, id: string) => { const index = ideas.findIndex((x) => x.id === id); if (index >= 0) ideas.splice(index, 1); }) } as any,
@@ -47,5 +47,12 @@ describe('Brain Dump → Today vertical slice', () => {
 
     const applied = await service.apply(user, preview.changeSetId, {});
     expect(applied.tasks[0]).toMatchObject({ status: 'inbox', plannedStart: null, plannedEnd: null });
+  });
+  it('lists saved Brain Dump drafts in Inbox even before a task is scheduled', async () => {
+    const r = repos(); const service = createPlanService(r);
+
+    const inbox = await service.inbox(user);
+
+    expect(inbox.drafts).toEqual([expect.objectContaining({ id: 'dump-1', text: 'думки', status: 'classified' })]);
   });
 });

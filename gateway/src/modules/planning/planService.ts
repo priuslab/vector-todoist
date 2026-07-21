@@ -7,7 +7,7 @@ import type { ChangeSetRepository, ChangeSetRecord } from '../../repositories/ch
 import type { AnalysisService } from '../ai/analyzeBrainDump.js';
 import { buildDailyPlan } from '../scheduler/buildDailyPlan.js';
 import type { SchedulerBusySlot, SchedulerTask, SchedulerProfile } from '../scheduler/types.js';
-import { applyBodySchema, applyResponseSchema, inboxResponseSchema, ideaResponseShape, planPreviewBodySchema, planPreviewSchema, taskResponseSchema, todayResponseSchema, type ChangeSetResponse, type PlanPreviewBody, type PlanPreview, type TaskResponse, type IdeaResponse } from './planSchemas.js';
+import { applyBodySchema, applyResponseSchema, inboxResponseSchema, ideaResponseShape, planPreviewBodySchema, planPreviewSchema, taskResponseSchema, todayResponseSchema, type ChangeSetResponse, type PlanPreviewBody, type PlanPreview, type TaskResponse, type IdeaResponse, type DraftResponse } from './planSchemas.js';
 import type { BusySlotService } from '../calendar/busySlotService.js';
 import type { CalendarEventService } from '../calendar/calendarEventService.js';
 import type { AdaptationService } from '../adaptation/adaptationService.js';
@@ -20,7 +20,7 @@ export interface PlanService {
   preview(user: VerifiedUser, dumpId: string, input: unknown): Promise<PlanPreview>;
   apply(user: VerifiedUser, changeSetId: string, input: unknown): Promise<{ changeSet: ChangeSetResponse; tasks: TaskResponse[]; ideas: IdeaResponse[] }>;
   today(user: VerifiedUser, date: string, timezone: string): Promise<{ date: string; timezone: string; tasks: TaskResponse[]; blocks: TaskResponse[]; warnings: unknown[] }>;
-  inbox(user: VerifiedUser): Promise<{ ideas: IdeaResponse[]; tasks: TaskResponse[] }>;
+  inbox(user: VerifiedUser): Promise<{ ideas: IdeaResponse[]; tasks: TaskResponse[]; drafts: DraftResponse[] }>;
   task(user: VerifiedUser, id: string): Promise<TaskResponse>;
 }
 
@@ -29,6 +29,14 @@ const priorityAlignment: Record<string, number> = { urgent: 1, high: .9, medium:
 const pick = (record: Record<string, unknown>, keys: string[]) => Object.fromEntries(keys.filter((key) => record[key] !== undefined).map((key) => [key, record[key]]));
 const publicTask = (task: TaskRecord): TaskResponse => taskResponseSchema.parse(pick(task, ['id', 'title', 'description', 'status', 'priority', 'deadline', 'plannedStart', 'plannedEnd', 'estimatedMinutes', 'actualMinutes', 'energy', 'flexible', 'locked', 'sourceDump', 'rescheduleCount', 'syncStatus', 'calendarEventId']));
 const publicIdea = <T extends Record<string, unknown>>(idea: T): IdeaResponse => ideaResponseShape.parse(pick(idea, ['id', 'text', 'summary', 'status', 'sourceDump']));
+const publicDraft = (draft: Record<string, unknown>): DraftResponse => ({
+  id: String(draft.id),
+  text: String(draft.rawText ?? draft.transcript ?? ''),
+  ...(typeof draft.status === 'string' ? { status: draft.status } : {}),
+  ...(typeof draft.source === 'string' ? { source: draft.source } : {}),
+  ...(typeof draft.kind === 'string' ? { kind: draft.kind } : {}),
+  ...(typeof draft.created === 'string' ? { created: draft.created } : {}),
+});
 const publicChangeSet = (changeSet: ChangeSetRecord): ChangeSetResponse => ({ id: changeSet.id, status: String(changeSet.status ?? ''), ...(changeSet.kind ? { kind: changeSet.kind } : {}), ...(typeof changeSet.idempotencyKey === 'string' ? { idempotencyKey: changeSet.idempotencyKey } : {}), ...(changeSet.beforeJson !== undefined ? { beforeJson: changeSet.beforeJson } : {}), ...(changeSet.afterJson !== undefined ? { afterJson: changeSet.afterJson } : {}) });
 
 export function createPlanService(deps: {
@@ -129,7 +137,13 @@ export function createPlanService(deps: {
     preview,
     apply,
     today,
-    async inbox(user) { return inboxResponseSchema.parse({ ideas: (await ideaRepository.list(user)).filter((idea) => idea.status === 'backlog').map(publicIdea), tasks: (await taskRepository.list(user)).filter((task) => task.status === 'inbox').map(publicTask) }); },
+    async inbox(user) {
+      const drafts = (await dumpRepository.list(user))
+        .filter((draft) => String(draft.rawText ?? draft.transcript ?? '').trim().length > 0)
+        .sort((left, right) => String(right.created ?? '').localeCompare(String(left.created ?? '')))
+        .map(publicDraft);
+      return inboxResponseSchema.parse({ ideas: (await ideaRepository.list(user)).filter((idea) => idea.status === 'backlog').map(publicIdea), tasks: (await taskRepository.list(user)).filter((task) => task.status === 'inbox').map(publicTask), drafts });
+    },
     async task(user, id) { const record = await taskRepository.get(user, id); if (!record || record.user !== user.userId) throw new PlanNotFoundError(); return publicTask(record); },
   };
 }
