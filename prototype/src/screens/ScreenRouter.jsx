@@ -52,7 +52,7 @@ export function ScreenRouter({ route, draftId, onNavigate, onGoogleLogin, onAuth
   const screen = SCREEN_MAP[route] ?? SCREEN_MAP["entry-chaos"];
   const back = () => onNavigate(ONBOARDING_BACK[route] ?? "today-normal");
   if (screen.group === "Entry") {
-    if (route === "auth-loading") return <AuthStateScreen state="loading" onContinue={() => onNavigate("onboarding-welcome")} />;
+    if (route === "auth-loading") return <AuthStateScreen state="loading" onContinue={() => onNavigate("today-normal")} />;
     if (route === "auth-error" || loginError) return <AuthStateScreen state="error" onRetry={requestGoogleLogin} />;
     return <EntryCarousel initialIndex={{ "entry-chaos": 0, "entry-voice": 1, "entry-path": 2 }[route]} onContinue={requestGoogleLogin} />;
   }

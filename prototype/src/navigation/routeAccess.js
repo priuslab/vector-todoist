@@ -43,7 +43,6 @@ export function resolveProductionRoute({ pathname = "/", auth, env = import.meta
   if (pathname === "/auth/callback") return "auth-callback";
   if (auth.status === "loading") return "auth-loading";
   if (auth.status !== "authenticated") return "entry-chaos";
-  if (!auth.record?.onboardingCompleted) return "onboarding-welcome";
   const access = protectedPaths[pathname.toLowerCase()];
   return access && isFeatureEnabled(access[0], env) ? access[1] : "today-normal";
 }

@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { resolveInternalRoute, resolveProductionRoute } from "./routeAccess";
 
 describe("resolveProductionRoute", () => {
-  it("routes an authenticated person without onboarding to the welcome flow", () => {
-    expect(resolveProductionRoute({ pathname: "/", auth: { status: "authenticated", record: { onboardingCompleted: false } } })).toBe("onboarding-welcome");
+  it("routes an authenticated person straight to today", () => {
+    expect(resolveProductionRoute({ pathname: "/", auth: { status: "authenticated", record: { onboardingCompleted: false } } })).toBe("today-normal");
   });
 
   it("keeps optional feature deep links on a safe enabled screen", () => {
