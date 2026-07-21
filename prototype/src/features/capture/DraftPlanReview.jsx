@@ -18,6 +18,22 @@ function idempotencyKey() {
   return globalThis.crypto?.randomUUID?.() ?? `draft-plan-${Date.now()}-key`;
 }
 
+function ukrainianCount(count, singular, few, many) {
+  const remainder = Math.abs(count) % 100;
+  if (remainder >= 11 && remainder <= 14) return many;
+  switch (remainder % 10) {
+    case 1: return singular;
+    case 2:
+    case 3:
+    case 4: return few;
+    default: return many;
+  }
+}
+
+function savedCountMessage(tasks, ideas) {
+  return `Збережено ${tasks} ${ukrainianCount(tasks, "задача", "задачі", "задач")} і ${ideas} ${ukrainianCount(ideas, "ідея", "ідеї", "ідей")}.`;
+}
+
 function ProposalList({ preview }) {
   return <>
     <section className="scheduled-preview" aria-label="Запропоновані задачі">
@@ -95,7 +111,7 @@ export function DraftPlanReview({ draftId, apiClient, onNavigate = () => {} }) {
     }
   };
 
-  const content = result ? <StateView state="success" title="Пропозиції збережено" message={`Збережено ${result.tasks?.length ?? 0} задач і ${result.ideas?.length ?? 0} ідей.`} action={<div className="detail-actions"><Button onClick={() => onNavigate("today-normal")}>До плану на сьогодні</Button><Button variant="secondary" onClick={() => onNavigate("inbox-default")}>В Inbox</Button><Button variant="secondary" onClick={() => onNavigate("oracle-balanced")}>В Oracle</Button></div>} />
+  const content = result ? <StateView state="success" title="Пропозиції збережено" message={savedCountMessage(result.tasks?.length ?? 0, result.ideas?.length ?? 0)} action={<div className="detail-actions"><Button onClick={() => onNavigate("today-normal")}>До плану на сьогодні</Button><Button variant="secondary" onClick={() => onNavigate("inbox-default")}>В Inbox</Button><Button variant="secondary" onClick={() => onNavigate("oracle-balanced")}>В Oracle</Button></div>} />
     : state === "loading" ? <StateView state="loading" title="Готую пропозиції" message="Перевіряю одну збережену чернетку та її зв’язок із головною метою." />
       : state === "unavailable" ? <StateView state="error" title="Потрібне підключення" message="Відкрий цю чернетку у підключеному застосунку, щоб підготувати реальні пропозиції." action={<Button onClick={() => onNavigate("inbox-drafts")}>В Inbox</Button>} />
         : state === "missing" ? <StateView state="error" title="Чернетку не знайдено" message="Повернись до Inbox і вибери збережений Brain Dump." action={<Button onClick={() => onNavigate("inbox-drafts")}>В Inbox</Button>} />

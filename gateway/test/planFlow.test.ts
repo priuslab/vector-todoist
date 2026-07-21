@@ -47,6 +47,18 @@ describe('Brain Dump → Today vertical slice', () => {
       preview: expect.objectContaining({ blocks: firstPreview.blocks }),
     }));
   });
+  it('requires a fresh key when replaying a legacy pending Change Set without a stored preview', async () => {
+    const r = repos(); const service = createPlanService(r);
+    const firstPreview = await service.preview(user, 'dump-1', { now: '2026-07-18T08:00:00+02:00', idempotencyKey: 'plan-legacy-missing-preview' });
+    delete r.changes[0].afterJson.preview;
+
+    await expect(service.preview(user, 'dump-1', { now: '2026-07-18T19:00:00+02:00', idempotencyKey: 'plan-legacy-missing-preview' }))
+      .rejects.toMatchObject({ code: 'CONFLICT' });
+
+    expect(r.changes).toHaveLength(1);
+    expect(r.changes[0].afterJson.tasks).toEqual(firstPreview.tasks);
+    await expect(service.apply(user, firstPreview.changeSetId, {})).resolves.toMatchObject({ tasks: [expect.objectContaining({ title: 'Підготувати структуру' })] });
+  });
   it('rolls back partial persistence and leaves change set retryable', async () => {
     const r = repos(); r.ideaRepository.create = vi.fn(async () => { throw new Error('injected persistence failure'); }); const service = createPlanService(r);
     const preview = await service.preview(user, 'dump-1', { now: '2026-07-18T08:00:00+02:00', idempotencyKey: 'plan-87654321' });

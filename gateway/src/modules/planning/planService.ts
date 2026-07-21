@@ -85,6 +85,10 @@ export function createPlanService(deps: {
       const storedPayload = parsePayload(existing.afterJson);
       if (storedPayload.dumpId !== dumpId || storedPayload.goalId !== (body.goalId ?? null)) throw new PlanConflictError();
       if (storedPayload.preview) return planPreviewSchema.parse({ changeSetId: existing.id, tasks: storedPayload.tasks, ideas: storedPayload.ideas, ...storedPayload.preview });
+      // Legacy pending Change Sets did not persist the scheduler output. Re-running
+      // the scheduler here could display a proposal that conflicts with the
+      // already-persisted task and idea proposals, so callers must start fresh.
+      throw new PlanConflictError();
     }
     const profile: SchedulerProfile = { ...body.profile, timezone: body.timezone ?? body.profile.timezone };
     const tasks: SchedulerTask[] = analysis.tasks.map((task, index) => ({ id: `proposal-${result.id}-t-${index + 1}`, title: task.title, estimatedMinutes: task.estimatedMinutes, priority: task.priority, energy: task.energy, goalAlignment: priorityAlignment[task.priority] ?? .5, deadline: task.deadline, }));
@@ -106,7 +110,7 @@ export function createPlanService(deps: {
       return { id, title: task.title, description: task.description, status: slot ? 'scheduled' as const : 'inbox' as const, priority: task.priority, deadline: task.deadline, plannedStart: slot?.start ?? null, plannedEnd: slot?.end ?? null, estimatedMinutes: task.estimatedMinutes, energy: task.energy, flexible: true, locked: false, sourceDump: dumpId, goalId: goal?.id ?? null };
     });
     const ideas = analysis.ideas.map((idea, index) => ({ id: `proposal-${result.id}-i-${index + 1}`, text: idea.text, summary: idea.summary, status: 'backlog' as const, sourceDump: dumpId, goalId: goal?.id ?? null }));
-    let changeSet = existing;
+    let changeSet: ChangeSetRecord | undefined = existing;
     if (!changeSet) {
       const currentTasks = (await taskRepository.list(user)).filter((task) => task.sourceDump === dumpId);
       const currentIdeas = (await ideaRepository.list(user)).filter((idea) => idea.sourceDump === dumpId);
@@ -117,7 +121,7 @@ export function createPlanService(deps: {
     const storedPayload = parsePayload(changeSet.afterJson);
     if (storedPayload.dumpId !== dumpId || storedPayload.goalId !== (body.goalId ?? null)) throw new PlanConflictError();
     if (storedPayload.preview) return planPreviewSchema.parse({ changeSetId: changeSet.id, tasks: storedPayload.tasks, ideas: storedPayload.ideas, ...storedPayload.preview });
-    return planPreviewSchema.parse({ changeSetId: changeSet.id, tasks: proposedTasks, ideas, blocks: plan.blocks, unscheduledTaskIds: plan.unscheduledTaskIds, warnings: calendarWarning ? [...plan.warnings, calendarWarning] : plan.warnings, reasons: plan.reasons });
+    throw new PlanConflictError();
   }
 
   async function appliedResult(user: VerifiedUser, changeSet: ChangeSetRecord, payload: PlanChangeSetPayload) {

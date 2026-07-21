@@ -43,12 +43,30 @@ it("keeps the saved result and its actions visible after confirming a draft prop
   await user.click(screen.getByRole("button", { name: "Зберегти пропозиції" }));
 
   expect(await screen.findByText("Пропозиції збережено")).toBeInTheDocument();
-  expect(screen.getByText("Збережено 1 задач і 1 ідей.")).toBeInTheDocument();
+  expect(screen.getByText("Збережено 1 задача і 1 ідея.")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "До плану на сьогодні" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "В Inbox" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "В Oracle" })).toBeInTheDocument();
   expect(onNavigate).not.toHaveBeenCalled();
   expect(request).toHaveBeenNthCalledWith(3, "/api/v1/brain-dumps/dump-1/plan-preview", expect.objectContaining({ method: "POST" }));
+});
+
+it.each([
+  [2, 2, "Збережено 2 задачі і 2 ідеї."],
+  [4, 4, "Збережено 4 задачі і 4 ідеї."],
+  [5, 5, "Збережено 5 задач і 5 ідей."],
+])("uses Ukrainian plurals for %i saved tasks and %i ideas", async (taskCount, ideaCount, message) => {
+  const user = userEvent.setup();
+  const request = vi.fn()
+    .mockResolvedValueOnce([{ id: "goal-1", title: "Запустити застосунок", status: "active" }])
+    .mockResolvedValueOnce({ analysis: classifiedAnalysis })
+    .mockResolvedValueOnce({ changeSetId: "change-1", tasks: [proposalTask], ideas: [proposalIdea], blocks: [], unscheduledTaskIds: [], warnings: [], reasons: {} })
+    .mockResolvedValueOnce({ changeSet: { id: "change-1", status: "applied" }, tasks: Array.from({ length: taskCount }, (_, index) => ({ id: `task-${index}` })), ideas: Array.from({ length: ideaCount }, (_, index) => ({ id: `idea-${index}` })) });
+
+  render(<DraftPlanReview draftId="dump-1" apiClient={{ request }} />);
+  await user.click(await screen.findByRole("button", { name: "Зберегти пропозиції" }));
+
+  expect(await screen.findByText(message)).toBeInTheDocument();
 });
 
 it("shows the main-goal action instead of making a proposal against a demo goal", async () => {
