@@ -38,7 +38,7 @@ export function createGeminiClient(options: { apiKey?: string; model?: string; t
             }),
           });
           if (!response.ok) {
-            if (response.status === 503 && candidateModel !== models.at(-1)) continue;
+            if ((response.status === 503 || response.status === 404) && candidateModel !== models.at(-1)) continue;
             throw new Error(`AI provider request failed (${candidateModel}, HTTP ${response.status})`);
           }
           const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> };

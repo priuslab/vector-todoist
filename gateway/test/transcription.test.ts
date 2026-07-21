@@ -58,6 +58,23 @@ describe('transcription service safety', () => {
     ]);
   });
 
+  it('falls back to Flash-Lite when the primary Gemini model id is not found', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: { code: 404, status: 'NOT_FOUND', message: 'models/gemini-3.5-flash is not found for API version v1beta.' },
+      }), { status: 404, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        candidates: [{ content: { parts: [{ text: 'Привіт, ти мене чуєш?' }] } }],
+      }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    const gemini = createGeminiTranscriptionAdapter({ apiKey: 'test-key', model: 'gemini-3.5-flash', fetcher });
+
+    await expect(gemini.transcribe({ bytes: Buffer.from('audio'), mimeType: 'audio/webm', locale: 'uk-UA' })).resolves.toBe('Привіт, ти мене чуєш?');
+    expect(fetcher.mock.calls.map(([url]) => String(url))).toEqual([
+      expect.stringContaining('/models/gemini-3.5-flash:generateContent'),
+      expect.stringContaining('/models/gemini-3.1-flash-lite:generateContent'),
+    ]);
+  });
+
   it('accepts Ukrainian audio, returns normalized transcript and cleans temporary audio', async () => {
     const storage = createAudioStorage({ directory: '/tmp/vector-transcription-test' });
     const adapterInstance = adapter('  Мені треба\r\nпідготувати випуск  ');

@@ -55,7 +55,7 @@ export function createGeminiTranscriptionAdapter(options: { apiKey?: string; mod
           const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }>; error?: unknown };
           if (!response.ok) {
             const error = providerFailure(response, body);
-            if (error.status === 503 && candidateModel !== models.at(-1)) {
+            if ((error.status === 503 || error.status === 404) && candidateModel !== models.at(-1)) {
               lastTransientError = error;
               continue;
             }
