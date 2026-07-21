@@ -9,7 +9,8 @@ import { TaskCard } from "../../components/TaskCard";
 import { UndoSnackbar } from "../../components/UndoSnackbar";
 import { DEMO_EVENTS, DEMO_TASKS, DEMO_USER } from "../../data/demoData";
 import { EveningReview } from "./EveningReview";
-import { applyReschedule, completeTask, getToday, previewReschedule, undoChangeSet } from "./todayApi";
+import { TaskTimeSheet } from "./TaskTimeSheet";
+import { applyReschedule, completeTask, getToday, previewReschedule, undoChangeSet, updateTask } from "./todayApi";
 
 function localDate(timezone) {
   const parts = new Intl.DateTimeFormat("en-GB", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
@@ -17,7 +18,7 @@ function localDate(timezone) {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
-function DayPlan({ active = false, onNavigate, completed = false, tasks = DEMO_TASKS, onComplete }) {
+function DayPlan({ active = false, onNavigate, completed = false, tasks = DEMO_TASKS, onComplete, onSelect }) {
   const current = tasks[0] ?? DEMO_TASKS[0];
   return (
     <div className="day-plan">
@@ -25,7 +26,7 @@ function DayPlan({ active = false, onNavigate, completed = false, tasks = DEMO_T
       <div className="timeline-list">
         <span className="timeline-label">Далі</span>
         <TaskCard task={{ ...DEMO_EVENTS[0], duration: 45, alignment: null }} state="locked" />
-        {tasks.slice(1).map((task) => <TaskCard key={task.id} task={{ ...task, duration: task.duration ?? task.estimatedMinutes, start: task.start ?? task.plannedStart?.slice(11, 16), end: task.end ?? task.plannedEnd?.slice(11, 16) }} state={task.status === "completed" || completed ? "completed" : "scheduled"} onComplete={onComplete} />)}
+        {tasks.slice(1).map((task) => { const state = task.status === "completed" || completed ? "completed" : "scheduled"; return <TaskCard key={task.id} task={{ ...task, duration: task.duration ?? task.estimatedMinutes, start: task.start ?? task.plannedStart?.slice(11, 16), end: task.end ?? task.plannedEnd?.slice(11, 16) }} state={state} onComplete={onComplete} onClick={state === "completed" || task.locked ? undefined : () => onSelect?.(task)} />; })}
       </div>
     </div>
   );
@@ -43,6 +44,9 @@ export function TodayScreens({ screenId = "today-normal", onNavigate = () => {},
   const [rescheduleLoading, setRescheduleLoading] = useState(false);
   const [rescheduleError, setRescheduleError] = useState("");
   const [rescheduleApplied, setRescheduleApplied] = useState(false);
+  const [sheetTask, setSheetTask] = useState(null);
+  const [savingTime, setSavingTime] = useState(false);
+  const [moveAnnouncement, setMoveAnnouncement] = useState("");
   useEffect(() => { if (!apiClient || !["today-normal", "today-active", "today-overload"].includes(screenId)) return; let alive = true; const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; getToday({ apiClient, date: localDate(timezone), timezone }).then((value) => alive && setRemote(value)).catch(() => alive && setRemoteError("Не вдалося завантажити план. Спробуй оновити сторінку.")); return () => { alive = false; }; }, [apiClient, screenId]);
   const common = { title: "Сьогодні", eyebrow: "П'ятниця, 18 липня", activeRoute: "today-normal", onNavigate, avatar: true };
 
@@ -62,6 +66,40 @@ export function TodayScreens({ screenId = "today-normal", onNavigate = () => {},
     if (!apiClient) { setUndoChange({ local: true, previous }); return; }
     try { const result = await completeTask({ apiClient, id, idempotencyKey: `today-complete-${id}` }); setLocalTasks((current) => current?.map((task) => task.id === id ? (result.task ?? { ...task, status: "completed" }) : task)); setUndoChange({ id: result.changeSet?.id, previous }); }
     catch { setLocalTasks(previous); setMutationError("Не вдалося виконати задачу. План повернуто до попереднього стану."); }
+  };
+  const saveTime = async ({ plannedStart, plannedEnd }) => {
+    const task = sheetTask;
+    if (!task || !apiClient) { setSheetTask(null); return; }
+    const previous = visibleTasks;
+    const updated = previous
+      .map((item) => (item.id === task.id ? { ...item, plannedStart, plannedEnd } : item))
+      .sort((a, b) => (a.plannedStart ?? "").localeCompare(b.plannedStart ?? ""));
+    setLocalTasks(updated);
+    setSheetTask(null);
+    setSavingTime(true);
+    setMutationError("");
+    const patch = { plannedStart, plannedEnd, ...(Number.isInteger(Number(task.version)) ? { expectedVersion: Number(task.version) } : {}) };
+    try {
+      const result = await updateTask({ apiClient, id: task.id, patch, idempotencyKey: `move-${task.id}-${plannedStart}` });
+      const merged = result.task ?? result;
+      setLocalTasks((current) => current?.map((item) => (item.id === task.id ? { ...item, ...merged } : item)));
+      setMoveAnnouncement(`Задачу перенесено на ${plannedStart.slice(11, 16)}`);
+    } catch (error) {
+      setLocalTasks(previous);
+      if (error?.code === "CONFLICT") {
+        setMutationError("Задача змінилася в іншому вікні. Оновлюю план.");
+        try {
+          const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+          const fresh = await getToday({ apiClient, date: localDate(timezone), timezone });
+          setRemote(fresh);
+          setLocalTasks(fresh.tasks ?? []);
+        } catch { /* keep rollback state if refetch also fails */ }
+      } else {
+        setMutationError("Не вдалося перенести задачу. План повернуто до попереднього стану.");
+      }
+    } finally {
+      setSavingTime(false);
+    }
   };
   const undo = async () => {
     if (undoing) return;
@@ -104,7 +142,9 @@ export function TodayScreens({ screenId = "today-normal", onNavigate = () => {},
       {rescheduleApplied ? <InlineInsight title="План змінився — я знайшов новий час.">Гнучкі задачі отримали нові слоти. Якщо це не підходить, зміни можна скасувати.</InlineInsight> : null}
       {mutationError ? <InlineInsight tone="warning" title="План не змінився">{mutationError}</InlineInsight> : null}
       {undoing ? <InlineInsight title="Скасовую зміни…">Зачекай, поки Вектор поверне попередній стан плану.</InlineInsight> : null}
-      <DayPlan active={screenId === "today-active"} onNavigate={onNavigate} tasks={visibleTasks} onComplete={complete} />
+      <DayPlan active={screenId === "today-active"} onNavigate={onNavigate} tasks={visibleTasks} onComplete={complete} onSelect={setSheetTask} />
+      {moveAnnouncement ? <p role="status" aria-live="polite" className="sr-only">{moveAnnouncement}</p> : null}
+      {sheetTask ? <TaskTimeSheet task={sheetTask} saving={savingTime} onClose={() => setSheetTask(null)} onSave={saveTime} /> : null}
       <div className="break-card"><Coffee size={20} /><span><strong>10:30 · Перерва</strong><small>10 хв без задач</small></span><Clock size={17} /></div>
       {screenId === "today-overload" ? <Button variant="secondary" onClick={previewReschedulePlan} disabled={rescheduleLoading}>{rescheduleLoading ? "Готую новий план…" : "Переглянути новий план"}</Button> : null}
       {showUndo ? <UndoSnackbar message="Зміни застосовано — можна скасувати." onUndo={() => setShowUndo(false)} /> : null}
