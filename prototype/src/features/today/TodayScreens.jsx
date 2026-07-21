@@ -138,7 +138,7 @@ export function TodayScreens({ screenId = "today-normal", onNavigate = () => {},
   };
   const greeting = apiClient ? "Привіт!" : `Привіт, ${DEMO_USER.name}`;
   const totalMinutes = visibleTasks.reduce((sum, task) => sum + (task.estimatedMinutes ?? task.duration ?? 0), 0);
-  const plannedLabel = `${Math.floor(totalMinutes / 60)} год ${totalMinutes % 60} хв заплановано`;
+  const plannedLabel = apiClient ? `${Math.floor(totalMinutes / 60)} год ${totalMinutes % 60} хв заплановано` : "4 год 20 хв заплановано · 3 вільні слоти";
   const completedCount = visibleTasks.filter((task) => task.status === "completed").length;
   const progressValue = apiClient ? (visibleTasks.length ? Math.round((completedCount / visibleTasks.length) * 100) : 0) : (screenId === "today-active" ? 38 : 25);
   return (
