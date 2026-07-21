@@ -99,3 +99,5 @@ S1 (strip-down plan): complete (ef92148..fddd6bd, review clean). Onboarding gate
 S2 (strip-down plan): complete (23dd273..efde4d4, review r2 PASS). Nav reduced to Today/BrainDump/Inbox, DEMO_HIDDEN route blocking incl. direct-URL fix for /goalfocus, focus switcher removed from Today. 158/158 tests.
 
 S3 (strip-down plan): complete (97cd625..3da1355, review PASS). DraftPlanReview works with zero goals; no /api/v1/goals fetch; mock chains verified. Minor deferred to S4: stale loading copy "зв'язок із головною метою" in DraftPlanReview.jsx:104. 158/158 tests.
+
+S4 (strip-down plan): complete (659909f..c9ef40a, review PASS). previewLoading on plan-preview button, composer submitting spinner, undo indicator+guard, TaskScreens loading props, goal-free loading copy. Minor for final review: TaskScreens "Повторити синхронізацію" still disabled= not loading=. 160/160 tests.
