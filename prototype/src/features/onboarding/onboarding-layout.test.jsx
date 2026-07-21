@@ -1,5 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { OnboardingFlow } from "./OnboardingFlow";
 import { GoalSetup } from "./GoalSetup";
 import { TelegramSetup } from "./TelegramSetup";
@@ -83,6 +85,19 @@ it("makes quiet hours and focus settings editable", () => {
   expect(screen.getByLabelText("Фокус-блок").tagName).toBe("SELECT");
   expect(screen.getByLabelText("Перерва").tagName).toBe("SELECT");
   expect(screen.getByLabelText("Денний ліміт").tagName).toBe("SELECT");
+});
+
+it("gives onboarding selects a 48px mobile tap target", () => {
+  const settingsCss = readFileSync(resolve(process.cwd(), "src/styles/settings.css"), "utf8");
+
+  expect(settingsCss).toMatch(/\.form-stack select[^}]*min-height:\s*48px/);
+});
+
+it("keeps the mobile app inside the viewport instead of letting Safari reveal the page background", () => {
+  const globalCss = readFileSync(resolve(process.cwd(), "src/styles/global.css"), "utf8");
+
+  expect(globalCss).toMatch(/body\s*\{[\s\S]*?overflow:\s*hidden/);
+  expect(globalCss).toMatch(/\.mobile-prototype\s*\{[\s\S]*?min-height:\s*100svh/);
 });
 
 it("uses a native date picker for a manually entered goal", () => {

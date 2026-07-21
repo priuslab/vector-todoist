@@ -50,7 +50,7 @@
   padding-block: 20px;
 }
 .form-help { margin: 0; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
-.form-stack select, .form-stack input[type="time"] { width: 100%; min-height: 44px; border: 1px solid var(--border-default); border-radius: 12px; padding: 0 12px; color: var(--text-primary); background: var(--bg-surface); font: inherit; }
+.form-stack select, .form-stack input[type="time"] { width: 100%; min-height: 48px; border: 1px solid var(--border-default); border-radius: 12px; padding: 0 12px; color: var(--text-primary); background: var(--bg-surface); font: inherit; }
 .time-picker-control { width: 100%; min-height: 56px; border: 1px solid var(--border-default); border-radius: 12px; padding: 9px 14px; display: flex; align-items: center; justify-content: space-between; text-align: left; color: var(--text-primary); background: var(--bg-surface); cursor: pointer; }
 .time-picker-control:focus-visible { border-color: var(--focus-ring); }
 .time-picker-control__label { color: var(--text-secondary); font-size: 12px; font-weight: 700; }
