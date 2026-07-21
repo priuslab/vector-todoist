@@ -11,7 +11,6 @@ import { DEMO_EVENTS, DEMO_TASKS, DEMO_USER } from "../../data/demoData";
 import { EveningReview } from "./EveningReview";
 import { TaskTimeSheet } from "./TaskTimeSheet";
 import { applyReschedule, completeTask, getToday, previewReschedule, undoChangeSet, updateTask } from "./todayApi";
-import { useDragReorder } from "./useDragReorder";
 
 function localDate(timezone) {
   const parts = new Intl.DateTimeFormat("en-GB", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
@@ -19,41 +18,16 @@ function localDate(timezone) {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
-function DayPlan({ active = false, onNavigate, completed = false, tasks = DEMO_TASKS, onComplete, onSelect, onReorder, apiClient }) {
+function DayPlan({ active = false, onNavigate, completed = false, tasks = DEMO_TASKS, onComplete, onSelect, apiClient }) {
   const current = tasks[0] ?? DEMO_TASKS[0];
   const nextLabel = active ? "Зараз · 24 хв залишилось" : `Наступна${current.plannedStart ? ` · ${current.plannedStart.slice(11, 16)}` : ""}`;
-  const draggableTasks = tasks.slice(1);
-  const isDraggable = (task) => Boolean(apiClient) && !task.locked && task.status !== "completed" && !completed;
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-  const { getCardProps, displayOrder, isDragging } = useDragReorder({
-    tasks: draggableTasks,
-    onReorder,
-    date: localDate(timezone),
-    isDraggable,
-  });
-  const orderedTasks = isDragging
-    ? displayOrder.map((id) => draggableTasks.find((task) => task.id === id)).filter(Boolean)
-    : draggableTasks;
   return (
     <div className="day-plan">
       <div className="now-card"><div><span>{nextLabel}</span><h2>{current.title}</h2><small>{current.duration ?? current.estimatedMinutes ?? 60} хв</small></div><button aria-label="Почати фокус" onClick={() => onNavigate?.("focus-mode")}><Play size={20} weight="fill" /></button></div>
-      <div className={`timeline-list${isDragging ? " is-reordering" : ""}`}>
+      <div className="timeline-list">
         <span className="timeline-label">Далі</span>
         {!apiClient ? <TaskCard task={{ ...DEMO_EVENTS[0], duration: 45, alignment: null }} state="locked" /> : null}
-        {orderedTasks.map((task) => {
-          const state = task.status === "completed" || completed ? "completed" : "scheduled";
-          const dragProps = isDraggable(task) ? getCardProps(task) : {};
-          return (
-            <TaskCard
-              key={task.id}
-              task={{ ...task, duration: task.duration ?? task.estimatedMinutes, start: task.start ?? task.plannedStart?.slice(11, 16), end: task.end ?? task.plannedEnd?.slice(11, 16) }}
-              state={state}
-              onComplete={onComplete}
-              onClick={state === "completed" || task.locked ? undefined : () => onSelect?.(task)}
-              {...dragProps}
-            />
-          );
-        })}
+        {tasks.slice(1).map((task) => { const state = task.status === "completed" || completed ? "completed" : "scheduled"; return <TaskCard key={task.id} task={{ ...task, duration: task.duration ?? task.estimatedMinutes, start: task.start ?? task.plannedStart?.slice(11, 16), end: task.end ?? task.plannedEnd?.slice(11, 16) }} state={state} onComplete={onComplete} onClick={state === "completed" || task.locked ? undefined : () => onSelect?.(task)} />; })}
       </div>
     </div>
   );
@@ -98,13 +72,15 @@ export function TodayScreens({ screenId = "today-normal", onNavigate = () => {},
     try { const result = await completeTask({ apiClient, id, idempotencyKey: `today-complete-${id}` }); setLocalTasks((current) => current?.map((task) => task.id === id ? (result.task ?? { ...task, status: "completed" }) : task)); setUndoChange({ id: result.changeSet?.id, previous }); }
     catch { setLocalTasks(previous); setMutationError("Не вдалося виконати задачу. План повернуто до попереднього стану."); }
   };
-  const persistTime = async (task, { plannedStart, plannedEnd }) => {
-    if (!task || !apiClient) return;
+  const saveTime = async ({ plannedStart, plannedEnd }) => {
+    const task = sheetTask;
+    if (!task || !apiClient) { setSheetTask(null); return; }
     const previous = visibleTasks;
     const updated = previous
       .map((item) => (item.id === task.id ? { ...item, plannedStart, plannedEnd } : item))
       .sort((a, b) => (a.plannedStart ?? "").localeCompare(b.plannedStart ?? ""));
     setLocalTasks(updated);
+    setSheetTask(null);
     setSavingTime(true);
     setMutationError("");
     const patch = { plannedStart, plannedEnd, ...(Number.isInteger(Number(task.version)) ? { expectedVersion: Number(task.version) } : {}) };
@@ -129,18 +105,6 @@ export function TodayScreens({ screenId = "today-normal", onNavigate = () => {},
     } finally {
       setSavingTime(false);
     }
-  };
-  const saveTime = async ({ plannedStart, plannedEnd }) => {
-    const task = sheetTask;
-    setSheetTask(null);
-    await persistTime(task, { plannedStart, plannedEnd });
-  };
-  const reorderTask = async (taskId, plannedStartISO) => {
-    const task = visibleTasks.find((item) => item.id === taskId);
-    if (!task) return;
-    const minutes = task.estimatedMinutes ?? 30;
-    const plannedEnd = new Date(new Date(plannedStartISO).getTime() + minutes * 60000).toISOString();
-    await persistTime(task, { plannedStart: plannedStartISO, plannedEnd });
   };
   const undo = async () => {
     if (undoing) return;
@@ -188,7 +152,7 @@ export function TodayScreens({ screenId = "today-normal", onNavigate = () => {},
       {rescheduleApplied ? <InlineInsight title="План змінився — я знайшов новий час.">Гнучкі задачі отримали нові слоти. Якщо це не підходить, зміни можна скасувати.</InlineInsight> : null}
       {mutationError ? <InlineInsight tone="warning" title="План не змінився">{mutationError}</InlineInsight> : null}
       {undoing ? <InlineInsight title="Скасовую зміни…">Зачекай, поки Вектор поверне попередній стан плану.</InlineInsight> : null}
-      <DayPlan active={screenId === "today-active"} onNavigate={onNavigate} tasks={visibleTasks} onComplete={complete} onSelect={setSheetTask} onReorder={reorderTask} apiClient={apiClient} />
+      <DayPlan active={screenId === "today-active"} onNavigate={onNavigate} tasks={visibleTasks} onComplete={complete} onSelect={setSheetTask} apiClient={apiClient} />
       {moveAnnouncement ? <p role="status" aria-live="polite" className="sr-only">{moveAnnouncement}</p> : null}
       {sheetTask ? <TaskTimeSheet task={sheetTask} saving={savingTime} onClose={() => setSheetTask(null)} onSave={saveTime} /> : null}
       {!apiClient ? <div className="break-card"><Coffee size={20} /><span><strong>10:30 · Перерва</strong><small>10 хв без задач</small></span><Clock size={17} /></div> : null}

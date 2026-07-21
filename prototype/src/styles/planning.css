@@ -17,10 +17,6 @@
 .now-card button { width: 46px; height: 46px; border: 0; border-radius: 50%; display: grid; place-items: center; color: var(--brand-primary); background: #fff; }
 .timeline-list { display: flex; flex-direction: column; gap: 9px; margin-top: 14px; }
 .timeline-label { color: var(--text-secondary); font-size: 12px; font-weight: 800; }
-.timeline-list.is-reordering { touch-action: none; }
-.task-card.is-dragging { position: relative; z-index: 2; box-shadow: 0 12px 28px rgb(32 35 48 / 18%); transition: none; }
-.timeline-list:not(.is-reordering) .task-card { transition: transform .18s ease; }
-@media (prefers-reduced-motion: reduce) { .timeline-list .task-card { transition: none !important; } }
 .break-card { min-height: 54px; margin: 9px 0; border: 1px dashed var(--border-default); border-radius: 14px; display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; align-items: center; padding: 8px 12px; color: var(--brand-primary); }
 .break-card span { display: flex; flex-direction: column; }
 .break-card strong { color: var(--text-primary); font-size: 12px; }
