@@ -21,3 +21,8 @@ export async function getBrainDumpResult({ apiClient, id }) {
   if (!apiClient?.request) throw new Error("API client is not configured");
   return apiClient.request(`/api/v1/brain-dumps/${encodeURIComponent(id)}/result`, { method: "GET" });
 }
+
+export function getGoals({ apiClient }) {
+  if (!apiClient?.request) throw new Error("API client is not configured");
+  return apiClient.request("/api/v1/goals");
+}

@@ -1,5 +1,6 @@
-export function previewBrainDumpPlan({ apiClient, id, profile, busySlots = [], now, timezone, idempotencyKey }) {
-  return apiClient.request(`/api/v1/brain-dumps/${encodeURIComponent(id)}/plan-preview`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) }, body: JSON.stringify({ profile, busySlots, now, timezone, idempotencyKey }) });
+export function previewBrainDumpPlan({ apiClient, id, goalId, ...input }) {
+  const { idempotencyKey } = input;
+  return apiClient.request(`/api/v1/brain-dumps/${encodeURIComponent(id)}/plan-preview`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) }, body: JSON.stringify({ ...input, ...(goalId ? { goalId } : {}) }) });
 }
 export function applyChangeSet({ apiClient, id, idempotencyKey }) {
   return apiClient.request(`/api/v1/change-sets/${encodeURIComponent(id)}/apply`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idempotencyKey }) });

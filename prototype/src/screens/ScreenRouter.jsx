@@ -4,6 +4,7 @@ import { GoalSetup } from "../features/onboarding/GoalSetup";
 import { OnboardingFlow } from "../features/onboarding/OnboardingFlow";
 import { TelegramSetup } from "../features/onboarding/TelegramSetup";
 import { CaptureFlow } from "../features/capture/CaptureFlow";
+import { DraftPlanReview } from "../features/capture/DraftPlanReview";
 import { TodayScreens } from "../features/today/TodayScreens";
 import { InboxScreens } from "../features/inbox/InboxScreens";
 import { IdeaProjectScreens } from "../features/inbox/IdeaProjectScreens";
@@ -31,7 +32,7 @@ const ONBOARDING_BACK = {
   "telegram-connect": "goal-choice", "telegram-success": "telegram-connect", "first-brain-dump": "telegram-success",
 };
 
-export function ScreenRouter({ route, onNavigate, onGoogleLogin, onAuthComplete, pocketBase, apiClient }) {
+export function ScreenRouter({ route, draftId, onNavigate, onGoogleLogin, onAuthComplete, pocketBase, apiClient }) {
   const [loginError, setLoginError] = useState(false);
   useEffect(() => setLoginError(false), [route]);
   const requestGoogleLogin = async () => {
@@ -71,6 +72,7 @@ export function ScreenRouter({ route, onNavigate, onGoogleLogin, onAuthComplete,
     };
     return <OnboardingFlow screenId={route} onBack={back} onNext={nextOnboarding} onCalendarConnect={route === "calendar-permission" ? connectCalendar : nextOnboarding} onCalendarSkip={nextOnboarding} />;
   }
+  if (route === "draft-plan-review") return <DraftPlanReview draftId={draftId} onNavigate={onNavigate} apiClient={apiClient} />;
   if (screen.group === "Capture") return <CaptureFlow key={route} screenId={route} onBack={() => onNavigate("today-normal")} onNavigate={onNavigate} apiClient={apiClient} />;
   if (screen.group === "Today") return <TodayScreens screenId={route} onNavigate={onNavigate} apiClient={apiClient} />;
   if (screen.group === "Inbox") return ["idea-detail", "idea-decomposition", "project-detail"].includes(route) ? <IdeaProjectScreens screenId={route} onNavigate={onNavigate} apiClient={apiClient} /> : <InboxScreens screenId={route} onNavigate={onNavigate} apiClient={apiClient} />;

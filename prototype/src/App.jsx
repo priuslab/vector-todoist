@@ -9,17 +9,32 @@ import { isQaEnvironment, resolveInternalRoute, resolveProductionRoute } from ".
 import { AuthStateScreen } from "./features/entry/AuthStateScreen";
 import { createApiClient } from "./lib/apiClient";
 
+function requestedDraftRoute() {
+  const params = new URLSearchParams(window.location.search);
+  const draft = params.get("draft");
+  return params.get("screen") === "draft-plan-review" && draft ? { route: "draft-plan-review", draft } : { route: null, draft: null };
+}
+
+function persistRoute(nextRoute, draft) {
+  const params = new URLSearchParams({ screen: nextRoute });
+  if (nextRoute === "draft-plan-review" && draft) params.set("draft", draft);
+  window.history.replaceState({}, "", `?${params.toString()}`);
+}
+
 function PrototypeExperience({ initialCatalog = false }) {
   const { route, navigate } = usePrototype();
   const [catalog, setCatalog] = React.useState(initialCatalog);
-  const go = (nextRoute) => {
+  const [draftId, setDraftId] = React.useState(() => requestedDraftRoute().draft);
+  const go = (nextRoute, options = {}) => {
+    const nextDraft = nextRoute === "draft-plan-review" ? options.draft ?? draftId : null;
     navigate(nextRoute);
+    setDraftId(nextDraft);
     setCatalog(false);
-    window.history.replaceState({}, "", `?screen=${nextRoute}`);
+    persistRoute(nextRoute, nextDraft);
   };
   return (
     <main className="mobile-prototype" data-testid="mobile-prototype">
-      {catalog ? <ScreenCatalog onOpen={go} /> : <ScreenRouter route={route} onNavigate={go} />}
+      {catalog ? <ScreenCatalog onOpen={go} /> : <ScreenRouter route={route} draftId={draftId} onNavigate={go} />}
     </main>
   );
 }
@@ -44,15 +59,29 @@ export function ProductionExperience({ env = import.meta.env, pocketBase: provid
   }) : null, [authStore, env.VITE_GATEWAY_URL]);
   const [pathname, setPathname] = React.useState(() => window.location.pathname);
   const resolvedRoute = resolveProductionRoute({ pathname, auth, env });
-  const [route, setRoute] = React.useState(resolvedRoute);
-  React.useEffect(() => setRoute(resolvedRoute), [resolvedRoute]);
-  const navigate = (nextRoute) => setRoute(resolveInternalRoute({ route: nextRoute, env }));
+  const routeFromLocation = React.useCallback(() => {
+    const requested = requestedDraftRoute();
+    return resolvedRoute === "today-normal" && requested.route ? requested.route : resolvedRoute;
+  }, [resolvedRoute]);
+  const [route, setRoute] = React.useState(routeFromLocation);
+  const [draftId, setDraftId] = React.useState(() => requestedDraftRoute().draft);
+  React.useEffect(() => {
+    setRoute(routeFromLocation());
+    setDraftId(requestedDraftRoute().draft);
+  }, [routeFromLocation]);
+  const navigate = (nextRoute, options = {}) => {
+    const allowedRoute = resolveInternalRoute({ route: nextRoute, env });
+    const nextDraft = allowedRoute === "draft-plan-review" ? options.draft ?? draftId : null;
+    setRoute(allowedRoute);
+    setDraftId(nextDraft);
+    persistRoute(allowedRoute, nextDraft);
+  };
   const completeAuth = React.useCallback(() => {
     window.history.replaceState({}, "", "/");
     setPathname("/");
   }, []);
   return <main className="mobile-prototype" data-testid="mobile-prototype">
-    <ScreenRouter route={route} onNavigate={navigate} onAuthComplete={completeAuth} pocketBase={pocketBase} apiClient={apiClient} onGoogleLogin={() => startGoogleLogin({ clientId: env.VITE_GOOGLE_CLIENT_ID })} />
+    <ScreenRouter route={route} draftId={draftId} onNavigate={navigate} onAuthComplete={completeAuth} pocketBase={pocketBase} apiClient={apiClient} onGoogleLogin={() => startGoogleLogin({ clientId: env.VITE_GOOGLE_CLIENT_ID })} />
   </main>;
 }
 
