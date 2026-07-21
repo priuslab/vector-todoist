@@ -15,6 +15,10 @@ describe("resolveProductionRoute", () => {
     expect(resolveProductionRoute({ pathname: "/oracle", auth: { status: "authenticated", record: { onboardingCompleted: true } }, env: { VITE_FEATURE_ORACLE: "false" } })).toBe("today-normal");
   });
 
+  it("hides demo-hidden routes from direct URLs in production", () => {
+    expect(resolveProductionRoute({ pathname: "/goalfocus", auth: { status: "authenticated", record: {} }, env: { DEV: false, VITE_FEATURE_GOAL_FOCUS: "true" } })).toBe("today-normal");
+  });
+
   it("keeps callback and anonymous entry routes outside protected screens", () => {
     expect(resolveProductionRoute({ pathname: "/auth/callback", auth: { status: "anonymous" } })).toBe("auth-callback");
     expect(resolveProductionRoute({ pathname: "/calendar", auth: { status: "anonymous" } })).toBe("entry-chaos");

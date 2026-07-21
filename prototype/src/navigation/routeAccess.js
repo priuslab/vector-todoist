@@ -62,7 +62,7 @@ export function resolveProductionRoute({ pathname = "/", auth, env = import.meta
   if (auth.status === "loading") return "auth-loading";
   if (auth.status !== "authenticated") return "entry-chaos";
   const access = protectedPaths[pathname.toLowerCase()];
-  return access && isFeatureEnabled(access[0], env) ? access[1] : "today-normal";
+  return access && isFeatureEnabled(access[0], env) && (isQaEnvironment(env) || !DEMO_HIDDEN.has(access[1])) ? access[1] : "today-normal";
 }
 
 export const isQaEnvironment = (env = import.meta.env) => Boolean(env?.DEV || env?.MODE === "test");
