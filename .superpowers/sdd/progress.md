@@ -101,3 +101,5 @@ S2 (strip-down plan): complete (23dd273..efde4d4, review r2 PASS). Nav reduced t
 S3 (strip-down plan): complete (97cd625..3da1355, review PASS). DraftPlanReview works with zero goals; no /api/v1/goals fetch; mock chains verified. Minor deferred to S4: stale loading copy "зв'язок із головною метою" in DraftPlanReview.jsx:104. 158/158 tests.
 
 S4 (strip-down plan): complete (659909f..c9ef40a, review PASS). previewLoading on plan-preview button, composer submitting spinner, undo indicator+guard, TaskScreens loading props, goal-free loading copy. Minor for final review: TaskScreens "Повторити синхронізацію" still disabled= not loading=. 160/160 tests.
+
+S5a (strip-down plan): complete (8fae2a8..6cdcc2d, review PASS). TaskTimeSheet bottom sheet: tap card -> time picker -> optimistic PATCH plannedStart/plannedEnd with rollback/CONFLICT refresh/aria-live. Minors for final review: localDate helper duplicated in TaskTimeSheet; CONFLICT refetch failure silently swallowed. 162/162 tests.
