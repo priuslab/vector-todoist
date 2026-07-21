@@ -18,14 +18,15 @@ function localDate(timezone) {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
-function DayPlan({ active = false, onNavigate, completed = false, tasks = DEMO_TASKS, onComplete, onSelect }) {
+function DayPlan({ active = false, onNavigate, completed = false, tasks = DEMO_TASKS, onComplete, onSelect, apiClient }) {
   const current = tasks[0] ?? DEMO_TASKS[0];
+  const nextLabel = active ? "Зараз · 24 хв залишилось" : `Наступна${current.plannedStart ? ` · ${current.plannedStart.slice(11, 16)}` : ""}`;
   return (
     <div className="day-plan">
-      <div className="now-card"><div><span>{active ? "Зараз · 24 хв залишилось" : "Наступна · 09:30"}</span><h2>{current.title}</h2><small>Deep Work · {current.duration ?? current.estimatedMinutes ?? 60} хв · 94% до мети</small></div><button aria-label="Почати фокус" onClick={() => onNavigate?.("focus-mode")}><Play size={20} weight="fill" /></button></div>
+      <div className="now-card"><div><span>{nextLabel}</span><h2>{current.title}</h2><small>{current.duration ?? current.estimatedMinutes ?? 60} хв</small></div><button aria-label="Почати фокус" onClick={() => onNavigate?.("focus-mode")}><Play size={20} weight="fill" /></button></div>
       <div className="timeline-list">
         <span className="timeline-label">Далі</span>
-        <TaskCard task={{ ...DEMO_EVENTS[0], duration: 45, alignment: null }} state="locked" />
+        {!apiClient ? <TaskCard task={{ ...DEMO_EVENTS[0], duration: 45, alignment: null }} state="locked" /> : null}
         {tasks.slice(1).map((task) => { const state = task.status === "completed" || completed ? "completed" : "scheduled"; return <TaskCard key={task.id} task={{ ...task, duration: task.duration ?? task.estimatedMinutes, start: task.start ?? task.plannedStart?.slice(11, 16), end: task.end ?? task.plannedEnd?.slice(11, 16) }} state={state} onComplete={onComplete} onClick={state === "completed" || task.locked ? undefined : () => onSelect?.(task)} />; })}
       </div>
     </div>
@@ -48,7 +49,11 @@ export function TodayScreens({ screenId = "today-normal", onNavigate = () => {},
   const [savingTime, setSavingTime] = useState(false);
   const [moveAnnouncement, setMoveAnnouncement] = useState("");
   useEffect(() => { if (!apiClient || !["today-normal", "today-active", "today-overload"].includes(screenId)) return; let alive = true; const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; getToday({ apiClient, date: localDate(timezone), timezone }).then((value) => alive && setRemote(value)).catch(() => alive && setRemoteError("Не вдалося завантажити план. Спробуй оновити сторінку.")); return () => { alive = false; }; }, [apiClient, screenId]);
-  const common = { title: "Сьогодні", eyebrow: "П'ятниця, 18 липня", activeRoute: "today-normal", onNavigate, avatar: true };
+  const todayEyebrow = (() => {
+    const formatted = new Intl.DateTimeFormat("uk-UA", { weekday: "long", day: "numeric", month: "long" }).format(new Date());
+    return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+  })();
+  const common = { title: "Сьогодні", eyebrow: todayEyebrow, activeRoute: "today-normal", onNavigate, avatar: true };
 
   if (apiClient && !remote && !remoteError && ["today-normal", "today-active", "today-overload"].includes(screenId)) return <AppFrame {...common}><StateView state="loading" title="Завантажую план" message="Вектор дістає твої задачі та вільні слоти." /></AppFrame>;
   if (apiClient && remoteError && !remote) return <AppFrame {...common}><StateView state="error" title="План тимчасово недоступний" message={remoteError} action={<Button onClick={() => window.location.reload()}>Оновити</Button>} /></AppFrame>;
@@ -131,9 +136,14 @@ export function TodayScreens({ screenId = "today-normal", onNavigate = () => {},
     catch { setRescheduleError("План не змінився. Одна із задач могла оновитися в іншій вкладці."); }
     finally { setRescheduleLoading(false); }
   };
+  const greeting = apiClient ? "Привіт!" : `Привіт, ${DEMO_USER.name}`;
+  const totalMinutes = visibleTasks.reduce((sum, task) => sum + (task.estimatedMinutes ?? task.duration ?? 0), 0);
+  const plannedLabel = `${Math.floor(totalMinutes / 60)} год ${totalMinutes % 60} хв заплановано`;
+  const completedCount = visibleTasks.filter((task) => task.status === "completed").length;
+  const progressValue = apiClient ? (visibleTasks.length ? Math.round((completedCount / visibleTasks.length) * 100) : 0) : (screenId === "today-active" ? 38 : 25);
   return (
     <AppFrame {...common}>
-      <section className="today-header"><div><p>Привіт, {DEMO_USER.name}</p><h1>{screenId === "today-active" ? "Тримай один фокус" : "Спокійний план на день"}</h1><span>4 год 20 хв заплановано · 3 вільні слоти</span></div><ProgressRing value={screenId === "today-active" ? 38 : 25} /></section>
+      <section className="today-header"><div><p>{greeting}</p><h1>{screenId === "today-active" ? "Тримай один фокус" : "Спокійний план на день"}</h1><span>{plannedLabel}</span></div><ProgressRing value={progressValue} /></section>
       {screenId === "today-overload" ? <InlineInsight tone="warning" title="День перевантажений">На сьогодні заплановано на 1 год 20 хв більше твого ліміту. Я можу перенести дві гнучкі задачі.</InlineInsight> : null}
       {rescheduleError ? <InlineInsight tone="warning" title="Перепланування не виконано">{rescheduleError}</InlineInsight> : null}
       {reschedulePreview ? <section className="reschedule-preview" aria-label="Попередній перегляд перепланування"><h2>Що зміниться</h2><p>{reschedulePreview.changes?.filter((change) => change.changed).length ?? 0} задач отримають новий час.</p><ul>{(reschedulePreview.changes ?? []).filter((change) => change.changed).slice(0, 3).map((change) => <li key={change.taskId}>{change.title}: {change.after?.plannedStart?.slice(11, 16) ?? "без слоту"}</li>)}</ul><Button onClick={applyReschedulePlan} disabled={rescheduleLoading}>{rescheduleLoading ? "Застосовую…" : "Застосувати перепланування"}</Button></section> : null}
@@ -142,10 +152,10 @@ export function TodayScreens({ screenId = "today-normal", onNavigate = () => {},
       {rescheduleApplied ? <InlineInsight title="План змінився — я знайшов новий час.">Гнучкі задачі отримали нові слоти. Якщо це не підходить, зміни можна скасувати.</InlineInsight> : null}
       {mutationError ? <InlineInsight tone="warning" title="План не змінився">{mutationError}</InlineInsight> : null}
       {undoing ? <InlineInsight title="Скасовую зміни…">Зачекай, поки Вектор поверне попередній стан плану.</InlineInsight> : null}
-      <DayPlan active={screenId === "today-active"} onNavigate={onNavigate} tasks={visibleTasks} onComplete={complete} onSelect={setSheetTask} />
+      <DayPlan active={screenId === "today-active"} onNavigate={onNavigate} tasks={visibleTasks} onComplete={complete} onSelect={setSheetTask} apiClient={apiClient} />
       {moveAnnouncement ? <p role="status" aria-live="polite" className="sr-only">{moveAnnouncement}</p> : null}
       {sheetTask ? <TaskTimeSheet task={sheetTask} saving={savingTime} onClose={() => setSheetTask(null)} onSave={saveTime} /> : null}
-      <div className="break-card"><Coffee size={20} /><span><strong>10:30 · Перерва</strong><small>10 хв без задач</small></span><Clock size={17} /></div>
+      {!apiClient ? <div className="break-card"><Coffee size={20} /><span><strong>10:30 · Перерва</strong><small>10 хв без задач</small></span><Clock size={17} /></div> : null}
       {screenId === "today-overload" ? <Button variant="secondary" onClick={previewReschedulePlan} disabled={rescheduleLoading}>{rescheduleLoading ? "Готую новий план…" : "Переглянути новий план"}</Button> : null}
       {showUndo ? <UndoSnackbar message="Зміни застосовано — можна скасувати." onUndo={() => setShowUndo(false)} /> : null}
       {undoChange ? <UndoSnackbar message={undoChange.reschedule ? "Перепланування застосовано" : "Задачу виконано"} onUndo={undo} /> : null}
