@@ -8,7 +8,7 @@ import type { ChangeSetRepository, ChangeSetRecord } from '../../repositories/ch
 import type { AnalysisService } from '../ai/analyzeBrainDump.js';
 import { buildDailyPlan } from '../scheduler/buildDailyPlan.js';
 import type { SchedulerBusySlot, SchedulerTask, SchedulerProfile } from '../scheduler/types.js';
-import { applyBodySchema, applyResponseSchema, inboxResponseSchema, ideaResponseShape, planChangeSetPayloadSchema, planPreviewBodySchema, planPreviewSchema, taskResponseSchema, todayResponseSchema, type ChangeSetResponse, type PlanChangeSetPayload, type PlanPreviewBody, type PlanPreview, type TaskResponse, type IdeaResponse, type DraftResponse } from './planSchemas.js';
+import { applyBodySchema, applyResponseSchema, inboxResponseSchema, ideaResponseShape, normalizeLegacyPlanChangeSetPayload, planChangeSetPayloadSchema, planPreviewBodySchema, planPreviewSchema, taskResponseSchema, todayResponseSchema, type ChangeSetResponse, type PlanChangeSetPayload, type PlanPreviewBody, type PlanPreview, type TaskResponse, type IdeaResponse, type DraftResponse } from './planSchemas.js';
 import type { BusySlotService } from '../calendar/busySlotService.js';
 import type { CalendarEventService } from '../calendar/calendarEventService.js';
 import type { AdaptationService } from '../adaptation/adaptationService.js';
@@ -40,7 +40,7 @@ const publicDraft = (draft: Record<string, unknown>): DraftResponse => ({
 });
 const publicChangeSet = (changeSet: ChangeSetRecord): ChangeSetResponse => ({ id: changeSet.id, status: String(changeSet.status ?? ''), ...(changeSet.kind ? { kind: changeSet.kind } : {}), ...(typeof changeSet.idempotencyKey === 'string' ? { idempotencyKey: changeSet.idempotencyKey } : {}), ...(changeSet.beforeJson !== undefined ? { beforeJson: changeSet.beforeJson } : {}), ...(changeSet.afterJson !== undefined ? { afterJson: changeSet.afterJson } : {}) });
 const parsePayload = (value: unknown): PlanChangeSetPayload => {
-  const parsed = planChangeSetPayloadSchema.safeParse(value);
+  const parsed = planChangeSetPayloadSchema.safeParse(normalizeLegacyPlanChangeSetPayload(value));
   if (!parsed.success) throw new PlanValidationError();
   return parsed.data;
 };

@@ -30,6 +30,21 @@ export const proposalTaskSchema = z.object({
   deadline: iso.nullable(), plannedStart: iso.nullable(), plannedEnd: iso.nullable(), estimatedMinutes: z.number().int().positive().max(1440), energy: z.enum(['low', 'medium', 'high']), flexible: z.boolean(), locked: z.boolean(), sourceDump: boundedId, goalId: boundedId.nullable().default(null),
 }).strict();
 export const proposalIdeaSchema = z.object({ id: z.string().min(1), text: z.string().min(1).max(20_000), summary: z.string().max(2_000), status: z.literal('backlog'), sourceDump: boundedId, goalId: boundedId.nullable().default(null) }).strict();
+
+export function normalizeLegacyPlanChangeSetPayload(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || Object.prototype.hasOwnProperty.call(value, 'dumpId')) return value;
+  const payload = value as { tasks?: unknown; ideas?: unknown };
+  if (Object.prototype.hasOwnProperty.call(payload, 'goalId') || !Array.isArray(payload.tasks) || !Array.isArray(payload.ideas)) return value;
+  const sourceDumps = [...payload.tasks, ...payload.ideas].map((proposal) => {
+    if (!proposal || typeof proposal !== 'object') return null;
+    if (Object.prototype.hasOwnProperty.call(proposal, 'goalId')) return null;
+    const parsed = boundedId.safeParse((proposal as { sourceDump?: unknown }).sourceDump);
+    return parsed.success ? parsed.data : null;
+  });
+  if (!sourceDumps.length || sourceDumps.some((sourceDump) => sourceDump === null) || new Set(sourceDumps).size !== 1) return value;
+  return { ...payload, dumpId: sourceDumps[0] };
+}
+
 export const planChangeSetPayloadSchema = z.object({
   dumpId: boundedId,
   goalId: boundedId.nullable().default(null),

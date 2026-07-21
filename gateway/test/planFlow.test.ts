@@ -265,18 +265,40 @@ describe('Brain Dump → Today vertical slice', () => {
     expect(r.ideaRepository.create).not.toHaveBeenCalled();
     expect(r.dumpRepository.update).not.toHaveBeenCalled();
   });
-  it('applies legacy no-goal payloads that predate goalId fields', async () => {
+  it('reuses and applies a historical payload without top-level identities', async () => {
     const r = repos(); const service = createPlanService(r);
     const preview = await service.preview(user, 'dump-1', { idempotencyKey: 'plan-legacy-no-goal' });
+    delete r.changes[0].afterJson.dumpId;
     delete r.changes[0].afterJson.goalId;
     for (const task of r.changes[0].afterJson.tasks) delete task.goalId;
     for (const idea of r.changes[0].afterJson.ideas) delete idea.goalId;
 
+    const reused = await service.preview(user, 'dump-1', { idempotencyKey: 'plan-legacy-no-goal' });
     const applied = await service.apply(user, preview.changeSetId, {});
 
+    expect(reused.changeSetId).toBe(preview.changeSetId);
     expect(applied.tasks).toEqual([expect.objectContaining({ goalId: null })]);
     expect(applied.ideas).toEqual([expect.objectContaining({ goalId: null })]);
     expect(r.edges).toHaveLength(0);
+  });
+  it.each([
+    ['an inconsistent proposal sourceDump', (payload: any) => { payload.ideas[0].sourceDump = 'dump-other'; }],
+    ['a missing proposal sourceDump', (payload: any) => { delete payload.tasks[0].sourceDump; }],
+  ])('rejects a historical payload with %s before any apply write', async (_case, mutate) => {
+    const r = repos(); const service = createPlanService(r);
+    const preview = await service.preview(user, 'dump-1', { idempotencyKey: `plan-legacy-invalid-${String(_case)}` });
+    delete r.changes[0].afterJson.dumpId;
+    delete r.changes[0].afterJson.goalId;
+    for (const task of r.changes[0].afterJson.tasks) delete task.goalId;
+    for (const idea of r.changes[0].afterJson.ideas) delete idea.goalId;
+    mutate(r.changes[0].afterJson);
+    vi.clearAllMocks();
+
+    await expect(service.apply(user, preview.changeSetId, {})).rejects.toMatchObject({ code: 'INVALID_PLAN' });
+
+    expect(r.taskRepository.create).not.toHaveBeenCalled();
+    expect(r.ideaRepository.create).not.toHaveBeenCalled();
+    expect(r.dumpRepository.update).not.toHaveBeenCalled();
   });
   it('stores canonical dump and goal ids in preview Change Set payloads', async () => {
     const r = repos({ goals: [{ id: 'goal-1', user: 'alice', title: 'Мета', status: 'active' }] });
