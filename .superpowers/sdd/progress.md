@@ -95,3 +95,5 @@ Task 2 (voice-and-brain-dump-save-fixes plan): complete (ad7ca32..7ebf205, revie
 Task 3 (voice-and-brain-dump-save-fixes plan): complete (7ebf205..af0ac6e, review clean, one Minor note: verification report used a JSON-parse check instead of the brief's literal `tsx watch --env-file` reproduction command — low risk, tsx 4.19.3 already supports Node flag pass-through). gateway/package.json "dev" script now loads .env via --env-file; "start"/"worker"/"build" untouched.
 
 S1 (strip-down plan): complete (ef92148..fddd6bd, review clean). Onboarding gate removed; authenticated users land on today-normal. 156/156 frontend tests.
+
+S2 (strip-down plan): complete (23dd273..efde4d4, review r2 PASS). Nav reduced to Today/BrainDump/Inbox, DEMO_HIDDEN route blocking incl. direct-URL fix for /goalfocus, focus switcher removed from Today. 158/158 tests.
