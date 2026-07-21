@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 const iso = z.string().datetime({ offset: true });
+const boundedId = z.string().trim().min(1).max(128);
 const profile = z.object({
   timezone: z.string().min(1).max(80).default('Europe/Warsaw'),
   workHours: z.object({ start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/), end: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/) }).default({ start: '09:00', end: '18:00' }),
@@ -17,7 +18,7 @@ export const planPreviewBodySchema = z.object({
   now: iso.optional(),
   timezone: z.string().min(1).max(80).optional(),
   idempotencyKey: z.string().min(8).max(255).optional(),
-  goalId: z.string().trim().min(1).max(128).optional(),
+  goalId: boundedId.optional(),
   calendarDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   confirmCalendarConflicts: z.boolean().optional(),
 }).strict();
@@ -26,19 +27,26 @@ export const todayQuerySchema = z.object({ date: z.string().regex(/^\d{4}-\d{2}-
 
 export const proposalTaskSchema = z.object({
   id: z.string().min(1), title: z.string().min(1).max(500), description: z.string().max(10_000), status: z.enum(['inbox', 'scheduled']), priority: z.enum(['low', 'medium', 'high', 'urgent']),
-  deadline: iso.nullable(), plannedStart: iso.nullable(), plannedEnd: iso.nullable(), estimatedMinutes: z.number().int().positive().max(1440), energy: z.enum(['low', 'medium', 'high']), flexible: z.boolean(), locked: z.boolean(), sourceDump: z.string(), goalId: z.string().nullable().default(null),
+  deadline: iso.nullable(), plannedStart: iso.nullable(), plannedEnd: iso.nullable(), estimatedMinutes: z.number().int().positive().max(1440), energy: z.enum(['low', 'medium', 'high']), flexible: z.boolean(), locked: z.boolean(), sourceDump: boundedId, goalId: boundedId.nullable().default(null),
 }).strict();
-export const proposalIdeaSchema = z.object({ id: z.string().min(1), text: z.string().min(1).max(20_000), summary: z.string().max(2_000), status: z.literal('backlog'), sourceDump: z.string(), goalId: z.string().nullable().default(null) }).strict();
+export const proposalIdeaSchema = z.object({ id: z.string().min(1), text: z.string().min(1).max(20_000), summary: z.string().max(2_000), status: z.literal('backlog'), sourceDump: boundedId, goalId: boundedId.nullable().default(null) }).strict();
 export const planChangeSetPayloadSchema = z.object({
-  dumpId: z.string().min(1).optional(),
-  goalId: z.string().nullable().default(null),
+  dumpId: boundedId,
+  goalId: boundedId.nullable().default(null),
   tasks: z.array(proposalTaskSchema),
   ideas: z.array(proposalIdeaSchema),
   calendarStale: z.boolean().optional(),
   appliedTaskIds: z.array(z.string().min(1)).optional(),
   appliedIdeaIds: z.array(z.string().min(1)).optional(),
   appliedEdgeIds: z.array(z.string().min(1)).optional(),
-}).strict();
+}).strict().superRefine((payload, context) => {
+  for (const [collection, proposals] of [['tasks', payload.tasks], ['ideas', payload.ideas]] as const) {
+    proposals.forEach((proposal, index) => {
+      if (proposal.sourceDump !== payload.dumpId) context.addIssue({ code: 'custom', path: [collection, index, 'sourceDump'], message: 'Proposal sourceDump must match dumpId' });
+      if (proposal.goalId !== payload.goalId) context.addIssue({ code: 'custom', path: [collection, index, 'goalId'], message: 'Proposal goalId must match goalId' });
+    });
+  }
+});
 export const draftResponseShape = z.object({ id: z.string(), text: z.string(), status: z.string().optional(), source: z.string().optional(), kind: z.string().optional(), created: z.string().optional() }).strict();
 export const planPreviewSchema = z.object({
   changeSetId: z.string().min(1), tasks: z.array(proposalTaskSchema), ideas: z.array(proposalIdeaSchema), blocks: z.array(z.object({ id: z.string(), kind: z.enum(['busy', 'task', 'break']), title: z.string(), start: iso, end: iso, locked: z.boolean(), taskId: z.string().optional() })), unscheduledTaskIds: z.array(z.string()), warnings: z.array(z.object({ code: z.string(), message: z.string(), taskId: z.string().optional() })), reasons: z.record(z.string(), z.array(z.object({ code: z.string(), message: z.string() }))),

@@ -44,11 +44,6 @@ const parsePayload = (value: unknown): PlanChangeSetPayload => {
   if (!parsed.success) throw new PlanValidationError();
   return parsed.data;
 };
-const payloadGoalId = (payload: PlanChangeSetPayload): string | null => {
-  const entityGoalIds = new Set([...payload.tasks, ...payload.ideas].flatMap((item) => item.goalId ? [item.goalId] : []));
-  if (entityGoalIds.size > 1 || (payload.goalId && entityGoalIds.size === 1 && !entityGoalIds.has(payload.goalId))) throw new PlanValidationError();
-  return payload.goalId ?? entityGoalIds.values().next().value ?? null;
-};
 
 export function createPlanService(deps: {
   dumpRepository: BrainDumpRepository;
@@ -106,7 +101,10 @@ export function createPlanService(deps: {
     const ideas = analysis.ideas.map((idea, index) => ({ id: `proposal-${result.id}-i-${index + 1}`, text: idea.text, summary: idea.summary, status: 'backlog' as const, sourceDump: dumpId, goalId: goal?.id ?? null }));
     const idempotencyKey = body.idempotencyKey ?? `plan:${user.userId}:${dumpId}:${result.id}`;
     const existing = (await changeSetRepository.list(user)).find((record) => record.idempotencyKey === idempotencyKey);
-    if (existing && payloadGoalId(parsePayload(existing.afterJson)) !== (body.goalId ?? null)) throw new PlanConflictError();
+    if (existing) {
+      const existingPayload = parsePayload(existing.afterJson);
+      if (existingPayload.dumpId !== dumpId || existingPayload.goalId !== (body.goalId ?? null)) throw new PlanConflictError();
+    }
     let changeSet = existing;
     if (!changeSet) {
       const currentTasks = (await taskRepository.list(user)).filter((task) => task.sourceDump === dumpId);
@@ -114,7 +112,8 @@ export function createPlanService(deps: {
       try { changeSet = await changeSetRepository.create(user, { kind: 'ai_classification', status: 'pending', beforeJson: { tasks: currentTasks, ideas: currentIdeas }, afterJson: { dumpId, goalId: goal?.id ?? null, tasks: proposedTasks, ideas, ...(calendarWarning ? { calendarStale: true } : {}) }, idempotencyKey }); }
       catch { changeSet = (await changeSetRepository.list(user)).find((record) => record.idempotencyKey === idempotencyKey); if (!changeSet) throw new RepositoryError('UNAVAILABLE'); }
     }
-    if (payloadGoalId(parsePayload(changeSet.afterJson)) !== (body.goalId ?? null)) throw new PlanConflictError();
+    const storedPayload = parsePayload(changeSet.afterJson);
+    if (storedPayload.dumpId !== dumpId || storedPayload.goalId !== (body.goalId ?? null)) throw new PlanConflictError();
     return planPreviewSchema.parse({ changeSetId: changeSet.id, tasks: proposedTasks, ideas, blocks: plan.blocks, unscheduledTaskIds: plan.unscheduledTaskIds, warnings: calendarWarning ? [...plan.warnings, calendarWarning] : plan.warnings, reasons: plan.reasons });
   }
 
@@ -141,13 +140,12 @@ export function createPlanService(deps: {
     const applyInput = applyBodySchema.safeParse(input ?? {});
     if (!applyInput.success || (applyInput.data.idempotencyKey && applyInput.data.idempotencyKey !== changeSet.idempotencyKey)) throw new PlanValidationError();
     const payload = parsePayload(changeSet.afterJson);
+    const sourceDump = await dumpRepository.get(user, payload.dumpId);
+    if (!sourceDump || sourceDump.id !== payload.dumpId || sourceDump.user !== user.userId) throw new PlanValidationError();
     if (changeSet.status === 'applied') return appliedResult(user, changeSet, payload);
     if (payload.calendarStale === true && applyInput.data.confirmCalendarConflicts !== true) throw new PlanValidationError();
-    const storedGoalId = payloadGoalId(payload);
-    const goalIds = new Set([...payload.tasks, ...payload.ideas].flatMap((item) => item.goalId ? [item.goalId] : []));
-    if (storedGoalId) goalIds.add(storedGoalId);
-    for (const goalId of goalIds) {
-      const goal = goalGraphRepository ? await goalGraphRepository.goals.get(user, goalId) : null;
+    if (payload.goalId) {
+      const goal = goalGraphRepository ? await goalGraphRepository.goals.get(user, payload.goalId) : null;
       if (!goal || goal.user !== user.userId || goal.status !== 'active') throw new PlanValidationError();
     }
     const reservationKey = `plan-apply:${changeSetId}`;
@@ -161,20 +159,27 @@ export function createPlanService(deps: {
     } catch {
       return waitForConcurrentApply(user, changeSetId);
     }
-    const persistedTasks: TaskRecord[] = []; const persistedIdeas: IdeaRecord[] = []; const createdTasks: TaskRecord[] = []; const createdIdeas: IdeaRecord[] = []; const updatedTasks: Array<{ before: TaskRecord }> = []; const updatedIdeas: Array<{ before: IdeaRecord }> = []; const persistedEdges: GraphEdgeRecord[] = []; const createdEdges: GraphEdgeRecord[] = [];
+    const persistedTasks: TaskRecord[] = []; const persistedIdeas: IdeaRecord[] = []; const createdTasks: TaskRecord[] = []; const createdIdeas: IdeaRecord[] = []; const updatedTasks: Array<{ before: TaskRecord }> = []; const updatedIdeas: Array<{ before: IdeaRecord }> = []; const persistedEdges: GraphEdgeRecord[] = []; const createdEdges: GraphEdgeRecord[] = []; const removedEdges: GraphEdgeRecord[] = [];
     try {
       for (const proposed of payload.tasks) { const { id: _id, ...recordInput } = proposed; const existing = (await taskRepository.list(user)).find((task) => task.id === proposed.id || (task.sourceDump === proposed.sourceDump && task.title === proposed.title)); const before = existing ? { ...existing } : null; const task = existing ? await taskRepository.update(user, existing.id, recordInput) : await taskRepository.create(user, recordInput); persistedTasks.push(task); if (before) updatedTasks.push({ before }); else createdTasks.push(task); }
       for (const proposed of payload.ideas) { const { id: _id, ...recordInput } = proposed; const existing = (await ideaRepository.list(user)).find((idea) => idea.id === proposed.id || (idea.sourceDump === proposed.sourceDump && idea.text === proposed.text)); const before = existing ? { ...existing } : null; const idea = existing ? await ideaRepository.update(user, existing.id, recordInput) : await ideaRepository.create(user, recordInput); persistedIdeas.push(idea); if (before) updatedIdeas.push({ before }); else createdIdeas.push(idea); }
       if (goalGraphRepository) {
         const existingEdges = await goalGraphRepository.edges.list(user);
-        const edgesByKey = new Map(existingEdges.filter((edge) => edge.status === 'confirmed').map((edge) => [`${edge.fromType}:${edge.fromId}:goal:${edge.toId}`, edge]));
         const persistedEdgeIds = new Set<string>();
-        for (const [entityType, entities] of [['task', persistedTasks], ['idea', persistedIdeas]] as const) for (const entity of entities) if (entity.goalId) {
-          const key = `${entityType}:${entity.id}:goal:${entity.goalId}`;
-          const existingEdge = edgesByKey.get(key);
-          if (existingEdge) { if (!persistedEdgeIds.has(existingEdge.id)) { persistedEdges.push(existingEdge); persistedEdgeIds.add(existingEdge.id); } continue; }
-          const edge = await goalGraphRepository.edges.create(user, { fromType: entityType, fromId: entity.id, toType: 'goal', toId: String(entity.goalId), actor: 'ai', status: 'confirmed', confirmedBy: user.userId, confidence: 1, rationale: 'Підтверджено користувачем під час розбору Brain Dump.' });
-          createdEdges.push(edge); persistedEdges.push(edge); persistedEdgeIds.add(edge.id); edgesByKey.set(key, edge);
+        for (const [entityType, records] of [['task', persistedTasks], ['idea', persistedIdeas]] as const) for (const entity of new Map(records.map((record) => [record.id, record])).values()) {
+          const confirmedGoalEdges = existingEdges
+            .filter((edge) => edge.fromType === entityType && edge.fromId === entity.id && edge.toType === 'goal' && edge.status === 'confirmed')
+            .sort((left, right) => left.id.localeCompare(right.id));
+          let canonicalEdge = entity.goalId ? confirmedGoalEdges.find((edge) => edge.toId === entity.goalId) : undefined;
+          if (entity.goalId && !canonicalEdge) {
+            canonicalEdge = await goalGraphRepository.edges.create(user, { fromType: entityType, fromId: entity.id, toType: 'goal', toId: String(entity.goalId), actor: 'ai', status: 'confirmed', confirmedBy: user.userId, confidence: 1, rationale: 'Підтверджено користувачем під час розбору Brain Dump.' });
+            createdEdges.push(canonicalEdge);
+          }
+          if (canonicalEdge && !persistedEdgeIds.has(canonicalEdge.id)) { persistedEdges.push(canonicalEdge); persistedEdgeIds.add(canonicalEdge.id); }
+          for (const obsoleteEdge of confirmedGoalEdges) if (obsoleteEdge.id !== canonicalEdge?.id) {
+            await goalGraphRepository.edges.delete(user, obsoleteEdge.id);
+            removedEdges.push(obsoleteEdge);
+          }
         }
       }
       if (calendarEventService) {
@@ -188,6 +193,7 @@ export function createPlanService(deps: {
       return applyResponseSchema.parse({ changeSet: publicChangeSet(updated), tasks: [...new Map(persistedTasks.map((task) => [task.id, task])).values()].map(publicTask), ideas: [...new Map(persistedIdeas.map((idea) => [idea.id, idea])).values()].map(publicIdea) });
     } catch (error) {
       for (const edge of createdEdges) { try { if (edge.id) await goalGraphRepository?.edges.delete(user, edge.id); } catch { /* retain failed change set for safe retry */ } }
+      for (const edge of removedEdges) { try { await goalGraphRepository?.edges.create(user, pick(edge, ['fromType', 'fromId', 'toType', 'toId', 'actor', 'status', 'confirmedBy', 'confidence', 'rationale'])); } catch { /* retain failed change set for diagnosis */ } }
       for (const task of createdTasks) { try { if (task.id) await taskRepository.delete(user, task.id); } catch { try { if (task.id) await taskRepository.update(user, task.id, { status: 'cancelled' }); } catch { /* explicit failed change set remains retryable */ } } }
       for (const idea of createdIdeas) { try { if (idea.id) await ideaRepository.delete(user, idea.id); } catch { try { if (idea.id) await ideaRepository.update(user, idea.id, { status: 'archived' }); } catch { /* explicit failed change set remains retryable */ } } }
       for (const { before } of updatedTasks.reverse()) { try { await taskRepository.update(user, before.id, pick(before, ['title', 'description', 'status', 'priority', 'deadline', 'plannedStart', 'plannedEnd', 'estimatedMinutes', 'actualMinutes', 'energy', 'flexible', 'locked', 'sourceDump', 'goalId', 'rescheduleCount', 'version'])); } catch { /* explicit failed change set retains the snapshot for diagnosis */ } }
