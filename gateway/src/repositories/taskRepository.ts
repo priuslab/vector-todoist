@@ -2,7 +2,7 @@ import type { PocketBaseClient, PocketBaseRecord } from '../pocketbase/client.js
 import type { VerifiedUser } from '../auth/verifyPocketBaseToken.js';
 import { createOwned, deleteOwned, listOwned, owned, updateOwned, RepositoryError } from './base.js';
 
-export type TaskRecord = PocketBaseRecord & { title?: string; status?: string; deadline?: string; estimatedMinutes?: number; version?: number };
+export type TaskRecord = PocketBaseRecord & { title?: string; status?: string; deadline?: string; estimatedMinutes?: number; version?: number; goalId?: string | null; sourceDump?: string };
 export type TaskInput = Omit<Partial<TaskRecord>, 'id' | 'user'> & { user?: never };
 export interface TaskRepository {
   create(user: VerifiedUser, input: TaskInput): Promise<TaskRecord>;

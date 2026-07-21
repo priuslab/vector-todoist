@@ -4,15 +4,19 @@ import type { VerifiedUser } from '../src/auth/verifyPocketBaseToken.js';
 
 const user: VerifiedUser = { userId: 'alice', email: 'alice@example.test' };
 const analysis = { id: 'session-1', status: 'classified' as const, analysis: { summary: 'Готово', confidence: .95, questions: [], context: [], tasks: [{ title: 'Підготувати структуру', description: 'Тези', priority: 'high' as const, estimatedMinutes: 60, deadline: null, energy: 'high' as const, confidence: .95 }], ideas: [{ text: 'Епізод про синдром самозванця', summary: 'Можлива тема', confidence: .9 }] } };
-function repos() {
-  let sequence = 0; const dumps = [{ id: 'dump-1', user: 'alice', rawText: 'думки', source: 'web', kind: 'text', status: 'classified', created: '2026-07-18 08:00:00' }]; const tasks: any[] = []; const ideas: any[] = []; const changes: any[] = [];
+function repos({ goals = [] as any[] }: { goals?: any[] } = {}) {
+  let sequence = 0; const dumps = [{ id: 'dump-1', user: 'alice', rawText: 'думки', source: 'web', kind: 'text', status: 'classified', created: '2026-07-18 08:00:00' }]; const tasks: any[] = []; const ideas: any[] = []; const changes: any[] = []; const edges: any[] = [];
   return {
-    dumpRepository: { get: vi.fn(async () => dumps[0]), list: vi.fn(async () => dumps) } as any,
+    dumpRepository: { get: vi.fn(async () => dumps[0]), list: vi.fn(async () => dumps), update: vi.fn(async (_u: VerifiedUser, id: string, input: any) => { const dump = dumps.find((item) => item.id === id); Object.assign(dump, input); return dump; }) } as any,
     analysisService: { result: vi.fn(async () => analysis) } as any,
     taskRepository: { create: vi.fn(async (_u: VerifiedUser, input: any) => { const item = { id: `task-${++sequence}`, user: 'alice', collectionName: 'tasks', created: 'now', updated: 'now', ...input }; tasks.push(item); return item; }), list: vi.fn(async () => tasks), get: vi.fn(async (_u: VerifiedUser, id: string) => tasks.find((x) => x.id === id) ?? null), delete: vi.fn(async (_u: VerifiedUser, id: string) => { const index = tasks.findIndex((x) => x.id === id); if (index >= 0) tasks.splice(index, 1); }) } as any,
     ideaRepository: { create: vi.fn(async (_u: VerifiedUser, input: any) => { const item = { id: `idea-${++sequence}`, user: 'alice', collectionName: 'ideas', created: 'now', updated: 'now', ...input }; ideas.push(item); return item; }), list: vi.fn(async () => ideas), delete: vi.fn(async (_u: VerifiedUser, id: string) => { const index = ideas.findIndex((x) => x.id === id); if (index >= 0) ideas.splice(index, 1); }) } as any,
     changeSetRepository: { create: vi.fn(async (_u: VerifiedUser, input: any) => { const item = { id: `change-${++sequence}`, user: 'alice', ...input }; changes.push(item); return item; }), get: vi.fn(async (_u: VerifiedUser, id: string) => changes.find((x) => x.id === id) ?? null), list: vi.fn(async () => changes), update: vi.fn(async (_u: VerifiedUser, id: string, input: any) => { const item = changes.find((x) => x.id === id); Object.assign(item, input); return item; }) } as any,
-    tasks, ideas, changes,
+    goalGraphRepository: {
+      goals: { get: vi.fn(async (u: VerifiedUser, id: string) => goals.find((goal) => goal.id === id && goal.user === u.userId) ?? null) },
+      edges: { create: vi.fn(async (_u: VerifiedUser, input: any) => { const item = { id: `edge-${++sequence}`, user: 'alice', ...input }; edges.push(item); return item; }), list: vi.fn(async () => edges), delete: vi.fn(async (_u: VerifiedUser, id: string) => { const index = edges.findIndex((edge) => edge.id === id); if (index >= 0) edges.splice(index, 1); }) },
+    } as any,
+    dumps, tasks, ideas, changes, edges,
   };
 }
 
@@ -25,13 +29,14 @@ describe('Brain Dump → Today vertical slice', () => {
     expect(repeatedPreview.changeSetId).toBe(preview.changeSetId); expect(r.changes).toHaveLength(1);
     const applied = await service.apply(user, preview.changeSetId, {});
     expect(applied.changeSet.status).toBe('applied'); expect(applied.tasks).toHaveLength(1); expect(applied.ideas).toHaveLength(1);
+    expect(r.dumps[0].status).toBe('applied');
     const repeated = await service.apply(user, preview.changeSetId, {}); expect(repeated.changeSet.id).toBe(preview.changeSetId); expect(r.tasks).toHaveLength(1); expect(r.ideas).toHaveLength(1);
     expect((await service.inbox(user)).ideas).toHaveLength(1);
   });
   it('rolls back partial persistence and leaves change set retryable', async () => {
     const r = repos(); r.ideaRepository.create = vi.fn(async () => { throw new Error('injected persistence failure'); }); const service = createPlanService(r);
     const preview = await service.preview(user, 'dump-1', { now: '2026-07-18T08:00:00+02:00', idempotencyKey: 'plan-87654321' });
-    await expect(service.apply(user, preview.changeSetId, {})).rejects.toBeDefined(); expect(r.tasks).toHaveLength(0); expect(r.changes[0].status).toBe('failed');
+    await expect(service.apply(user, preview.changeSetId, {})).rejects.toBeDefined(); expect(r.tasks).toHaveLength(0); expect(r.changes[0].status).toBe('failed'); expect(r.dumps[0].status).toBe('classified');
   });
   it('stores the actual affected pre-state in the Change Set snapshot', async () => {
     const r = repos(); r.tasks.push({ id: 'old-task', user: 'alice', sourceDump: 'dump-1', title: 'Стара задача', status: 'inbox' }); r.ideas.push({ id: 'old-idea', user: 'alice', sourceDump: 'dump-1', text: 'Стара ідея', status: 'backlog' });
@@ -54,5 +59,46 @@ describe('Brain Dump → Today vertical slice', () => {
     const inbox = await service.inbox(user);
 
     expect(inbox.drafts).toEqual([expect.objectContaining({ id: 'dump-1', text: 'думки', status: 'classified' })]);
+  });
+  it('links confirmed proposals to an owned goal and creates Oracle edges', async () => {
+    const r = repos({ goals: [{ id: 'goal-1', user: 'alice', title: 'Запустити застосунок', status: 'active' }] });
+    const service = createPlanService(r);
+
+    const preview = await service.preview(user, 'dump-1', { goalId: 'goal-1', idempotencyKey: 'plan-goal-123' });
+    await service.apply(user, preview.changeSetId, {});
+    await service.apply(user, preview.changeSetId, {});
+
+    expect(r.tasks[0]).toMatchObject({ goalId: 'goal-1', sourceDump: 'dump-1' });
+    expect(r.ideas[0]).toMatchObject({ goalId: 'goal-1', sourceDump: 'dump-1' });
+    expect(r.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({ fromType: 'task', toType: 'goal', fromId: r.tasks[0].id, toId: 'goal-1', status: 'confirmed' }),
+      expect.objectContaining({ fromType: 'idea', toType: 'goal', fromId: r.ideas[0].id, toId: 'goal-1', status: 'confirmed' }),
+    ]));
+    expect(r.edges).toHaveLength(2);
+    expect(r.changes[0].afterJson.appliedEdgeIds).toHaveLength(2);
+  });
+  it('rejects another user’s goal', async () => {
+    const r = repos({ goals: [{ id: 'goal-bob', user: 'bob', title: 'Приватна мета', status: 'active' }] });
+    const service = createPlanService(r);
+
+    await expect(service.preview(user, 'dump-1', { goalId: 'goal-bob', idempotencyKey: 'plan-goal-456' }))
+      .rejects.toMatchObject({ code: 'INVALID_PLAN' });
+  });
+  it('rolls back created Oracle edges before linked records when persistence fails', async () => {
+    const r = repos({ goals: [{ id: 'goal-1', user: 'alice', title: 'Запустити застосунок', status: 'active' }] });
+    r.goalGraphRepository.edges.create = vi.fn(async (_u: VerifiedUser, input: any) => {
+      if (r.edges.length === 1) throw new Error('injected edge failure');
+      const edge = { id: `edge-${r.edges.length + 1}`, user: 'alice', ...input };
+      r.edges.push(edge);
+      return edge;
+    });
+    const service = createPlanService(r);
+    const preview = await service.preview(user, 'dump-1', { goalId: 'goal-1', idempotencyKey: 'plan-goal-rollback' });
+
+    await expect(service.apply(user, preview.changeSetId, {})).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(r.edges).toHaveLength(0);
+    expect(r.tasks).toHaveLength(0);
+    expect(r.ideas).toHaveLength(0);
+    expect(r.changes[0].status).toBe('failed');
   });
 });

@@ -45,6 +45,16 @@ function ruleValue(source: string, rule: string): string {
 }
 
 describe('PocketBase core schema contract', () => {
+  it('adds an optional tasks.goalId relation to goals without removing existing task plans', async () => {
+    const source = await readFile(resolve(import.meta.dirname, '../../pocketbase/pb_migrations/1784333300_task_goal_link.js'), 'utf8').catch(() => '');
+
+    expect(source).toContain("findCollectionByNameOrId('tasks')");
+    expect(source).toContain("findCollectionByNameOrId('goals')");
+    expect(source).toMatch(/new RelationField\(\{ name: 'goalId', required: false, collectionId: goals\.id, maxSelect: 1, cascadeDelete: false \}\)/);
+    expect(source).toContain('CREATE INDEX idx_tasks_user_goal ON tasks (user, goalId)');
+    expect(source).toContain("fields.removeById(field.id)");
+  });
+
   it('allows a newly created goal discovery session to start with no answers', async () => {
     const source = await readFile(resolve(
       import.meta.dirname,

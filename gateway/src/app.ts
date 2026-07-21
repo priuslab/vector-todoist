@@ -119,6 +119,7 @@ export async function buildApp({
       taskRepository: _services.taskRepository as TaskRepository,
       ideaRepository: _services.ideaRepository as IdeaRepository,
       changeSetRepository: _services.changeSetRepository as ChangeSetRepository,
+      goalGraphRepository: _services.goalGraphRepository as GoalGraphRepository | undefined,
       calendarService: _services.busySlotService as BusySlotService | undefined,
       calendarEventService: _services.calendarEventService as CalendarEventService | undefined,
       adaptationService: _services.adaptationService as import('./modules/adaptation/adaptationService.js').AdaptationService | undefined,
