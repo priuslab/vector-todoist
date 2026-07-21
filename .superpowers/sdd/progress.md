@@ -105,3 +105,5 @@ S4 (strip-down plan): complete (659909f..c9ef40a, review PASS). previewLoading o
 S5a (strip-down plan): complete (8fae2a8..6cdcc2d, review PASS). TaskTimeSheet bottom sheet: tap card -> time picker -> optimistic PATCH plannedStart/plannedEnd with rollback/CONFLICT refresh/aria-live. Minors for final review: localDate helper duplicated in TaskTimeSheet; CONFLICT refetch failure silently swallowed. 162/162 tests.
 
 S6 (strip-down plan): complete (0088900..2ae17b7, review r2 PASS). Live Today shows real date/totals/progress/times; demo event, break card and demo header copy preserved only in demo mode. Minor for final review: now-card 60-min hardcoded duration fallback (pre-existing). 164/164 tests.
+
+S5b (strip-down plan): attempted and DROPPED per plan cut-line (658c068 reverted by 7f7332d). Review found 3 critical interaction bugs (no setPointerCapture -> stuck drag over anchor cards + leaked touchmove listener; mouse ghost-click reopens sheet; no unmount cleanup). S5a sheet remains the task-move path. Post-revert: 164/164 tests.
