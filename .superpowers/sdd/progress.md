@@ -87,3 +87,5 @@ Task 28: complete (`70f5055..f69ad5a`, review r3 PASS). Versioned fail-closed AI
 Task 29: complete (`f69ad5a..7bccd0e`, review final PASS). Security/failure/accessibility audit matrix, named checklists, fixture-gated mobile/Oracle/keyboard/reduced-motion/failure E2E specs with file-based auth fixture loading, and proven reduced-motion CSS hardening. Gateway 193 tests; prototype 99; builds/diff-check/rules pass; E2E collection clean with expected fixture skips.
 
 Task 30: complete (`7bccd0e..7ed673b`, review PASS). Full verification/demo package: core/full demo runbooks, final release report, known limitations, production full-flow fixture-gated spec, and honest external prerequisite tracking. Gateway 193/193; prototype 99/99; typecheck/build, E2E collection (17 expected skips), rules and diff-check pass.
+
+Task 1 (voice-and-brain-dump-save-fixes plan): complete (4cd71c1..2289f5f, review clean). CaptureFlow.jsx saveDraft now reports a real error instead of a false "Чернетку збережено" when the draft POST itself fails; dead retry button fixed. Frontend 156/156 tests pass.
