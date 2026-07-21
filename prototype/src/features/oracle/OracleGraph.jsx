@@ -26,10 +26,13 @@ function positionNodes(nodes) {
 export function OracleGraph({ graph, selectedNodeId, pathNodeIds = [], pathEdgeIds = [], filters = {}, focusMode = false, onSelect, loading = false, error = false, onReset, userId }) {
   const { viewport, reset, zoomBy, beginPan, pan, endPan } = useGraphViewport({ storageKey: `vector-oracle-viewport-v1:${userId || "local"}` });
   const [draggedNode, setDraggedNode] = useState(null);
-  const nodes = useMemo(() => positionNodes(graph?.nodes?.length ? graph.nodes : fallbackNodes), [graph]);
+  // Demo content is only for the standalone prototype. A live empty graph must
+  // stay empty; otherwise it conceals the user's actual database state.
+  const hasLiveGraph = Array.isArray(graph?.nodes);
+  const nodes = useMemo(() => positionNodes(hasLiveGraph ? graph.nodes : fallbackNodes), [graph, hasLiveGraph]);
   const [nodePositions, setNodePositions] = useState({});
   const positionedNodes = useMemo(() => nodes.map((node) => nodePositions[node.id] ? { ...node, ...nodePositions[node.id] } : node), [nodePositions, nodes]);
-  const edges = useMemo(() => graph?.edges?.length ? graph.edges : fallbackEdges, [graph]);
+  const edges = useMemo(() => hasLiveGraph ? (graph.edges ?? []) : fallbackEdges, [graph, hasLiveGraph]);
   const path = new Set(pathNodeIds);
   const visibleNodes = useMemo(() => positionedNodes.filter((node) => (!filters.type || filters.type === "all" || node.type === filters.type) && (!filters.pathOnly || path.size === 0 || path.has(node.id))), [filters.pathOnly, filters.type, pathNodeIds, positionedNodes]);
   const visibleIds = new Set(visibleNodes.map((node) => node.id));

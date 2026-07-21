@@ -7,13 +7,26 @@ import { StateView } from "../../components/StateView";
 import { TaskCard } from "../../components/TaskCard";
 import { DEMO_IDEAS, DEMO_TASKS } from "../../data/demoData";
 import { getInbox } from "../today/todayApi";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function InboxScreens({ screenId = "inbox-default", onNavigate = () => {}, apiClient }) {
   const [remote, setRemote] = useState(null);
   const [remoteError, setRemoteError] = useState("");
-  const [activeTab, setActiveTab] = useState(screenId === "inbox-search" ? "ideas" : "tasks");
+  const [activeTab, setActiveTab] = useState(screenId === "inbox-search" ? "ideas" : screenId === "inbox-drafts" ? "drafts" : "tasks");
+  const autoSelectedDrafts = useRef(false);
+  useEffect(() => {
+    autoSelectedDrafts.current = false;
+    if (screenId === "inbox-drafts") setActiveTab("drafts");
+    else if (screenId === "inbox-search") setActiveTab("ideas");
+  }, [screenId]);
   useEffect(() => { if (!apiClient) return; let alive = true; getInbox({ apiClient }).then((value) => alive && setRemote(value)).catch(() => alive && setRemoteError("Не вдалося завантажити Inbox. Спробуй оновити сторінку.")); return () => { alive = false; }; }, [apiClient]);
+  useEffect(() => {
+    if (autoSelectedDrafts.current || screenId !== "inbox-default" || activeTab !== "tasks") return;
+    if ((remote?.tasks?.length ?? 0) === 0 && (remote?.ideas?.length ?? 0) === 0 && (remote?.drafts?.length ?? 0) > 0) {
+      autoSelectedDrafts.current = true;
+      setActiveTab("drafts");
+    }
+  }, [activeTab, remote, screenId]);
   if (screenId === "inbox-failed-draft") return <AppFrame title="Чернетка" onBack={() => onNavigate("inbox-default")} activeRoute="inbox-default" onNavigate={onNavigate}><StateView state="error" title="Думки збережено" message="AI не зміг завершити обробку, але твій Brain Dump не втрачено." action={<Button onClick={() => onNavigate("capture-processing")}>Повторити обробку</Button>} /><div className="draft-preview"><WarningCircle size={20} /><p>Мені треба підготувати перший випуск подкасту, написати Марії…</p></div></AppFrame>;
   if (apiClient && !remote && !remoteError) return <AppFrame title="Inbox" activeRoute="inbox-default" onNavigate={onNavigate} avatar><StateView state="loading" title="Завантажую Inbox" message="Збираю твої чернетки, задачі та ідеї." /></AppFrame>;
   if (apiClient && remoteError) return <AppFrame title="Inbox" activeRoute="inbox-default" onNavigate={onNavigate} avatar><StateView state="error" title="Inbox тимчасово недоступний" message={remoteError} action={<Button onClick={() => window.location.reload()}>Оновити</Button>} /></AppFrame>;

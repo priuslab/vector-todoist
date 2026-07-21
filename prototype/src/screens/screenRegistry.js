@@ -48,6 +48,7 @@ export const SCREEN_REGISTRY = [
   ]),
   ...createScreens("Inbox", [
     ["inbox-default", "Inbox: задачі, ідеї, чернетки"],
+    ["inbox-drafts", "Inbox: збережені чернетки"],
     ["inbox-search", "Inbox search та filters"],
     ["inbox-failed-draft", "Необроблена чернетка", "error"],
     ["idea-detail", "Idea Detail"],

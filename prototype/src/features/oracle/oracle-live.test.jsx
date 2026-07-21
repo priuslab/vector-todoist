@@ -46,3 +46,10 @@ it("renders loading and error states without a page overflow dependency", async 
   rerender(<OracleScreens apiClient={{ request: vi.fn().mockRejectedValue(new Error("offline")) }} />);
   await waitFor(() => expect(screen.getByTestId("oracle-graph-error")).toBeInTheDocument());
 });
+
+it("does not replace an empty live Oracle with the demo graph", async () => {
+  render(<OracleScreens apiClient={{ request: vi.fn().mockResolvedValue({ nodes: [], edges: [] }) }} />);
+
+  await waitFor(() => expect(screen.getByTestId("oracle-graph-empty")).toBeInTheDocument());
+  expect(screen.queryByRole("button", { name: "Зробити епізод про синдром самозванця" })).not.toBeInTheDocument();
+});

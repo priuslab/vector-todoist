@@ -37,3 +37,17 @@ it("shows saved Brain Dump drafts in the Inbox drafts tab", async () => {
   expect(screen.getByText("Потрібно підготувати запуск сайту")).toBeInTheDocument();
   expect(screen.getByText("Оброблено AI")).toBeInTheDocument();
 });
+
+it("opens the saved Brain Dump directly in drafts instead of hiding it behind the tasks tab", async () => {
+  const apiClient = { request: vi.fn().mockResolvedValue({ tasks: [], ideas: [], drafts: [{ id: "dump-2", text: "Мій щойно збережений запис", status: "received" }] }) };
+  render(<InboxScreens screenId="inbox-drafts" apiClient={apiClient} />);
+
+  expect(await screen.findByText("Мій щойно збережений запис")).toBeInTheDocument();
+});
+
+it("selects drafts in the default Inbox when a live account only has saved Brain Dumps", async () => {
+  const apiClient = { request: vi.fn().mockResolvedValue({ tasks: [], ideas: [], drafts: [{ id: "dump-3", text: "Запис не має загубитися", status: "received" }] }) };
+  render(<InboxScreens apiClient={apiClient} />);
+
+  expect(await screen.findByText("Запис не має загубитися")).toBeInTheDocument();
+});
