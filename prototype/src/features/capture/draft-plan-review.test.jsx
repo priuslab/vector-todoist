@@ -32,7 +32,6 @@ it("keeps the saved result and its actions visible after confirming a draft prop
   const user = userEvent.setup();
   const onNavigate = vi.fn();
   const request = vi.fn()
-    .mockResolvedValueOnce([{ id: "goal-1", title: "Запустити застосунок", status: "active" }])
     .mockResolvedValueOnce({ analysis: classifiedAnalysis })
     .mockResolvedValueOnce({ changeSetId: "change-1", tasks: [proposalTask], ideas: [proposalIdea], blocks: [], unscheduledTaskIds: [], warnings: [], reasons: {} })
     .mockResolvedValueOnce({ changeSet: { id: "change-1", status: "applied" }, tasks: [{ id: "task-1" }], ideas: [{ id: "idea-1" }] });
@@ -48,7 +47,7 @@ it("keeps the saved result and its actions visible after confirming a draft prop
   expect(screen.getByRole("button", { name: "В Inbox" })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "В Oracle" })).not.toBeInTheDocument();
   expect(onNavigate).not.toHaveBeenCalled();
-  expect(request).toHaveBeenNthCalledWith(3, "/api/v1/brain-dumps/dump-1/plan-preview", expect.objectContaining({ method: "POST" }));
+  expect(request).toHaveBeenNthCalledWith(2, "/api/v1/brain-dumps/dump-1/plan-preview", expect.objectContaining({ method: "POST" }));
 });
 
 it.each([
@@ -58,7 +57,6 @@ it.each([
 ])("uses Ukrainian plurals for %i saved tasks and %i ideas", async (taskCount, ideaCount, message) => {
   const user = userEvent.setup();
   const request = vi.fn()
-    .mockResolvedValueOnce([{ id: "goal-1", title: "Запустити застосунок", status: "active" }])
     .mockResolvedValueOnce({ analysis: classifiedAnalysis })
     .mockResolvedValueOnce({ changeSetId: "change-1", tasks: [proposalTask], ideas: [proposalIdea], blocks: [], unscheduledTaskIds: [], warnings: [], reasons: {} })
     .mockResolvedValueOnce({ changeSet: { id: "change-1", status: "applied" }, tasks: Array.from({ length: taskCount }, (_, index) => ({ id: `task-${index}` })), ideas: Array.from({ length: ideaCount }, (_, index) => ({ id: `idea-${index}` })) });
@@ -69,24 +67,23 @@ it.each([
   expect(await screen.findByText(message)).toBeInTheDocument();
 });
 
-it("shows the main-goal action instead of making a proposal against a demo goal", async () => {
-  const user = userEvent.setup();
+it("renders a plan preview with no goals at all, never requesting /api/v1/goals", async () => {
   const onNavigate = vi.fn();
-  const request = vi.fn().mockResolvedValue([]);
+  const request = vi.fn()
+    .mockResolvedValueOnce({ analysis: classifiedAnalysis })
+    .mockResolvedValueOnce({ changeSetId: "change-1", tasks: [proposalTask], ideas: [proposalIdea], blocks: [], unscheduledTaskIds: [], warnings: [], reasons: {} });
 
   render(<DraftPlanReview draftId="dump-1" apiClient={{ request }} onNavigate={onNavigate} />);
 
-  await user.click(await screen.findByRole("button", { name: "Створити головну мету" }));
-
-  expect(onNavigate).toHaveBeenCalledWith("goal-manual");
-  expect(request).toHaveBeenCalledTimes(1);
-  expect(screen.queryByRole("button", { name: "Зберегти пропозиції" })).not.toBeInTheDocument();
+  expect(await screen.findByRole("button", { name: "Зберегти пропозиції" })).toBeInTheDocument();
+  expect(request).toHaveBeenCalledTimes(2);
+  expect(request.mock.calls.some(([url]) => url.includes("/api/v1/goals"))).toBe(false);
+  expect(onNavigate).not.toHaveBeenCalled();
 });
 
 it("keeps the saved draft available and offers a Ukrainian retry when preview fails", async () => {
   const user = userEvent.setup();
   const request = vi.fn()
-    .mockResolvedValueOnce([{ id: "goal-1", title: "Запустити застосунок", status: "active" }])
     .mockResolvedValueOnce({ analysis: classifiedAnalysis })
     .mockRejectedValueOnce(new Error("offline"))
     .mockResolvedValueOnce({ analysis: classifiedAnalysis })
@@ -102,7 +99,6 @@ it("keeps the saved draft available and offers a Ukrainian retry when preview fa
 it("keeps one stable preview instant across a retry after the preview response is lost", async () => {
   const user = userEvent.setup();
   const request = vi.fn()
-    .mockResolvedValueOnce([{ id: "goal-1", title: "Запустити застосунок", status: "active" }])
     .mockResolvedValueOnce({ analysis: classifiedAnalysis })
     .mockRejectedValueOnce(new Error("response lost"))
     .mockResolvedValueOnce({ analysis: classifiedAnalysis })
@@ -113,8 +109,8 @@ it("keeps one stable preview instant across a retry after the preview response i
   await user.click(await screen.findByRole("button", { name: "Спробувати ще раз" }));
   await screen.findByRole("button", { name: "Зберегти пропозиції" });
 
-  const firstPreview = JSON.parse(request.mock.calls[2][1].body);
-  const retriedPreview = JSON.parse(request.mock.calls[4][1].body);
+  const firstPreview = JSON.parse(request.mock.calls[1][1].body);
+  const retriedPreview = JSON.parse(request.mock.calls[3][1].body);
   expect(firstPreview.now).toEqual(expect.any(String));
   expect(retriedPreview.now).toBe(firstPreview.now);
   expect(retriedPreview.idempotencyKey).toBe(firstPreview.idempotencyKey);
