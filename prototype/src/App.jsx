@@ -61,8 +61,8 @@ export function ProductionExperience({ env = import.meta.env, pocketBase: provid
   const resolvedRoute = resolveProductionRoute({ pathname, auth, env });
   const routeFromLocation = React.useCallback(() => {
     const requested = requestedDraftRoute();
-    return resolvedRoute === "today-normal" && requested.route ? requested.route : resolvedRoute;
-  }, [resolvedRoute]);
+    return auth.status === "authenticated" && auth.record?.onboardingCompleted && requested.route ? requested.route : resolvedRoute;
+  }, [auth.record?.onboardingCompleted, auth.status, resolvedRoute]);
   const [route, setRoute] = React.useState(routeFromLocation);
   const [draftId, setDraftId] = React.useState(() => requestedDraftRoute().draft);
   React.useEffect(() => {

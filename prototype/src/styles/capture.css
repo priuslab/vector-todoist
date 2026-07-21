@@ -70,6 +70,6 @@
 .result-summary small { color: var(--text-secondary); font-size: 10px; }
 .scheduled-preview { margin: 14px 0; border: 1px solid var(--border-default); border-radius: var(--radius-card); display: flex; flex-direction: column; padding: 14px; background: var(--bg-surface); }
 .scheduled-preview > strong { margin-bottom: 8px; font-size: 13px; }
-.scheduled-preview span { border-top: 1px solid var(--border-default); display: flex; gap: 8px; padding: 9px 0; font-size: 11px; }
+.scheduled-preview span { border-top: 1px solid var(--border-default); display: flex; gap: 8px; padding: 9px 0; font-size: 12px; }
 .scheduled-preview b { color: var(--brand-primary); }
 .scheduled-preview .locked { color: var(--text-secondary); }

@@ -41,6 +41,7 @@ export function DraftPlanReview({ draftId, apiClient, onNavigate = () => {} }) {
   const [error, setError] = useState("");
   const [applying, setApplying] = useState(false);
   const [key] = useState(idempotencyKey);
+  const [now] = useState(() => new Date().toISOString());
 
   const prepare = async ({ useStoredGoal = false } = {}) => {
     if (!apiClient?.request) {
@@ -70,7 +71,7 @@ export function DraftPlanReview({ draftId, apiClient, onNavigate = () => {} }) {
         setState("needs-clarification");
         return;
       }
-      const nextPreview = await previewBrainDumpPlan({ apiClient, id: draftId, goalId: activeGoal.id, profile: DEFAULT_PROFILE, busySlots: [], timezone: DEFAULT_PROFILE.timezone, idempotencyKey: key });
+      const nextPreview = await previewBrainDumpPlan({ apiClient, id: draftId, goalId: activeGoal.id, profile: DEFAULT_PROFILE, busySlots: [], timezone: DEFAULT_PROFILE.timezone, now, idempotencyKey: key });
       setPreview(nextPreview);
       setState("ready");
     } catch {
@@ -87,7 +88,6 @@ export function DraftPlanReview({ draftId, apiClient, onNavigate = () => {} }) {
     try {
       const applied = await applyChangeSet({ apiClient, id: preview.changeSetId, idempotencyKey: key });
       setResult(applied);
-      onNavigate("today-normal");
     } catch {
       setError("Не вдалося зберегти пропозиції. Чернетка лишилась у Inbox — спробуй ще раз.");
     } finally {

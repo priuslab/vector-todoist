@@ -79,6 +79,13 @@ export function createPlanService(deps: {
     const result = await analysisService.result(user, dumpId);
     if (!result || result.status !== 'classified' || result.analysis.questions.length > 0) throw new PlanValidationError();
     const analysis = result.analysis;
+    const idempotencyKey = body.idempotencyKey ?? `plan:${user.userId}:${dumpId}:${result.id}`;
+    const existing = (await changeSetRepository.list(user)).find((record) => record.idempotencyKey === idempotencyKey);
+    if (existing) {
+      const storedPayload = parsePayload(existing.afterJson);
+      if (storedPayload.dumpId !== dumpId || storedPayload.goalId !== (body.goalId ?? null)) throw new PlanConflictError();
+      if (storedPayload.preview) return planPreviewSchema.parse({ changeSetId: existing.id, tasks: storedPayload.tasks, ideas: storedPayload.ideas, ...storedPayload.preview });
+    }
     const profile: SchedulerProfile = { ...body.profile, timezone: body.timezone ?? body.profile.timezone };
     const tasks: SchedulerTask[] = analysis.tasks.map((task, index) => ({ id: `proposal-${result.id}-t-${index + 1}`, title: task.title, estimatedMinutes: task.estimatedMinutes, priority: task.priority, energy: task.energy, goalAlignment: priorityAlignment[task.priority] ?? .5, deadline: task.deadline, }));
     let calendarWarning: { code: string; message: string } | undefined;
@@ -99,21 +106,17 @@ export function createPlanService(deps: {
       return { id, title: task.title, description: task.description, status: slot ? 'scheduled' as const : 'inbox' as const, priority: task.priority, deadline: task.deadline, plannedStart: slot?.start ?? null, plannedEnd: slot?.end ?? null, estimatedMinutes: task.estimatedMinutes, energy: task.energy, flexible: true, locked: false, sourceDump: dumpId, goalId: goal?.id ?? null };
     });
     const ideas = analysis.ideas.map((idea, index) => ({ id: `proposal-${result.id}-i-${index + 1}`, text: idea.text, summary: idea.summary, status: 'backlog' as const, sourceDump: dumpId, goalId: goal?.id ?? null }));
-    const idempotencyKey = body.idempotencyKey ?? `plan:${user.userId}:${dumpId}:${result.id}`;
-    const existing = (await changeSetRepository.list(user)).find((record) => record.idempotencyKey === idempotencyKey);
-    if (existing) {
-      const existingPayload = parsePayload(existing.afterJson);
-      if (existingPayload.dumpId !== dumpId || existingPayload.goalId !== (body.goalId ?? null)) throw new PlanConflictError();
-    }
     let changeSet = existing;
     if (!changeSet) {
       const currentTasks = (await taskRepository.list(user)).filter((task) => task.sourceDump === dumpId);
       const currentIdeas = (await ideaRepository.list(user)).filter((idea) => idea.sourceDump === dumpId);
-      try { changeSet = await changeSetRepository.create(user, { kind: 'ai_classification', status: 'pending', beforeJson: { tasks: currentTasks, ideas: currentIdeas }, afterJson: { dumpId, goalId: goal?.id ?? null, tasks: proposedTasks, ideas, ...(calendarWarning ? { calendarStale: true } : {}) }, idempotencyKey }); }
+      const preview = { blocks: plan.blocks, unscheduledTaskIds: plan.unscheduledTaskIds, warnings: calendarWarning ? [...plan.warnings, calendarWarning] : plan.warnings, reasons: plan.reasons };
+      try { changeSet = await changeSetRepository.create(user, { kind: 'ai_classification', status: 'pending', beforeJson: { tasks: currentTasks, ideas: currentIdeas }, afterJson: { dumpId, goalId: goal?.id ?? null, tasks: proposedTasks, ideas, preview, ...(calendarWarning ? { calendarStale: true } : {}) }, idempotencyKey }); }
       catch { changeSet = (await changeSetRepository.list(user)).find((record) => record.idempotencyKey === idempotencyKey); if (!changeSet) throw new RepositoryError('UNAVAILABLE'); }
     }
     const storedPayload = parsePayload(changeSet.afterJson);
     if (storedPayload.dumpId !== dumpId || storedPayload.goalId !== (body.goalId ?? null)) throw new PlanConflictError();
+    if (storedPayload.preview) return planPreviewSchema.parse({ changeSetId: changeSet.id, tasks: storedPayload.tasks, ideas: storedPayload.ideas, ...storedPayload.preview });
     return planPreviewSchema.parse({ changeSetId: changeSet.id, tasks: proposedTasks, ideas, blocks: plan.blocks, unscheduledTaskIds: plan.unscheduledTaskIds, warnings: calendarWarning ? [...plan.warnings, calendarWarning] : plan.warnings, reasons: plan.reasons });
   }
 

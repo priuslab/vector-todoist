@@ -33,6 +33,20 @@ describe('Brain Dump → Today vertical slice', () => {
     const repeated = await service.apply(user, preview.changeSetId, {}); expect(repeated.changeSet.id).toBe(preview.changeSetId); expect(r.tasks).toHaveLength(1); expect(r.ideas).toHaveLength(1);
     expect((await service.inbox(user)).ideas).toHaveLength(1);
   });
+  it('replays the persisted proposals and blocks when a preview response is lost', async () => {
+    const r = repos(); const service = createPlanService(r);
+    const firstPreview = await service.preview(user, 'dump-1', { now: '2026-07-18T08:00:00+02:00', idempotencyKey: 'plan-response-loss' });
+
+    const retriedPreview = await service.preview(user, 'dump-1', { now: '2026-07-18T19:00:00+02:00', idempotencyKey: 'plan-response-loss' });
+
+    expect(retriedPreview).toEqual(firstPreview);
+    expect(r.changes).toHaveLength(1);
+    expect(r.changes[0].afterJson).toEqual(expect.objectContaining({
+      tasks: firstPreview.tasks,
+      ideas: firstPreview.ideas,
+      preview: expect.objectContaining({ blocks: firstPreview.blocks }),
+    }));
+  });
   it('rolls back partial persistence and leaves change set retryable', async () => {
     const r = repos(); r.ideaRepository.create = vi.fn(async () => { throw new Error('injected persistence failure'); }); const service = createPlanService(r);
     const preview = await service.preview(user, 'dump-1', { now: '2026-07-18T08:00:00+02:00', idempotencyKey: 'plan-87654321' });

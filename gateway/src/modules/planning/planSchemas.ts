@@ -30,6 +30,10 @@ export const proposalTaskSchema = z.object({
   deadline: iso.nullable(), plannedStart: iso.nullable(), plannedEnd: iso.nullable(), estimatedMinutes: z.number().int().positive().max(1440), energy: z.enum(['low', 'medium', 'high']), flexible: z.boolean(), locked: z.boolean(), sourceDump: boundedId, goalId: boundedId.nullable().default(null),
 }).strict();
 export const proposalIdeaSchema = z.object({ id: z.string().min(1), text: z.string().min(1).max(20_000), summary: z.string().max(2_000), status: z.literal('backlog'), sourceDump: boundedId, goalId: boundedId.nullable().default(null) }).strict();
+const planBlockSchema = z.object({ id: z.string(), kind: z.enum(['busy', 'task', 'break']), title: z.string(), start: iso, end: iso, locked: z.boolean(), taskId: z.string().optional() });
+const planWarningSchema = z.object({ code: z.string(), message: z.string(), taskId: z.string().optional() });
+const planReasonsSchema = z.record(z.string(), z.array(z.object({ code: z.string(), message: z.string() })));
+const persistedPreviewSchema = z.object({ blocks: z.array(planBlockSchema), unscheduledTaskIds: z.array(z.string()), warnings: z.array(planWarningSchema), reasons: planReasonsSchema }).strict();
 
 export function normalizeLegacyPlanChangeSetPayload(value: unknown): unknown {
   if (!value || typeof value !== 'object' || Object.prototype.hasOwnProperty.call(value, 'dumpId')) return value;
@@ -50,6 +54,7 @@ export const planChangeSetPayloadSchema = z.object({
   goalId: boundedId.nullable().default(null),
   tasks: z.array(proposalTaskSchema),
   ideas: z.array(proposalIdeaSchema),
+  preview: persistedPreviewSchema.optional(),
   calendarStale: z.boolean().optional(),
   appliedTaskIds: z.array(z.string().min(1)).optional(),
   appliedIdeaIds: z.array(z.string().min(1)).optional(),
@@ -64,7 +69,7 @@ export const planChangeSetPayloadSchema = z.object({
 });
 export const draftResponseShape = z.object({ id: z.string(), text: z.string(), status: z.string().optional(), source: z.string().optional(), kind: z.string().optional(), created: z.string().optional() }).strict();
 export const planPreviewSchema = z.object({
-  changeSetId: z.string().min(1), tasks: z.array(proposalTaskSchema), ideas: z.array(proposalIdeaSchema), blocks: z.array(z.object({ id: z.string(), kind: z.enum(['busy', 'task', 'break']), title: z.string(), start: iso, end: iso, locked: z.boolean(), taskId: z.string().optional() })), unscheduledTaskIds: z.array(z.string()), warnings: z.array(z.object({ code: z.string(), message: z.string(), taskId: z.string().optional() })), reasons: z.record(z.string(), z.array(z.object({ code: z.string(), message: z.string() }))),
+  changeSetId: z.string().min(1), tasks: z.array(proposalTaskSchema), ideas: z.array(proposalIdeaSchema), blocks: z.array(planBlockSchema), unscheduledTaskIds: z.array(z.string()), warnings: z.array(planWarningSchema), reasons: planReasonsSchema,
 }).strict();
 const taskResponseShape = z.object({ id: z.string(), title: z.string().optional(), description: z.string().optional(), status: z.string().optional(), priority: z.string().optional(), deadline: z.string().nullable().optional(), plannedStart: z.string().nullable().optional(), plannedEnd: z.string().nullable().optional(), estimatedMinutes: z.number().optional(), actualMinutes: z.number().optional(), energy: z.string().optional(), flexible: z.boolean().optional(), locked: z.boolean().optional(), sourceDump: z.string().optional(), goalId: z.string().nullable().optional(), rescheduleCount: z.number().optional() }).strict();
 export const ideaResponseShape = z.object({ id: z.string(), text: z.string().optional(), summary: z.string().optional(), status: z.string().optional(), sourceDump: z.string().optional(), goalId: z.string().nullable().optional() }).strict();
