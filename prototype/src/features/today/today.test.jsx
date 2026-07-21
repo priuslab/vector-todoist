@@ -27,6 +27,12 @@ it("renders the planning detail families", () => {
   expect(screen.getByText("50:00")).toBeInTheDocument();
 });
 
+it("shows demo header copy in demo mode", () => {
+  render(<TodayScreens screenId="today-normal" />);
+
+  expect(screen.getByText("4 год 20 хв заплановано · 3 вільні слоти")).toBeInTheDocument();
+});
+
 it("shows saved Brain Dump drafts in the Inbox drafts tab", async () => {
   const user = userEvent.setup();
   const apiClient = { request: vi.fn().mockResolvedValue({ tasks: [], ideas: [], drafts: [{ id: "dump-1", text: "Потрібно підготувати запуск сайту", status: "classified", created: "2026-07-21 13:00:00" }] }) };

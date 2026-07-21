@@ -93,3 +93,17 @@ Task 1 (voice-and-brain-dump-save-fixes plan): complete (4cd71c1..2289f5f, revie
 Task 2 (voice-and-brain-dump-save-fixes plan): complete (ad7ca32..7ebf205, review clean). Gemini fallback in transcriptionService.ts and geminiClient.ts now retries the Flash-Lite model on HTTP 404 (model not found) in addition to 503; 429 still throws immediately. Gateway 233/233 tests pass.
 
 Task 3 (voice-and-brain-dump-save-fixes plan): complete (7ebf205..af0ac6e, review clean, one Minor note: verification report used a JSON-parse check instead of the brief's literal `tsx watch --env-file` reproduction command — low risk, tsx 4.19.3 already supports Node flag pass-through). gateway/package.json "dev" script now loads .env via --env-file; "start"/"worker"/"build" untouched.
+
+S1 (strip-down plan): complete (ef92148..fddd6bd, review clean). Onboarding gate removed; authenticated users land on today-normal. 156/156 frontend tests.
+
+S2 (strip-down plan): complete (23dd273..efde4d4, review r2 PASS). Nav reduced to Today/BrainDump/Inbox, DEMO_HIDDEN route blocking incl. direct-URL fix for /goalfocus, focus switcher removed from Today. 158/158 tests.
+
+S3 (strip-down plan): complete (97cd625..3da1355, review PASS). DraftPlanReview works with zero goals; no /api/v1/goals fetch; mock chains verified. Minor deferred to S4: stale loading copy "зв'язок із головною метою" in DraftPlanReview.jsx:104. 158/158 tests.
+
+S4 (strip-down plan): complete (659909f..c9ef40a, review PASS). previewLoading on plan-preview button, composer submitting spinner, undo indicator+guard, TaskScreens loading props, goal-free loading copy. Minor for final review: TaskScreens "Повторити синхронізацію" still disabled= not loading=. 160/160 tests.
+
+S5a (strip-down plan): complete (8fae2a8..6cdcc2d, review PASS). TaskTimeSheet bottom sheet: tap card -> time picker -> optimistic PATCH plannedStart/plannedEnd with rollback/CONFLICT refresh/aria-live. Minors for final review: localDate helper duplicated in TaskTimeSheet; CONFLICT refetch failure silently swallowed. 162/162 tests.
+
+S6 (strip-down plan): complete (0088900..2ae17b7, review r2 PASS). Live Today shows real date/totals/progress/times; demo event, break card and demo header copy preserved only in demo mode. Minor for final review: now-card 60-min hardcoded duration fallback (pre-existing). 164/164 tests.
+
+S5b (strip-down plan): attempted and DROPPED per plan cut-line (658c068 reverted by 7f7332d). Review found 3 critical interaction bugs (no setPointerCapture -> stuck drag over anchor cards + leaked touchmove listener; mouse ghost-click reopens sheet; no unmount cleanup). S5a sheet remains the task-move path. Post-revert: 164/164 tests.

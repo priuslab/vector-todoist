@@ -26,7 +26,7 @@ function beginCallback() {
 }
 
 it.each([
-  [false, "Налаштуй Вектор під свій ритм"],
+  [false, "Спокійний план на день"],
   [true, "Спокійний план на день"],
 ])("canonicalizes OAuth success and restores the persisted route for onboarding=%s", async (onboardingCompleted, heading) => {
   beginCallback();

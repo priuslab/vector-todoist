@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { AppFrame } from "../../components/AppFrame";
 import { Button } from "../../components/Button";
 import { StateView } from "../../components/StateView";
-import { analyzeBrainDump, getGoals } from "./captureApi";
+import { analyzeBrainDump } from "./captureApi";
 import { applyChangeSet, previewBrainDumpPlan } from "../today/todayApi";
 
 const DEFAULT_PROFILE = {
@@ -49,7 +49,6 @@ function ProposalList({ preview }) {
 }
 
 export function DraftPlanReview({ draftId, apiClient, onNavigate = () => {} }) {
-  const [goal, setGoal] = useState(null);
   const [analysis, setAnalysis] = useState(null);
   const [preview, setPreview] = useState(null);
   const [result, setResult] = useState(null);
@@ -59,7 +58,7 @@ export function DraftPlanReview({ draftId, apiClient, onNavigate = () => {} }) {
   const [key] = useState(idempotencyKey);
   const [now] = useState(() => new Date().toISOString());
 
-  const prepare = async ({ useStoredGoal = false } = {}) => {
+  const prepare = async () => {
     if (!apiClient?.request) {
       setState("unavailable");
       return;
@@ -70,16 +69,6 @@ export function DraftPlanReview({ draftId, apiClient, onNavigate = () => {} }) {
     }
     setState("loading"); setError(""); setPreview(null);
     try {
-      let activeGoal = useStoredGoal ? goal : null;
-      if (!activeGoal) {
-        const goals = await getGoals({ apiClient });
-        activeGoal = Array.isArray(goals) ? goals.find((item) => item.status === "active") ?? null : null;
-        setGoal(activeGoal);
-      }
-      if (!activeGoal) {
-        setState("needs-goal");
-        return;
-      }
       const analyzed = await analyzeBrainDump({ apiClient, id: draftId });
       const nextAnalysis = analyzed?.analysis ?? null;
       setAnalysis(nextAnalysis);
@@ -87,7 +76,7 @@ export function DraftPlanReview({ draftId, apiClient, onNavigate = () => {} }) {
         setState("needs-clarification");
         return;
       }
-      const nextPreview = await previewBrainDumpPlan({ apiClient, id: draftId, goalId: activeGoal.id, profile: DEFAULT_PROFILE, busySlots: [], timezone: DEFAULT_PROFILE.timezone, now, idempotencyKey: key });
+      const nextPreview = await previewBrainDumpPlan({ apiClient, id: draftId, profile: DEFAULT_PROFILE, busySlots: [], timezone: DEFAULT_PROFILE.timezone, now, idempotencyKey: key });
       setPreview(nextPreview);
       setState("ready");
     } catch {
@@ -111,14 +100,13 @@ export function DraftPlanReview({ draftId, apiClient, onNavigate = () => {} }) {
     }
   };
 
-  const content = result ? <StateView state="success" title="Пропозиції збережено" message={savedCountMessage(result.tasks?.length ?? 0, result.ideas?.length ?? 0)} action={<div className="detail-actions"><Button onClick={() => onNavigate("today-normal")}>До плану на сьогодні</Button><Button variant="secondary" onClick={() => onNavigate("inbox-default")}>В Inbox</Button><Button variant="secondary" onClick={() => onNavigate("oracle-balanced")}>В Oracle</Button></div>} />
-    : state === "loading" ? <StateView state="loading" title="Готую пропозиції" message="Перевіряю одну збережену чернетку та її зв’язок із головною метою." />
+  const content = result ? <StateView state="success" title="Пропозиції збережено" message={savedCountMessage(result.tasks?.length ?? 0, result.ideas?.length ?? 0)} action={<div className="detail-actions"><Button onClick={() => onNavigate("today-normal")}>До плану на сьогодні</Button><Button variant="secondary" onClick={() => onNavigate("inbox-default")}>В Inbox</Button></div>} />
+    : state === "loading" ? <StateView state="loading" title="Готую пропозиції" message="Перевіряю збережену чернетку та готую пропозиції." />
       : state === "unavailable" ? <StateView state="error" title="Потрібне підключення" message="Відкрий цю чернетку у підключеному застосунку, щоб підготувати реальні пропозиції." action={<Button onClick={() => onNavigate("inbox-drafts")}>В Inbox</Button>} />
         : state === "missing" ? <StateView state="error" title="Чернетку не знайдено" message="Повернись до Inbox і вибери збережений Brain Dump." action={<Button onClick={() => onNavigate("inbox-drafts")}>В Inbox</Button>} />
-          : state === "needs-goal" ? <StateView state="empty" title="Спершу обери головну мету" message="Тоді Вектор зможе показати, як ця чернетка рухає тебе вперед." action={<Button onClick={() => onNavigate("goal-manual")}>Створити головну мету</Button>} />
-            : state === "needs-clarification" ? <StateView state="warning" title="Потрібне уточнення" message={analysis?.questions?.[0]?.prompt ?? "Для цієї чернетки AI ще чекає на одне уточнення."} action={<Button onClick={() => onNavigate("inbox-drafts")}>В Inbox</Button>} />
-              : state === "error" ? <StateView state="error" title="Не вдалося підготувати пропозиції" message="Чернетка лишилась у Inbox — спробуй ще раз." action={<Button onClick={() => prepare({ useStoredGoal: true })}>Спробувати ще раз</Button>} />
-                : <><p className="soft-copy"><strong>Головна мета:</strong> {goal?.title}</p><p className="soft-copy"><strong>Рекомендація AI:</strong> {analysis?.summary}</p><ProposalList preview={preview} />{error ? <p role="alert" className="soft-copy">{error}</p> : null}</>;
+          : state === "needs-clarification" ? <StateView state="warning" title="Потрібне уточнення" message={analysis?.questions?.[0]?.prompt ?? "Для цієї чернетки AI ще чекає на одне уточнення."} action={<Button onClick={() => onNavigate("inbox-drafts")}>В Inbox</Button>} />
+              : state === "error" ? <StateView state="error" title="Не вдалося підготувати пропозиції" message="Чернетка лишилась у Inbox — спробуй ще раз." action={<Button onClick={() => prepare()}>Спробувати ще раз</Button>} />
+                : <><p className="soft-copy"><strong>Рекомендація AI:</strong> {analysis?.summary}</p><ProposalList preview={preview} />{error ? <p role="alert" className="soft-copy">{error}</p> : null}</>;
 
   return <AppFrame title="Розбір Brain Dump" onBack={() => onNavigate("inbox-drafts")} noNav footer={state === "ready" && !result ? <Button loading={applying} onClick={confirm}>Зберегти пропозиції</Button> : null}>{content}</AppFrame>;
 }

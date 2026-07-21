@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { CircleNotch } from "@phosphor-icons/react";
 import { useVoiceRecorder } from "../hooks/useVoiceRecorder";
 
 export const VOICE_TEXT_COMPOSER_STATUSES = [
@@ -80,7 +81,7 @@ export function VoiceTextComposer({
   };
 
   const submit = () => {
-    if (disabled || !draft.trim()) return;
+    if (disabled || !draft.trim() || status === "submitting") return;
     onSubmit(draft);
   };
 
@@ -127,7 +128,10 @@ export function VoiceTextComposer({
             }}
             disabled={disabled}
           />
-          <button className="voice-text-composer__submit" type="button" onClick={submit} disabled={disabled || !draft.trim()}>{submitLabel}</button>
+          <button className="voice-text-composer__submit" type="button" onClick={submit} disabled={disabled || !draft.trim() || status === "submitting"}>
+            {status === "submitting" ? <CircleNotch className="spin" size={20} aria-hidden /> : null}
+            <span>{submitLabel}</span>
+          </button>
           <button className="voice-text-composer__mode-switch" type="button" onClick={() => setMode("voice")} disabled={disabled}>
             Увімкнути голосовий режим
           </button>

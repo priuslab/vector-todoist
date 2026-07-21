@@ -100,6 +100,27 @@ it("uses a host submit label and disables text composer controls while submissio
   expect(onSubmit).not.toHaveBeenCalled();
 });
 
+it("disables the submit button while status is submitting", async () => {
+  const user = userEvent.setup();
+  const onSubmit = vi.fn();
+
+  render(
+    <VoiceTextComposer
+      initialMode="text"
+      status="submitting"
+      onTranscribe={vi.fn()}
+      onSubmit={onSubmit}
+    />,
+  );
+
+  await user.type(screen.getByRole("textbox"), "Моя думка");
+  const submit = screen.getByRole("button", { name: "Відправити" });
+
+  expect(submit).toBeDisabled();
+  await user.click(submit);
+  expect(onSubmit).not.toHaveBeenCalled();
+});
+
 it("uses the mobile composer control classes", () => {
   render(<VoiceTextComposer initialMode="text" onTranscribe={vi.fn()} onSubmit={vi.fn()} />);
 

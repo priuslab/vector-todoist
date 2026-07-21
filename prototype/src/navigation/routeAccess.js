@@ -1,14 +1,32 @@
 import { FEATURES, isFeatureEnabled } from "../config/featureFlags";
 
 const protectedPaths = {
-  "/calendar": [FEATURES.calendar, "calendar-day"],
   "/telegram": [FEATURES.telegram, "settings-telegram"],
-  "/oracle": [FEATURES.oracle, "oracle-balanced"],
   "/stripe": [FEATURES.stripe, "paywall-lifetime"],
   "/goalfocus": [FEATURES.goalFocus, "goal-focus-active"],
   "/pomodoro": [FEATURES.pomodoro, "pomodoro-setup"],
   "/adaptation": [FEATURES.adaptation, "settings-adaptation"],
 };
+
+const DEMO_HIDDEN = new Set([
+  "calendar-day",
+  "calendar-week",
+  "calendar-drag",
+  "calendar-sheet",
+  "calendar-conflict",
+  "calendar-offline",
+  "settings-calendar",
+  "oracle-balanced",
+  "oracle-goal-selected",
+  "oracle-idea-selected",
+  "oracle-path",
+  "oracle-filters",
+  "oracle-suggested-edge",
+  "oracle-path-list",
+  "oracle-empty",
+  "goal-focus-confirm",
+  "goal-focus-active",
+]);
 
 const featureByRoute = {
   "calendar-day": FEATURES.calendar,
@@ -43,14 +61,14 @@ export function resolveProductionRoute({ pathname = "/", auth, env = import.meta
   if (pathname === "/auth/callback") return "auth-callback";
   if (auth.status === "loading") return "auth-loading";
   if (auth.status !== "authenticated") return "entry-chaos";
-  if (!auth.record?.onboardingCompleted) return "onboarding-welcome";
   const access = protectedPaths[pathname.toLowerCase()];
-  return access && isFeatureEnabled(access[0], env) ? access[1] : "today-normal";
+  return access && isFeatureEnabled(access[0], env) && (isQaEnvironment(env) || !DEMO_HIDDEN.has(access[1])) ? access[1] : "today-normal";
 }
 
 export const isQaEnvironment = (env = import.meta.env) => Boolean(env?.DEV || env?.MODE === "test");
 
 export function isInternalRouteAllowed({ route, env = import.meta.env }) {
+  if (!isQaEnvironment(env) && DEMO_HIDDEN.has(route)) return false;
   const feature = featureByRoute[route];
   return !feature || isQaEnvironment(env) || isFeatureEnabled(feature, env);
 }
