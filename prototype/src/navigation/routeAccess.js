@@ -9,21 +9,7 @@ const protectedPaths = {
 };
 
 const DEMO_HIDDEN = new Set([
-  "calendar-day",
-  "calendar-week",
-  "calendar-drag",
-  "calendar-sheet",
-  "calendar-conflict",
-  "calendar-offline",
   "settings-calendar",
-  "oracle-balanced",
-  "oracle-goal-selected",
-  "oracle-idea-selected",
-  "oracle-path",
-  "oracle-filters",
-  "oracle-suggested-edge",
-  "oracle-path-list",
-  "oracle-empty",
   "goal-focus-confirm",
   "goal-focus-active",
 ]);
