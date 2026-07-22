@@ -35,7 +35,7 @@ describe('Brain Dump → Today vertical slice', () => {
   });
   it('previews classified analysis even when non-critical clarification questions remain', async () => {
     const r = repos();
-    r.analysisService.result = vi.fn(async () => ({ ...analysis, analysis: { ...analysis.analysis, questions: [{ id: 'q1', prompt: 'Коли це робити?' }] } }));
+    r.analysisService.result = vi.fn(async () => ({ ...analysis, status: 'needs_clarification', analysis: { ...analysis.analysis, questions: [{ id: 'q1', prompt: 'Коли це робити?' }] } }));
     const service = createPlanService(r);
 
     const preview = await service.preview(user, 'dump-1', { now: '2026-07-18T08:00:00+02:00', idempotencyKey: 'plan-questions-123' });
