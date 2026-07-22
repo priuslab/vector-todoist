@@ -19,6 +19,7 @@ export const SCREEN_REGISTRY = [
     ["goal-choice", "Вибір головної мети"],
     ["goal-manual", "Ручне введення мети"],
     ["goal-test-start", "Старт AI-тесту мети"],
+    ["goal-test-question", "Питання AI-тесту", "loading"],
     ["goal-test-result", "Результат AI-тесту"],
     ["goal-skip-warning", "Продовження без мети", "warning"],
     ["telegram-connect", "Підключення Telegram"],
@@ -49,7 +50,6 @@ export const SCREEN_REGISTRY = [
   ...createScreens("Inbox", [
     ["inbox-default", "Inbox: задачі, ідеї, чернетки"],
     ["inbox-drafts", "Inbox: збережені чернетки"],
-    ["inbox-ideas", "Inbox: збережені ідеї"],
     ["inbox-search", "Inbox search та filters"],
     ["inbox-failed-draft", "Необроблена чернетка", "error"],
     ["idea-detail", "Idea Detail"],

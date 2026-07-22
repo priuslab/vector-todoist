@@ -1,0 +1,13 @@
+{
+  "summary": "Недійсний результат",
+  "confidence": 2,
+  "questions": [
+    { "id": "one", "text": "Питання", "field": "x" },
+    { "id": "two", "text": "Питання", "field": "y" },
+    { "id": "three", "text": "Питання", "field": "z" }
+  ],
+  "tasks": [],
+  "ideas": [],
+  "context": [],
+  "unexpected": true
+}

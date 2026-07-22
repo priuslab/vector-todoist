@@ -1,0 +1,146 @@
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+import { describe, expect, it } from 'vitest';
+
+const coreMigrationPath = resolve(
+  import.meta.dirname,
+  '../../pocketbase/pb_migrations/1784332800_core_collections.js',
+);
+const validatorPath = resolve(import.meta.dirname, '../../scripts/check-pocketbase-rules.mjs');
+
+const userOwnedCollections = [
+  'work_profiles',
+  'brain_dumps',
+  'tasks',
+  'ideas',
+  'ai_sessions',
+  'change_sets',
+] as const;
+
+function collectionSource(source: string, collection: string): string {
+  const starts = [...source.matchAll(/new Collection\(\{/g)].map((match) => match.index);
+
+  for (const [index, start] of starts.entries()) {
+    const candidate = source.slice(start, starts[index + 1]);
+    if (new RegExp(`name:\\s*['\"]${collection}['\"]`).test(candidate)) {
+      return candidate;
+    }
+  }
+
+  return '';
+}
+
+function replaceRule(source: string, collection: string, rule: string, value: string): string {
+  const collectionPattern = new RegExp(
+    `(name:\\s*['\"]${collection}['\"][\\s\\S]*?${rule}:\\s*)['\"][^'\"]*['\"]`,
+  );
+
+  return source.replace(collectionPattern, `$1'${value}'`);
+}
+
+function ruleValue(source: string, rule: string): string {
+  return new RegExp(`${rule}:\\s*'([^']*)'`).exec(source)?.[1] ?? '';
+}
+
+describe('PocketBase core schema contract', () => {
+  it('adds an optional tasks.goalId relation to goals without removing existing task plans', async () => {
+    const source = await readFile(resolve(import.meta.dirname, '../../pocketbase/pb_migrations/1784333300_task_goal_link.js'), 'utf8').catch(() => '');
+
+    expect(source).toContain("findCollectionByNameOrId('tasks')");
+    expect(source).toContain("findCollectionByNameOrId('goals')");
+    expect(source).toMatch(/new RelationField\(\{ name: 'goalId', required: false, collectionId: goals\.id, maxSelect: 1, cascadeDelete: false \}\)/);
+    expect(source).toContain('CREATE INDEX idx_tasks_user_goal ON tasks (user, goalId)');
+    expect(source).toContain("fields.removeById(field.id)");
+  });
+
+  it('allows a newly created goal discovery session to start with no answers', async () => {
+    const source = await readFile(resolve(
+      import.meta.dirname,
+      '../../pocketbase/pb_migrations/1784560200_goal_discovery_empty_answers.js',
+    ), 'utf8').catch(() => '');
+
+    expect(source).toContain("findCollectionByNameOrId('goal_discovery_sessions')");
+    expect(source).toContain("getByName('answersJson')");
+    expect(source).toContain('answers.required = false');
+    expect(source).toContain('answers.required = true');
+  });
+
+  it('makes calendar watch plaintext token optional via a reversible follow-up migration', async () => {
+    const source = await readFile(resolve(import.meta.dirname, '../../pocketbase/pb_migrations/1784333030_calendar_watch_token_hash.js'), 'utf8');
+    expect(source).toContain('token.required = false');
+    expect(source).toContain('token.required = true');
+    expect(source).toContain('channelTokenHash');
+  });
+  it('defines every user-owned collection with auth-bound access rules', async () => {
+    const source = await readFile(coreMigrationPath, 'utf8');
+
+    for (const collection of userOwnedCollections) {
+      const ruleSource = collectionSource(source, collection);
+
+      expect(ruleSource, `missing ${collection} collection`).not.toBe('');
+      expect(ruleValue(ruleSource, 'listRule')).toContain('user = @request.auth.id');
+      expect(ruleValue(ruleSource, 'viewRule')).toContain('user = @request.auth.id');
+      expect(ruleValue(ruleSource, 'createRule')).toContain('@request.body.user = @request.auth.id');
+      expect(ruleValue(ruleSource, 'updateRule')).toContain('user = @request.auth.id');
+      expect(ruleValue(ruleSource, 'updateRule')).toContain('@request.body.user:isset = false');
+      expect(ruleValue(ruleSource, 'updateRule')).toContain('@request.body.user = @request.auth.id');
+      expect(ruleValue(ruleSource, 'deleteRule')).toContain('user = @request.auth.id');
+    }
+  });
+
+  it('owns the auth collection reversibly and permits false or zero task values', async () => {
+    const source = await readFile(coreMigrationPath, 'utf8');
+
+    // PocketBase provisions its built-in auth collection before migrations run;
+    // the migration reuses it and only creates it for fresh non-PocketBase apps.
+    expect(source).toMatch(/type: 'auth',[\s\S]*?name: 'users'/);
+    expect(source).toMatch(/findCollectionByNameOrId\('users'\)/);
+
+    const tasks = collectionSource(source, 'tasks');
+    expect(tasks).toMatch(/name: 'flexible'\s*\}/);
+    expect(tasks).toMatch(/name: 'locked'\s*\}/);
+    expect(tasks).toMatch(/name: 'rescheduleCount', min: 0, onlyInt: true/);
+    expect(tasks).not.toMatch(/name: 'flexible', required:/);
+    expect(tasks).not.toMatch(/name: 'locked', required:/);
+    expect(tasks).not.toMatch(/name: 'rescheduleCount', required:/);
+    expect(source.match(/onlyInt: true/g)).toHaveLength(5);
+  });
+
+  it('stores onboarding completion on the PocketBase auth record with a false default', async () => {
+    const source = await readFile(coreMigrationPath, 'utf8');
+    const users = collectionSource(source, 'users');
+
+    expect(source).toMatch(/onboardingCompleted.*default: false/);
+  });
+
+  it('accepts only canonical ownership rules for every user-owned collection', async () => {
+    const { validateMigrationSource } = await import(pathToFileURL(validatorPath).href) as {
+      validateMigrationSource(source: string): string[];
+    };
+    const source = await readFile(coreMigrationPath, 'utf8');
+
+    expect(validateMigrationSource(source)).toEqual([]);
+
+    for (const collection of userOwnedCollections) {
+      for (const rule of ['listRule', 'viewRule', 'createRule', 'updateRule', 'deleteRule']) {
+        expect(validateMigrationSource(replaceRule(source, collection, rule, '@request.auth.id != ""')))
+          .toContain(`${collection}.${rule} must exactly match the canonical ownership rule`);
+      }
+    }
+
+    expect(validateMigrationSource(replaceRule(
+      source,
+      'tasks',
+      'listRule',
+      '@request.auth.id != "" && (user = @request.auth.id || @request.auth.id != "")',
+    ))).toContain('tasks.listRule must exactly match the canonical ownership rule');
+    expect(validateMigrationSource(replaceRule(
+      source,
+      'tasks',
+      'createRule',
+      '@request.auth.id != "" && @request.body.user = @request.auth.id /* ownership decoy */',
+    ))).toContain('tasks.createRule must exactly match the canonical ownership rule');
+  });
+});

@@ -29,3 +29,16 @@ it("does not add an action footer to settings home", () => {
   render(<SettingsScreens screenId="settings-home" />);
   expect(screen.queryByTestId("action-footer")).not.toBeInTheDocument();
 });
+
+it("uses editable controls for work and energy settings", () => {
+  const work = render(<SettingsScreens screenId="settings-work" />);
+  expect(work.getByRole("button", { name: "Початок 09:00" })).toBeInTheDocument();
+  expect(work.getByRole("button", { name: "Завершення 18:00" })).toBeInTheDocument();
+  work.unmount();
+
+  render(<SettingsScreens screenId="settings-energy" />);
+  expect(screen.getByLabelText("Пік енергії").tagName).toBe("SELECT");
+  expect(screen.getByLabelText("Фокус-блок").tagName).toBe("SELECT");
+  expect(screen.getByLabelText("Перерва").tagName).toBe("SELECT");
+  expect(screen.getByLabelText("Денний ліміт").tagName).toBe("SELECT");
+});

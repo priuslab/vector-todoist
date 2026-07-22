@@ -12,5 +12,8 @@ export function AuthStateScreen({ state, onContinue, onRetry }) {
       </section>
     );
   }
+  if (state === "configuration") {
+    return <section className="auth-screen"><StateView state="error" title="Потрібно налаштувати підключення" message="Вектор ще не має адреси захищеного сервісу. Звернись до команди, яка налаштовує застосунок." /></section>;
+  }
   return <section className="auth-screen"><StateView state="error" title="Не вдалося увійти" message="Google не підтвердив вхід. Твої дані не змінено — спробуй ще раз." action={<Button onClick={onRetry}>Спробувати знову</Button>} /></section>;
 }

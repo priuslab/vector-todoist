@@ -7,19 +7,25 @@
   box-sizing: border-box;
 }
 
-html {
-  background: #e9eeeb;
+html,
+body,
+#root {
+  min-height: 100%;
+  min-height: 100dvh;
+  background: var(--bg-base);
 }
 
 body {
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
   color: var(--text-primary);
-  background: #e9eeeb;
+  overflow: hidden;
+  overscroll-behavior-y: none;
   font-family: "Manrope", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+#root { overflow: hidden; }
 
 button,
 input,
@@ -42,11 +48,24 @@ a:focus-visible {
   outline-offset: 2px;
 }
 
+/* A user preference is a hard stop for decorative motion. Keep state changes
+ * understandable through color/labels instead of relying on animation. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 .mobile-prototype {
   position: relative;
   width: min(100vw, 390px);
-  height: min(100dvh, 844px);
-  min-height: 640px;
+  height: 100dvh;
+  min-height: 100svh;
   margin-inline: auto;
   overflow: hidden;
   background: var(--bg-base);
@@ -54,6 +73,8 @@ a:focus-visible {
 
 @media (min-width: 431px) {
   .mobile-prototype {
+    height: min(100dvh, 844px);
+    min-height: 640px;
     margin-block: 16px;
     border-radius: 28px;
     box-shadow: 0 24px 70px rgb(31 41 38 / 15%);

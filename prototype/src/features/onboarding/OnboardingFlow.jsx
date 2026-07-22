@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bell, CalendarBlank, Clock, Lightning, Moon, Timer } from "@phosphor-icons/react";
 import { AppFrame } from "../../components/AppFrame";
 import { Button } from "../../components/Button";
 import { SegmentedControl } from "../../components/SegmentedControl";
+import { TimePicker } from "../../components/TimePicker";
 
 const content = {
   "onboarding-welcome": { icon: CalendarBlank, title: "Налаштуй Вектор під свій ритм", text: "Три короткі кроки — календар, енергія та головна мета. Усе можна змінити пізніше." },
@@ -13,15 +14,54 @@ const content = {
   "focus-settings": { icon: Timer, title: "Який темп зручний?", text: "Початкові значення адаптуються після виконаних і перенесених задач." },
 };
 
-export function OnboardingFlow({ screenId, onBack, onNext }) {
-  const [days, setDays] = useState("Будні");
-  const [energy, setEnergy] = useState("Ранок");
+const progressByScreen = {
+  "onboarding-welcome": 1,
+  "calendar-permission": 1,
+  "work-rhythm": 2,
+  "quiet-hours": 2,
+  "energy-peak": 3,
+  "focus-settings": 3,
+};
+
+const energyWindows = {
+  "Ранок": { range: "09:30–12:30", description: "Ранковий deep work плануватиметься тут" },
+  "День": { range: "12:30–15:30", description: "Денний deep work плануватиметься тут" },
+  "Вечір": { range: "17:00–20:00", description: "Вечірній фокус плануватиметься тут" },
+};
+
+const ONBOARDING_PREFERENCES_KEY = "vector:onboarding-preferences";
+
+function readOnboardingPreferences() {
+  try {
+    return JSON.parse(window.localStorage.getItem(ONBOARDING_PREFERENCES_KEY) ?? "{}") ?? {};
+  } catch {
+    return {};
+  }
+}
+
+export function OnboardingFlow({ screenId, onBack, onNext, onCalendarConnect = onNext, onCalendarSkip = onNext }) {
+  const [preferences] = useState(readOnboardingPreferences);
+  const [days, setDays] = useState(preferences.days === "Щодня" ? "Щодня" : "Будні");
+  const [energy, setEnergy] = useState(preferences.energy ?? "Ранок");
+  const [workStart, setWorkStart] = useState(preferences.workStart ?? "09:00");
+  const [workEnd, setWorkEnd] = useState(preferences.workEnd ?? "18:00");
+  const [quietStart, setQuietStart] = useState(preferences.quietStart ?? "21:00");
+  const [quietEnd, setQuietEnd] = useState(preferences.quietEnd ?? "08:00");
+  const [focusBlock, setFocusBlock] = useState(preferences.focusBlock ?? "50");
+  const [breakMinutes, setBreakMinutes] = useState(preferences.breakMinutes ?? "10");
+  const [dailyLimit, setDailyLimit] = useState(preferences.dailyLimit ?? "6");
   const item = content[screenId] ?? content["onboarding-welcome"];
+  const activeProgress = progressByScreen[screenId] ?? 1;
+  const energyWindow = energyWindows[energy];
   const Icon = item.icon;
+  const calendar = screenId === "calendar-permission";
+  useEffect(() => {
+    window.localStorage.setItem(ONBOARDING_PREFERENCES_KEY, JSON.stringify({ days, energy, workStart, workEnd, quietStart, quietEnd, focusBlock, breakMinutes, dailyLimit }));
+  }, [days, energy, workStart, workEnd, quietStart, quietEnd, focusBlock, breakMinutes, dailyLimit]);
   const footer = (
     <>
-      <Button onClick={onNext}>{screenId === "calendar-permission" ? "Надати доступ" : "Продовжити"}</Button>
-      <button className="text-action" onClick={onNext}>Налаштувати пізніше</button>
+      <Button onClick={calendar ? onCalendarConnect : onNext}>{calendar ? "Надати доступ" : "Продовжити"}</Button>
+      <button className="text-action" onClick={calendar ? onCalendarSkip : onNext}>{calendar ? "Пропустити" : "Налаштувати пізніше"}</button>
     </>
   );
   const centered = ["onboarding-welcome", "calendar-permission"].includes(screenId);
@@ -36,27 +76,30 @@ export function OnboardingFlow({ screenId, onBack, onNext }) {
       footerRows={2}
     >
       <div className="onboarding-screen-body">
-        <div className="onboarding-progress"><span className="is-active" /><span /><span /><span /></div>
+        <div className="onboarding-progress" aria-label={`Крок ${activeProgress} з 4`}>
+          {[1, 2, 3, 4].map((step) => <span className={step <= activeProgress ? "is-active" : ""} key={step} />)}
+        </div>
         <div className={`onboarding-main ${centered ? "onboarding-main--center" : "onboarding-main--form"}`}>
           <section className="onboarding-hero">
             <span><Icon size={34} weight="duotone" /></span>
             <h1>{item.title}</h1>
             <p>{item.text}</p>
+            {calendar ? <p className="onboarding-note">Без доступу Вектор не бачитиме зайняті слоти й може запропонувати час із конфліктом.</p> : null}
           </section>
           {screenId === "work-rhythm" ? (
             <div className="form-stack">
               <SegmentedControl
-                items={[{ value: "Будні", label: "Пн–Пт" }, { value: "Щодня", label: "Щодня" }, { value: "Власні", label: "Власні" }]}
+                items={[{ value: "Будні", label: "Пн–Пт" }, { value: "Щодня", label: "Щодня" }]}
                 value={days}
                 onChange={setDays}
               />
-              <label>Початок<input value="09:00" readOnly /></label>
-              <label>Завершення<input value="18:00" readOnly /></label>
+              <TimePicker label="Початок" value={workStart} onChange={setWorkStart} title="Вибери час початку" />
+              <TimePicker label="Завершення" value={workEnd} onChange={setWorkEnd} title="Вибери час завершення" />
             </div>
           ) : null}
           {screenId === "quiet-hours" ? (
             <div className="form-stack">
-              <label>Не турбувати<input value="21:00–08:00" readOnly /></label>
+              <div className="form-grid"><TimePicker label="Тиха година початку" value={quietStart} onChange={setQuietStart} title="Вибери початок тихих годин" /><TimePicker label="Тиха година завершення" value={quietEnd} onChange={setQuietEnd} title="Вибери завершення тихих годин" /></div>
               <label className="switch-row"><span><Bell size={20} />Ранковий план</span><input type="checkbox" defaultChecked /></label>
               <label className="switch-row"><span><Bell size={20} />Вечірній підсумок</span><input type="checkbox" defaultChecked /></label>
             </div>
@@ -68,14 +111,14 @@ export function OnboardingFlow({ screenId, onBack, onNext }) {
                 value={energy}
                 onChange={setEnergy}
               />
-              <div className="energy-card"><strong>Твій пік</strong><span>09:30–12:30</span><small>Deep Work плануватиметься тут</small></div>
+              <div className="energy-card"><strong>Твій пік</strong><span>{energyWindow.range}</span><small>{energyWindow.description}</small></div>
             </div>
           ) : null}
           {screenId === "focus-settings" ? (
             <div className="form-stack">
-              <label>Фокус-блок<input value="50 хв" readOnly /></label>
-              <label>Перерва<input value="10 хв" readOnly /></label>
-              <label>Денний ліміт<input value="6 год" readOnly /></label>
+              <label htmlFor="focus-block">Фокус-блок<select id="focus-block" value={focusBlock} onChange={(event) => setFocusBlock(event.target.value)}>{[25, 50, 60, 90].map((value) => <option key={value} value={value}>{value} хв</option>)}</select></label>
+              <label htmlFor="break-minutes">Перерва<select id="break-minutes" value={breakMinutes} onChange={(event) => setBreakMinutes(event.target.value)}>{[5, 10, 15, 20].map((value) => <option key={value} value={value}>{value} хв</option>)}</select></label>
+              <label htmlFor="daily-limit">Денний ліміт<select id="daily-limit" value={dailyLimit} onChange={(event) => setDailyLimit(event.target.value)}>{[3, 4, 5, 6, 7, 8].map((value) => <option key={value} value={value}>{value} год</option>)}</select></label>
             </div>
           ) : null}
         </div>

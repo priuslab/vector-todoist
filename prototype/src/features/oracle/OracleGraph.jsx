@@ -1,67 +1,59 @@
-import { useEffect, useRef, useState } from "react";
-import { CheckCircle, CheckSquare, Flag, Folder, Lightbulb, Minus, Plus } from "@phosphor-icons/react";
+import { useMemo, useState } from "react";
+import { CheckCircle, CheckSquare, Flag, Folder, Lightbulb, Minus, Plus, ArrowsClockwise } from "@phosphor-icons/react";
+import { useGraphViewport } from "./useGraphViewport";
 
-const initialNodes = [
-  { id: "goal-podcast", type: "goal", label: "Запустити сезон подкасту", x: 170, y: 118, Icon: Flag },
-  { id: "project-pilot", type: "project", label: "Пілотний епізод", x: 72, y: 240, Icon: Folder },
-  { id: "idea-impostor", type: "idea", label: "Зробити епізод про синдром самозванця", x: 252, y: 260, Icon: Lightbulb },
-  { id: "task-structure", type: "task", label: "Структура першого епізоду", x: 120, y: 382, Icon: CheckSquare },
-  { id: "task-guest", type: "task", label: "Лист потенційному гостю", x: 267, y: 410, Icon: CheckSquare },
-  { id: "task-research", type: "completed", label: "Дослідити формат", x: 50, y: 465, Icon: CheckCircle },
-  { id: "idea-youtube", type: "idea", label: "Почати YouTube-канал", x: 304, y: 96, Icon: Lightbulb },
+const fallbackNodes = [
+  { id: "goal-podcast", type: "goal", title: "Запустити сезон подкасту", x: 170, y: 118 },
+  { id: "project-pilot", type: "project", title: "Пілотний епізод", x: 72, y: 240 },
+  { id: "idea-impostor", type: "idea", title: "Зробити епізод про синдром самозванця", x: 252, y: 260 },
+  { id: "task-structure", type: "task", title: "Структура першого епізоду", x: 120, y: 382 },
+  { id: "task-guest", type: "task", title: "Лист потенційному гостю", x: 267, y: 410 },
+  { id: "task-research", type: "completed", title: "Дослідити формат", x: 50, y: 465, completed: true },
+  { id: "idea-youtube", type: "idea", title: "Почати YouTube-канал", x: 304, y: 96 },
 ];
+const fallbackEdges = [
+  ["goal-podcast", "project-pilot"], ["goal-podcast", "idea-impostor"], ["project-pilot", "task-structure"],
+  ["project-pilot", "task-guest"], ["project-pilot", "task-research"], ["idea-impostor", "task-guest"], ["idea-youtube", "goal-podcast"],
+].map(([fromId, toId], index) => ({ id: `edge-${index}`, fromId, toId, actor: "user", status: "confirmed" }));
+const icons = { goal: Flag, project: Folder, idea: Lightbulb, task: CheckSquare, completed: CheckCircle };
+const labels = { goal: "Мета", project: "Проєкт", idea: "Ідея", task: "Задача", completed: "Виконано" };
 
-const edges = [
-  ["goal-podcast","project-pilot"],["goal-podcast","idea-impostor"],["project-pilot","task-structure"],["project-pilot","task-guest"],["project-pilot","task-research"],["idea-impostor","task-guest"],["idea-youtube","goal-podcast"],
-];
-
-const pathIds = new Set(["goal-podcast","project-pilot","idea-impostor","task-structure","task-guest"]);
-
-export function OracleGraph({ selectedNodeId: controlledSelection, focusMode = false, showPath = false, onSelect }) {
-  const [nodes, setNodes] = useState(initialNodes);
-  const [selection, setSelection] = useState(controlledSelection ?? null);
-  const [zoom, setZoom] = useState(1);
-  const canvasRef = useRef(null);
-  const dragRef = useRef(null);
-  const selectedNodeId = controlledSelection ?? selection;
-
-  useEffect(() => {
-    if (navigator.userAgent.includes("jsdom")) return;
-    const canvas = canvasRef.current;
-    const context = canvas.getContext("2d");
-    const ratio = window.devicePixelRatio || 1;
-    canvas.width = canvas.clientWidth * ratio;
-    canvas.height = canvas.clientHeight * ratio;
-    context.scale(ratio, ratio);
-    context.clearRect(0,0,canvas.clientWidth,canvas.clientHeight);
-    edges.forEach(([fromId,toId]) => {
-      const from = nodes.find((node) => node.id === fromId);
-      const to = nodes.find((node) => node.id === toId);
-      const recommended = showPath && pathIds.has(fromId) && pathIds.has(toId);
-      context.beginPath();
-      context.moveTo(from.x * zoom, from.y * zoom);
-      context.lineTo(to.x * zoom, to.y * zoom);
-      context.strokeStyle = recommended ? "#246b5e" : "#cdd7d2";
-      context.lineWidth = recommended ? 3 : 1.5;
-      context.stroke();
-    });
-  }, [nodes, showPath, zoom]);
-
-  const select = (node) => {
-    setSelection(node.id);
-    onSelect?.(node);
-  };
-
-  return (
-    <div className={`oracle-graph ${focusMode ? "is-focus" : ""} ${showPath ? "is-path" : ""}`} data-testid="oracle-graph" data-selection={selectedNodeId ?? ""}>
-      <canvas ref={canvasRef} aria-hidden />
-      <div className="graph-stage" style={{ transform: `scale(${zoom})` }}>
-        {nodes.map((node) => {
-          const dimmed = (selectedNodeId && node.id !== selectedNodeId && !pathIds.has(node.id)) || (focusMode && node.id === "idea-youtube");
-          return <button key={node.id} aria-label={node.label} className={`oracle-node oracle-node--${node.type} ${node.id === selectedNodeId ? "is-selected" : ""} ${dimmed ? "is-dimmed" : ""} ${showPath && pathIds.has(node.id) ? "is-path" : ""}`} style={{ left: node.x, top: node.y }} onClick={() => select(node)} onPointerDown={(event) => { dragRef.current = { id: node.id, x: event.clientX, y: event.clientY, originX: node.x, originY: node.y }; event.currentTarget.setPointerCapture?.(event.pointerId); }} onPointerMove={(event) => { const drag = dragRef.current; if (!drag || drag.id !== node.id) return; setNodes((items) => items.map((item) => item.id === node.id ? { ...item, x: drag.originX + event.clientX - drag.x, y: drag.originY + event.clientY - drag.y } : item)); }} onPointerUp={() => { dragRef.current = null; }}><node.Icon size={node.type === "goal" ? 25 : 19} weight="duotone" /><span>{node.label}</span></button>;
-        })}
-      </div>
-      <div className="graph-zoom"><button aria-label="Зменшити" onClick={() => setZoom((value) => Math.max(.8, value - .1))}><Minus size={18} /></button><button aria-label="Збільшити" onClick={() => setZoom((value) => Math.min(1.2, value + .1))}><Plus size={18} /></button></div>
-    </div>
-  );
+function positionNodes(nodes) {
+  const slots = [{ x: 170, y: 108 }, { x: 72, y: 230 }, { x: 262, y: 236 }, { x: 116, y: 370 }, { x: 270, y: 400 }, { x: 52, y: 464 }, { x: 304, y: 92 }];
+  return nodes.map((node, index) => ({ ...node, label: node.title ?? node.label ?? node.id, x: Number.isFinite(node.x) ? node.x : slots[index % slots.length].x, y: Number.isFinite(node.y) ? node.y : slots[index % slots.length].y }));
 }
+
+export function OracleGraph({ graph, selectedNodeId, pathNodeIds = [], pathEdgeIds = [], filters = {}, focusMode = false, onSelect, loading = false, error = false, onReset, userId }) {
+  const { viewport, reset, zoomBy, beginPan, pan, endPan } = useGraphViewport({ storageKey: `vector-oracle-viewport-v1:${userId || "local"}` });
+  const [draggedNode, setDraggedNode] = useState(null);
+  // Demo content is only for the standalone prototype. A live empty graph must
+  // stay empty; otherwise it conceals the user's actual database state.
+  const hasLiveGraph = Array.isArray(graph?.nodes);
+  const nodes = useMemo(() => positionNodes(hasLiveGraph ? graph.nodes : fallbackNodes), [graph, hasLiveGraph]);
+  const [nodePositions, setNodePositions] = useState({});
+  const positionedNodes = useMemo(() => nodes.map((node) => nodePositions[node.id] ? { ...node, ...nodePositions[node.id] } : node), [nodePositions, nodes]);
+  const edges = useMemo(() => hasLiveGraph ? (graph.edges ?? []) : fallbackEdges, [graph, hasLiveGraph]);
+  const path = new Set(pathNodeIds);
+  const visibleNodes = useMemo(() => positionedNodes.filter((node) => (!filters.type || filters.type === "all" || node.type === filters.type) && (!filters.pathOnly || path.size === 0 || path.has(node.id))), [filters.pathOnly, filters.type, pathNodeIds, positionedNodes]);
+  const visibleIds = new Set(visibleNodes.map((node) => node.id));
+  const nodeById = new Map(positionedNodes.map((node) => [node.id, node]));
+  const selected = selectedNodeId ? nodeById.get(selectedNodeId) : null;
+  const hasSelection = Boolean(selectedNodeId);
+  const isDimmed = (node) => (hasSelection && node.id !== selectedNodeId && path.size > 0 && !path.has(node.id)) || (hasSelection && path.size === 0 && node.id !== selectedNodeId) || (focusMode && node.type === "idea" && node.id.includes("youtube"));
+  const resetViewport = () => { reset(); onReset?.(); };
+  if (loading) return <div className="oracle-graph oracle-graph--state" data-testid="oracle-graph-loading" role="status">Завантажую карту зв’язків…</div>;
+  if (error) return <div className="oracle-graph oracle-graph--state" data-testid="oracle-graph-error" role="alert">Не вдалося завантажити Oracle. Спробуй оновити сторінку.</div>;
+  if (!nodes.length) return <div className="oracle-graph oracle-graph--state" data-testid="oracle-graph-empty">Тут поки немає зв’язків.</div>;
+  return <div className="oracle-graph" data-testid="oracle-graph" data-selection={selectedNodeId ?? ""} data-reduced-motion="media" onPointerDown={beginPan} onPointerMove={pan} onPointerUp={endPan} onPointerCancel={endPan}>
+    <svg className="oracle-edges" viewBox="0 0 390 520" aria-hidden="true" focusable="false"><g transform={`translate(${viewport.x} ${viewport.y}) scale(${viewport.scale})`}>
+      {edges.map((edge) => { const from = nodeById.get(edge.fromId); const to = nodeById.get(edge.toId); if (!from || !to || !visibleIds.has(from.id) || !visibleIds.has(to.id)) return null; const active = pathEdgeIds.includes?.(edge.id) || (path.size > 1 && path.has(from.id) && path.has(to.id)); const dimmed = hasSelection && !active && (!path.has(from.id) || !path.has(to.id)); return <line key={edge.id ?? `${edge.fromId}-${edge.toId}`} className={`oracle-edge ${active ? "is-active" : ""} ${edge.status === "proposed" ? "is-proposed" : ""} ${dimmed ? "is-dimmed" : ""}`} x1={from.x} y1={from.y} x2={to.x} y2={to.y} />; })}
+    </g></svg>
+    <div className="graph-stage" style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.scale})` }}>
+      {visibleNodes.map((node) => { const Icon = icons[node.type] ?? CheckSquare; const dimmed = isDimmed(node); const active = path.has(node.id); return <button key={`${node.type}-${node.id}`} type="button" aria-label={node.label} aria-pressed={node.id === selectedNodeId} className={`oracle-node oracle-node--${node.type} ${node.id === selectedNodeId ? "is-selected" : ""} ${dimmed ? "is-dimmed" : ""} ${active ? "is-path" : ""}`} style={{ left: node.x, top: node.y }} onPointerDown={(event) => { event.stopPropagation(); setDraggedNode({ id: node.id, clientX: event.clientX, clientY: event.clientY, originX: node.x, originY: node.y, moved: false }); event.currentTarget.setPointerCapture?.(event.pointerId); }} onPointerMove={(event) => { if (draggedNode?.id !== node.id) return; event.stopPropagation(); const dx = event.clientX - draggedNode.clientX; const dy = event.clientY - draggedNode.clientY; if (Math.abs(dx) + Math.abs(dy) > 3) draggedNode.moved = true; setNodePositions((current) => ({ ...current, [node.id]: { x: draggedNode.originX + dx / viewport.scale, y: draggedNode.originY + dy / viewport.scale } })); }} onPointerUp={(event) => { event.stopPropagation(); const wasMoved = draggedNode?.moved; setDraggedNode(null); if (!wasMoved) onSelect?.(node); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onSelect?.(node); }}><Icon size={node.type === "goal" ? 25 : 19} weight="duotone" aria-hidden /><span>{node.label}</span><small>{labels[node.type] ?? "Вузол"}{node.status === "proposed" ? " · пропозиція AI" : ""}</small></button>; })}
+    </div>
+    <div className="graph-controls" aria-label="Керування картою"><button type="button" aria-label="Зменшити масштаб" onClick={() => zoomBy(-.1)}><Minus size={18} aria-hidden /></button><span aria-live="polite">{Math.round(viewport.scale * 100)}%</span><button type="button" aria-label="Збільшити масштаб" onClick={() => zoomBy(.1)}><Plus size={18} aria-hidden /></button><button type="button" aria-label="Скинути карту" onClick={resetViewport}><ArrowsClockwise size={18} aria-hidden /></button></div>
+    {selected ? <p className="oracle-selection-hint" role="status">Обрано: {selected.label}. Показано пов’язані вузли та шлях.</p> : null}
+  </div>;
+}
+
+export { labels };

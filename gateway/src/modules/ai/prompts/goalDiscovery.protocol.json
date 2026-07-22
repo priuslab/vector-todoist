@@ -1,0 +1,17 @@
+{
+  "version": "goal-discovery.v1",
+  "enabled": true,
+  "title": "Коротке визначення мети",
+  "maxQuestions": 3,
+  "questions": [
+    { "id": "attention", "prompt": "Що зараз забирає найбільше твоєї уваги?", "maxLength": 1000 },
+    { "id": "result", "prompt": "Який результат дав би відчуття руху вперед у найближчі місяці?", "maxLength": 1000 },
+    { "id": "why", "prompt": "Чому це важливо саме зараз?", "maxLength": 1000 }
+  ],
+  "completion": { "minimumAnswers": 2, "maximumAnswers": 3 },
+  "output": { "titleMaxLength": 500, "rationaleMaxLength": 1000, "confidenceMin": 0, "confidenceMax": 1 },
+  "safety": {
+    "notice": "Це рекомендація для планування, а не медична чи психологічна оцінка.",
+    "disallowedClaims": ["діагноз", "лікування", "медичний висновок", "визначає ADHD"]
+  }
+}

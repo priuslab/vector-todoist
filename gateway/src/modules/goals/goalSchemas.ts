@@ -1,0 +1,21 @@
+import { z } from 'zod';
+
+const id = z.string().trim().min(1).max(128);
+const text = (max: number) => z.string().trim().min(1).max(max);
+const date = z.string().datetime({ offset: true });
+export const goalCreateSchema = z.object({ title: text(500), description: z.string().trim().max(2_000).optional(), deadline: date.nullable().optional() }).strict();
+export const goalPatchSchema = z.object({ title: text(500).optional(), description: z.string().trim().max(2_000).optional(), deadline: date.nullable().optional(), status: z.enum(['active', 'completed', 'archived']).optional(), progress: z.number().min(0).max(100).optional() }).strict();
+export const projectCreateSchema = z.object({ title: text(500), description: z.string().trim().max(2_000).optional(), goalId: id.nullable().optional(), status: z.enum(['active', 'completed', 'archived']).optional() }).strict();
+export const projectPatchSchema = projectCreateSchema.partial().strict();
+export const ideaCreateSchema = z.object({ text: text(2_000), summary: z.string().trim().max(500).optional(), status: z.enum(['backlog', 'converted', 'archived']).optional(), sourceDump: id.optional(), goalId: id.nullable().optional(), projectId: id.nullable().optional() }).strict();
+export const ideaPatchSchema = ideaCreateSchema.partial().strict();
+const edgeFields = { fromType: z.enum(['goal', 'project', 'idea', 'task', 'completed']), fromId: id, toType: z.enum(['goal', 'project', 'idea', 'task', 'completed']), toId: id, actor: z.enum(['user', 'ai']).default('user'), status: z.enum(['proposed', 'confirmed', 'rejected']).default('proposed'), confirmedBy: id.optional(), confidence: z.number().min(0).max(1).optional(), rationale: z.string().trim().max(1_000).optional() };
+export const edgeCreateSchema = z.object(edgeFields).strict().refine((v) => !(v.fromType === v.toType && v.fromId === v.toId), { message: 'Self edges are not useful' });
+export const edgePatchSchema = z.object(edgeFields).partial().strict();
+export const convertPreviewSchema = z.object({ projectTitle: text(500).optional(), taskTitles: z.array(text(500)).max(20).optional(), goalId: id.nullable().optional() }).strict();
+export const convertApplySchema = convertPreviewSchema.extend({ idempotencyKey: z.string().trim().min(8).max(255).optional(), confirm: z.literal(true) }).strict();
+export const goalResponseSchema = z.object({ id, title: z.string(), description: z.string().optional(), status: z.string(), deadline: z.string().nullable().optional(), progress: z.number().optional() }).strict();
+export type GoalCreate = z.infer<typeof goalCreateSchema>;
+export type ProjectCreate = z.infer<typeof projectCreateSchema>;
+export type IdeaCreate = z.infer<typeof ideaCreateSchema>;
+export type EdgeCreate = z.infer<typeof edgeCreateSchema>;
