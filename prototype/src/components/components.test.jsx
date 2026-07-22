@@ -18,6 +18,23 @@ it("gives the primary action an accessible name", () => {
   );
 });
 
+it("keeps Calendar and Oracle available in the primary bottom navigation", () => {
+  render(<BottomNav active="today-normal" onNavigate={vi.fn()} />);
+
+  expect(screen.getByRole("button", { name: "Сьогодні" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Inbox" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Brain Dump" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Календар" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Oracle" })).toBeInTheDocument();
+  expect([...screen.getByRole("navigation").querySelectorAll("button")].map((button) => button.getAttribute("aria-label"))).toEqual([
+    "Сьогодні",
+    "Inbox",
+    "Brain Dump",
+    "Календар",
+    "Oracle",
+  ]);
+});
+
 it("announces undo changes", () => {
   render(<UndoSnackbar message="План змінено" onUndo={vi.fn()} />);
 
@@ -74,11 +91,11 @@ it("centers short content safely when it fits", () => {
   expect(componentsCss).toMatch(/justify-content:\s*safe center/);
 });
 
-it("keeps only Today, Brain Dump and Inbox navigation visible in production", () => {
+it("keeps Calendar and Oracle visible in production navigation", () => {
   render(<BottomNav active="today-normal" onNavigate={vi.fn()} env={{ DEV: false }} />);
 
-  expect(screen.queryByRole("button", { name: "Календар" })).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Oracle" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Календар" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Oracle" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Сьогодні" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Brain Dump" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Inbox" })).toBeInTheDocument();

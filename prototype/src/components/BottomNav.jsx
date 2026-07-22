@@ -1,10 +1,12 @@
-import { House, Microphone, Tray } from "@phosphor-icons/react";
+import { CalendarBlank, Graph, House, Microphone, Tray } from "@phosphor-icons/react";
 import { isInternalRouteAllowed } from "../navigation/routeAccess";
 
 const items = [
   ["today-normal", "Сьогодні", House],
-  ["capture-chooser", "Brain Dump", Microphone],
   ["inbox-default", "Inbox", Tray],
+  ["capture-chooser", "Brain Dump", Microphone],
+  ["calendar-day", "Календар", CalendarBlank],
+  ["oracle-balanced", "Oracle", Graph],
 ];
 
 export function BottomNav({ active, onNavigate, env = import.meta.env }) {
