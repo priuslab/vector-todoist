@@ -3,8 +3,8 @@ import { isInternalRouteAllowed } from "../navigation/routeAccess";
 
 const items = [
   ["today-normal", "Сьогодні", House],
-  ["capture-chooser", "Brain Dump", Microphone],
   ["inbox-default", "Inbox", Tray],
+  ["capture-chooser", "Brain Dump", Microphone],
   ["calendar-day", "Календар", CalendarBlank],
   ["oracle-balanced", "Oracle", Graph],
 ];

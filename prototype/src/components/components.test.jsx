@@ -26,6 +26,13 @@ it("keeps Calendar and Oracle available in the primary bottom navigation", () =>
   expect(screen.getByRole("button", { name: "Brain Dump" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Календар" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Oracle" })).toBeInTheDocument();
+  expect([...screen.getByRole("navigation").querySelectorAll("button")].map((button) => button.getAttribute("aria-label"))).toEqual([
+    "Сьогодні",
+    "Inbox",
+    "Brain Dump",
+    "Календар",
+    "Oracle",
+  ]);
 });
 
 it("announces undo changes", () => {
