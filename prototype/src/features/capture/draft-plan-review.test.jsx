@@ -50,6 +50,18 @@ it("keeps the saved result and its actions visible after confirming a draft prop
   expect(request).toHaveBeenNthCalledWith(2, "/api/v1/brain-dumps/dump-1/plan-preview", expect.objectContaining({ method: "POST" }));
 });
 
+it("continues straight to plan preview when AI returns a non-critical question", async () => {
+  const request = vi.fn()
+    .mockResolvedValueOnce({ analysis: { ...classifiedAnalysis, questions: [{ id: "q1", prompt: "Коли це робити?" }] } })
+    .mockResolvedValueOnce({ changeSetId: "change-1", tasks: [proposalTask], ideas: [proposalIdea], blocks: [], unscheduledTaskIds: [], warnings: [], reasons: {} });
+
+  render(<DraftPlanReview draftId="dump-1" apiClient={{ request }} />);
+
+  expect(await screen.findByRole("button", { name: "Зберегти пропозиції" })).toBeInTheDocument();
+  expect(screen.queryByText("Потрібне уточнення")).not.toBeInTheDocument();
+  expect(request).toHaveBeenCalledTimes(2);
+});
+
 it.each([
   [2, 2, "Збережено 2 задачі і 2 ідеї."],
   [4, 4, "Збережено 4 задачі і 4 ідеї."],

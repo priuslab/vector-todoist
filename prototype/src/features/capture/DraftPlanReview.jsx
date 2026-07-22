@@ -71,11 +71,11 @@ export function DraftPlanReview({ draftId, apiClient, onNavigate = () => {} }) {
     try {
       const analyzed = await analyzeBrainDump({ apiClient, id: draftId });
       const nextAnalysis = analyzed?.analysis ?? null;
-      setAnalysis(nextAnalysis);
-      if (!nextAnalysis || nextAnalysis.questions?.length) {
-        setState("needs-clarification");
+      if (!nextAnalysis) {
+        setState("error");
         return;
       }
+      setAnalysis(nextAnalysis);
       const nextPreview = await previewBrainDumpPlan({ apiClient, id: draftId, profile: DEFAULT_PROFILE, busySlots: [], timezone: DEFAULT_PROFILE.timezone, now, idempotencyKey: key });
       setPreview(nextPreview);
       setState("ready");
