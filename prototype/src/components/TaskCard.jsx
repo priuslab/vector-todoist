@@ -16,6 +16,8 @@ export function TaskCard({ task, state = "scheduled", onClick, onComplete }) {
         <div className="task-card__meta">
           <span><Clock size={14} aria-hidden />{task.start ?? `${task.duration} хв`}</span>
           {task.locked ? <span><LockSimple size={14} aria-hidden />Зафіксовано</span> : task.duration ? <span><CalendarBlank size={14} aria-hidden />{task.duration} хв</span> : null}
+          {task.priority ? <span>{task.priority} пріоритет</span> : null}
+          {task.deadline ? <span>до {task.deadline.toLocaleLowerCase("uk-UA")}</span> : null}
         </div>
       </div>
       {task.alignment ? <span className="alignment">{task.alignment}%</span> : null}
