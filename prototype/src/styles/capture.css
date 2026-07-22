@@ -73,3 +73,9 @@
 .scheduled-preview span { border-top: 1px solid var(--border-default); display: flex; gap: 8px; padding: 9px 0; font-size: 12px; }
 .scheduled-preview b { color: var(--brand-primary); }
 .scheduled-preview .locked { color: var(--text-secondary); }
+.draft-plan-review { min-height: 620px; display: flex; flex-direction: column; justify-content: center; gap: 14px; }
+.draft-plan-review h1 { margin: 0; font-size: 28px; }
+.draft-review-card { border: 1px solid var(--border-default); border-radius: var(--radius-card); display: flex; flex-direction: column; gap: 8px; padding: 16px; background: var(--bg-surface); }
+.draft-review-card span { color: var(--brand-primary); font-size: 12px; font-weight: 800; text-transform: uppercase; }
+.draft-review-card strong { font-size: 18px; line-height: 1.4; }
+.draft-plan-review .button + .button { margin-top: 0; }

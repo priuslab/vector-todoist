@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo, useState } from "react";
 import { DEFAULT_ROUTE } from "../navigation/routes";
+import { DEMO_DRAFTS, DEMO_IDEAS } from "../data/demoData";
 
 const PrototypeContext = createContext(null);
 
@@ -11,6 +12,22 @@ const INITIAL_STATE = {
   quietHours: "21:00–08:00",
   pro: false,
   selectedNodeId: null,
+  plannedTasks: null,
+  pendingPlanTasks: null,
+  lastBrainDump: "",
+  planApplied: false,
+  inboxDrafts: DEMO_DRAFTS,
+  inboxIdeas: DEMO_IDEAS,
+  activeDraftId: null,
+};
+
+const FALLBACK_CONTEXT = {
+  route: DEFAULT_ROUTE,
+  state: INITIAL_STATE,
+  history: [],
+  navigate: () => {},
+  updateState: () => {},
+  undo: () => {},
 };
 
 export function PrototypeProvider({ children, initialRoute = DEFAULT_ROUTE }) {
@@ -43,6 +60,5 @@ export function PrototypeProvider({ children, initialRoute = DEFAULT_ROUTE }) {
 
 export function usePrototype() {
   const value = useContext(PrototypeContext);
-  if (!value) throw new Error("usePrototype must be used inside PrototypeProvider");
-  return value;
+  return value ?? FALLBACK_CONTEXT;
 }
