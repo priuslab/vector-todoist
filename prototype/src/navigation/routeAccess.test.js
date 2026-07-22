@@ -28,10 +28,10 @@ describe("resolveProductionRoute", () => {
     expect(resolveInternalRoute({ route: "inbox-default", env: { DEV: false } })).toBe("inbox-default");
   });
 
-  it("hides demo-hidden Calendar and Oracle routes in production regardless of feature flags", () => {
-    expect(isInternalRouteAllowed({ route: "calendar-day", env: { DEV: false, VITE_FEATURE_CALENDAR: "true" } })).toBe(false);
-    expect(resolveInternalRoute({ route: "calendar-day", env: { DEV: false } })).toBe("today-normal");
-    expect(resolveInternalRoute({ route: "oracle-balanced", env: { DEV: false } })).toBe("today-normal");
+  it("keeps Calendar and Oracle routes enabled in production", () => {
+    expect(isInternalRouteAllowed({ route: "calendar-day", env: { DEV: false, VITE_FEATURE_CALENDAR: "true" } })).toBe(true);
+    expect(resolveInternalRoute({ route: "calendar-day", env: { DEV: false } })).toBe("calendar-day");
+    expect(resolveInternalRoute({ route: "oracle-balanced", env: { DEV: false } })).toBe("oracle-balanced");
     expect(resolveInternalRoute({ route: "calendar-day", env: { DEV: false, VITE_FEATURE_CALENDAR: "false" } })).toBe("today-normal");
     expect(resolveInternalRoute({ route: "calendar-day", env: { DEV: true } })).toBe("calendar-day");
     expect(resolveInternalRoute({ route: "oracle-balanced", env: { MODE: "test" } })).toBe("oracle-balanced");
