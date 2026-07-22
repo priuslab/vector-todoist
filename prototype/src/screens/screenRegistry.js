@@ -33,6 +33,7 @@ export const SCREEN_REGISTRY = [
     ["capture-question-1", "Критичне уточнення 1"],
     ["capture-question-2", "Критичне уточнення 2"],
     ["capture-result", "AI Result", "success"],
+    ["draft-plan-review", "Розбір збереженого Brain Dump"],
     ["capture-review", "Перевірити транскрипт", "warning"],
     ["capture-failure", "Brain Dump збережено в Inbox", "error"],
   ]),
@@ -47,6 +48,8 @@ export const SCREEN_REGISTRY = [
   ]),
   ...createScreens("Inbox", [
     ["inbox-default", "Inbox: задачі, ідеї, чернетки"],
+    ["inbox-drafts", "Inbox: збережені чернетки"],
+    ["inbox-ideas", "Inbox: збережені ідеї"],
     ["inbox-search", "Inbox search та filters"],
     ["inbox-failed-draft", "Необроблена чернетка", "error"],
     ["idea-detail", "Idea Detail"],

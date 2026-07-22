@@ -10,8 +10,8 @@ const placements = {
   "task-cat-food": { top: 517, height: 30 },
 };
 
-export function CalendarTimeline({ dragMode = false, onSelect }) {
-  const items = [...DEMO_TASKS, ...DEMO_EVENTS];
+export function CalendarTimeline({ dragMode = false, onSelect, tasks = DEMO_TASKS }) {
+  const items = [...tasks, ...DEMO_EVENTS];
   return (
     <div className={`calendar-timeline ${dragMode ? "is-dragging" : ""}`}>
       <div className="calendar-hours">{hours.map((hour) => <span key={hour}>{hour}</span>)}</div>
@@ -19,7 +19,7 @@ export function CalendarTimeline({ dragMode = false, onSelect }) {
         {hours.map((hour) => <span className="calendar-line" key={hour} />)}
         {dragMode ? <span className="slot-highlight">12:30 · доступний слот</span> : null}
         {items.map((item) => {
-          const placement = placements[item.id];
+          const placement = placements[item.id] ?? { top: Math.max(20, ((Number(item.start?.slice(0, 2)) - 9) * 74) + (Number(item.start?.slice(3, 5)) / 60 * 74)), height: Math.max(28, (item.duration ?? 30) * 1.05) };
           return <button key={item.id} aria-label={item.title} data-locked={item.locked ? "true" : "false"} className={`calendar-block ${item.locked ? "calendar-block--locked" : "calendar-block--task"}`} style={{ top: placement.top, height: placement.height }} onClick={() => onSelect?.(item)}><strong>{item.start} · {item.title}</strong><small>{item.locked ? <><LockSimple size={11} />Google Calendar</> : <><Sparkle size={11} />AI-задача · {item.duration} хв</>}</small></button>;
         })}
       </div>

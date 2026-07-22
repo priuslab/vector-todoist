@@ -41,7 +41,7 @@ export function ScreenRouter({ route, onNavigate }) {
     if (route.startsWith("telegram-") || route === "first-brain-dump") return <TelegramSetup screenId={route} onBack={back} onNext={() => onNavigate(route === "telegram-connect" ? "telegram-success" : route === "telegram-success" ? "first-brain-dump" : "capture-chooser")} />;
     return <OnboardingFlow screenId={route} onBack={back} onNext={() => onNavigate(ONBOARDING_NEXT[route] ?? "goal-choice")} />;
   }
-  if (screen.group === "Capture") return <CaptureFlow key={route} screenId={route} onBack={() => onNavigate("today-normal")} onNavigate={onNavigate} />;
+  if (screen.group === "Capture") return <CaptureFlow key={route} screenId={route} onBack={() => onNavigate(route === "draft-plan-review" ? "inbox-drafts" : "today-normal")} onNavigate={onNavigate} />;
   if (screen.group === "Today") return <TodayScreens screenId={route} onNavigate={onNavigate} />;
   if (screen.group === "Inbox") return ["idea-detail", "idea-decomposition", "project-detail"].includes(route) ? <IdeaProjectScreens screenId={route} onNavigate={onNavigate} /> : <InboxScreens screenId={route} onNavigate={onNavigate} />;
   if (screen.group === "Task") return route.startsWith("focus-") ? <FocusScreens screenId={route} onNavigate={onNavigate} /> : <TaskScreens screenId={route} onNavigate={onNavigate} />;

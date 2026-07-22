@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { TodayScreens } from "./TodayScreens";
 import { InboxScreens } from "../inbox/InboxScreens";
 import { IdeaProjectScreens } from "../inbox/IdeaProjectScreens";
@@ -25,4 +25,16 @@ it("renders the planning detail families", () => {
   expect(screen.getByText("Підготувати структуру першого епізоду")).toBeInTheDocument();
   rerender(<FocusScreens screenId="focus-mode" />);
   expect(screen.getByText("50:00")).toBeInTheDocument();
+});
+
+it("opens the drafts tab and starts AI review from a saved Brain Dump", async () => {
+  const user = userEvent.setup();
+  const onNavigate = vi.fn();
+  render(<InboxScreens onNavigate={onNavigate} />);
+
+  await user.click(screen.getByRole("button", { name: "Чернетки" }));
+  expect(screen.getByText("Хочу бігати 10 км.")).toBeInTheDocument();
+  await user.click(screen.getAllByRole("button", { name: "Розібрати з AI" })[0]);
+
+  expect(onNavigate).toHaveBeenCalledWith("draft-plan-review");
 });

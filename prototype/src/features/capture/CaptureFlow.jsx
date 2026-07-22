@@ -3,7 +3,7 @@ import { Keyboard, Microphone } from "@phosphor-icons/react";
 import { AppFrame } from "../../components/AppFrame";
 import { Button } from "../../components/Button";
 import { StateView } from "../../components/StateView";
-import { DEMO_BRAIN_DUMP, buildPlanFromBrainDump } from "../../data/demoData";
+import { DEMO_BRAIN_DUMP, DEMO_DRAFTS, buildPlanFromBrainDump } from "../../data/demoData";
 import { usePrototype } from "../../state/prototypeState";
 import { AIProcessing } from "./AIProcessing";
 import { AIResult } from "./AIResult";
@@ -12,24 +12,27 @@ import { Transcript } from "./Transcript";
 import { VoiceRecorder } from "./VoiceRecorder";
 
 export function CaptureFlow({ screenId = "capture-chooser", onBack, onNavigate = () => {}, processingDelayMs = 1400 }) {
-  const { updateState } = usePrototype();
+  const { state, updateState } = usePrototype();
   const initial = screenId.replace("capture-", "");
+  const isSavedDraft = initial === "draft-plan-review";
+  const sourceDraft = state.inboxDrafts.find((draft) => draft.id === state.activeDraftId) ?? DEMO_DRAFTS[0];
   const [stage, setStage] = useState(initial === "chooser" ? "chooser" : initial);
-  const [draftText, setDraftText] = useState(DEMO_BRAIN_DUMP);
+  const [draftText, setDraftText] = useState(isSavedDraft ? sourceDraft.text : DEMO_BRAIN_DUMP);
 
   useEffect(() => {
     if (stage !== "processing") return undefined;
-    const timer = window.setTimeout(() => setStage("question-1"), processingDelayMs);
+    const timer = window.setTimeout(() => setStage(isSavedDraft ? "result" : "question-1"), processingDelayMs);
     return () => window.clearTimeout(timer);
   }, [processingDelayMs, stage]);
 
   const body = stage === "chooser" ? <section className="capture-chooser"><span className="capture-orb"><Microphone size={38} weight="duotone" /></span><h1>Що зараз у голові?</h1><p>Говори хаотично — не треба формулювати задачі чи оцінювати час.</p><div className="capture-options"><Button icon={Microphone} onClick={() => setStage("recording")}>Диктувати</Button><Button variant="secondary" icon={Keyboard} onClick={() => setStage("transcript")}>Написати текстом</Button></div></section>
     : stage === "recording" ? <VoiceRecorder transcript="Мені треба підготувати перший випуск…" onCancel={() => setStage("chooser")} onFinish={() => setStage("processing")} />
     : stage === "transcript" ? <section className="capture-transcript"><h1>Твої думки</h1><Transcript editable value={draftText} onChange={setDraftText} /><Button onClick={() => setStage("processing")}>Структурувати й запланувати</Button></section>
+    : stage === "draft-plan-review" ? <section className="draft-plan-review"><h1>Розібрати чернетку?</h1><p className="soft-copy">AI перетворить цю думку на конкретні задачі з часом, пріоритетом і дедлайном.</p><div className="draft-review-card"><span>Brain Dump</span><strong>{draftText}</strong></div><Button onClick={() => setStage("processing")}>Розібрати з AI</Button><Button variant="secondary" onClick={() => { updateState({ inboxIdeas: [...state.inboxIdeas, { id: `idea-${sourceDraft.id}`, title: draftText, alignment: null }], inboxDrafts: state.inboxDrafts.filter((draft) => draft.id !== sourceDraft.id), activeDraftId: null }); onNavigate("inbox-ideas"); }}>Зберегти як ідею</Button></section>
     : stage === "processing" ? <AIProcessing />
     : stage === "question-1" ? <Clarification number={1} onAnswer={() => setStage("question-2")} />
     : stage === "question-2" ? <Clarification number={2} onAnswer={() => setStage("result")} />
-    : stage === "result" ? <AIResult tasks={buildPlanFromBrainDump(draftText)} onApply={() => { updateState({ plannedTasks: buildPlanFromBrainDump(draftText), lastBrainDump: draftText, planApplied: true }); onNavigate("today-normal"); }} onUndo={() => setStage("chooser")} />
+    : stage === "result" ? <AIResult tasks={buildPlanFromBrainDump(draftText)} actionLabel={isSavedDraft ? "Обрати вільні слоти" : "Застосувати план"} onApply={() => { const plan = buildPlanFromBrainDump(draftText); updateState(isSavedDraft ? { pendingPlanTasks: plan, lastBrainDump: draftText } : { plannedTasks: plan, lastBrainDump: draftText, planApplied: true }); onNavigate(isSavedDraft ? "calendar-day" : "today-normal"); }} onUndo={() => setStage("chooser")} />
     : stage === "review" ? <section className="capture-transcript"><h1>Перевір транскрипт</h1><p className="soft-copy">Аудіо було тихим у кількох місцях. Відредагуй текст або запиши ще раз.</p><Transcript editable /><Button onClick={() => setStage("processing")}>Повторити обробку</Button></section>
     : <StateView state="error" title="Не вдалося опрацювати" message={`Brain Dump збережено в Inbox: «${DEMO_BRAIN_DUMP.slice(0, 58)}…»`} action={<Button onClick={() => setStage("processing")}>Спробувати ще раз</Button>} />;
 

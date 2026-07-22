@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo, useState } from "react";
 import { DEFAULT_ROUTE } from "../navigation/routes";
+import { DEMO_DRAFTS, DEMO_IDEAS } from "../data/demoData";
 
 const PrototypeContext = createContext(null);
 
@@ -12,8 +13,12 @@ const INITIAL_STATE = {
   pro: false,
   selectedNodeId: null,
   plannedTasks: null,
+  pendingPlanTasks: null,
   lastBrainDump: "",
   planApplied: false,
+  inboxDrafts: DEMO_DRAFTS,
+  inboxIdeas: DEMO_IDEAS,
+  activeDraftId: null,
 };
 
 const FALLBACK_CONTEXT = {

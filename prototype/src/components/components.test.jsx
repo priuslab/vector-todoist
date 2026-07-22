@@ -6,6 +6,7 @@ import { AppFrame } from "./AppFrame";
 import { Button } from "./Button";
 import { UndoSnackbar } from "./UndoSnackbar";
 import { ActionFooterLayout } from "./ActionFooterLayout";
+import { BottomNav } from "./BottomNav";
 
 const componentsCss = readFileSync(resolve(process.cwd(), "src/styles/components.css"), "utf8");
 
@@ -15,6 +16,16 @@ it("gives the primary action an accessible name", () => {
   expect(screen.getByRole("button", { name: "Продовжити" })).toHaveClass(
     "button--primary",
   );
+});
+
+it("keeps Calendar and Oracle available in the primary bottom navigation", () => {
+  render(<BottomNav active="today-normal" onNavigate={vi.fn()} />);
+
+  expect(screen.getByRole("button", { name: "Сьогодні" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Inbox" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Brain Dump" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Календар" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Oracle" })).toBeInTheDocument();
 });
 
 it("announces undo changes", () => {

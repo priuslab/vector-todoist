@@ -86,6 +86,12 @@ export const DEMO_IDEAS = [
   },
 ];
 
+export const DEMO_DRAFTS = [
+  { id: "draft-run-10k", text: "Хочу бігати 10 км.", status: "needs_clarification" },
+  { id: "draft-run-weekly", text: "Бігати 10 км 1 раз на тиждень", status: "saved" },
+  { id: "draft-run-training", text: "Потрібно скласти план тренувань для бігу", status: "needs_clarification" },
+];
+
 export const DEMO_BRAIN_DUMP =
   "Мені треба підготувати перший випуск подкасту, написати Марії про запис, ще не забути замовити корм коту. Думаю зробити окремий епізод про синдром самозванця, але не знаю, чи варто зараз ще запускати YouTube. У четвер об 11 у мене командний синк";
 
