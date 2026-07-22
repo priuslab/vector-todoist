@@ -27,6 +27,8 @@ export const DEMO_TASKS = [
     energy: "Висока",
     type: "deep",
     alignment: 94,
+    priority: "Високий",
+    deadline: "До четверга",
     projectId: "project-pilot",
     flexible: true,
   },
@@ -39,6 +41,8 @@ export const DEMO_TASKS = [
     energy: "Низька",
     type: "routine",
     alignment: 81,
+    priority: "Середній",
+    deadline: "Цього тижня",
     projectId: "project-pilot",
     flexible: true,
   },
@@ -51,6 +55,8 @@ export const DEMO_TASKS = [
     energy: "Низька",
     type: "neutral",
     alignment: 12,
+    priority: "Низький",
+    deadline: "Сьогодні",
     flexible: true,
   },
 ];
@@ -82,3 +88,28 @@ export const DEMO_IDEAS = [
 
 export const DEMO_BRAIN_DUMP =
   "Мені треба підготувати перший випуск подкасту, написати Марії про запис, ще не забути замовити корм коту. Думаю зробити окремий епізод про синдром самозванця, але не знаю, чи варто зараз ще запускати YouTube. У четвер об 11 у мене командний синк";
+
+export function buildPlanFromBrainDump(text = DEMO_BRAIN_DUMP) {
+  const normalized = text.toLocaleLowerCase("uk-UA");
+  const tasks = DEMO_TASKS.filter((task) => {
+    if (task.id === "task-structure") return /підгот|випуск|подкаст|епізод/.test(normalized);
+    if (task.id === "task-guest") return /марі|лист|гост/.test(normalized);
+    if (task.id === "task-cat-food") return /корм|кіт|кот/.test(normalized);
+    return false;
+  });
+
+  if (tasks.length > 0) return tasks;
+  return [{
+    id: "task-brain-dump-1",
+    title: text.trim().split(/[.!?]/)[0] || "Розібрати наступну думку",
+    duration: 25,
+    start: "09:30",
+    end: "09:55",
+    priority: "Середній",
+    deadline: "Сьогодні",
+    energy: "Середня",
+    type: "routine",
+    alignment: 50,
+    flexible: true,
+  }];
+}

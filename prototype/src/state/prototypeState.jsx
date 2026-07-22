@@ -11,6 +11,18 @@ const INITIAL_STATE = {
   quietHours: "21:00–08:00",
   pro: false,
   selectedNodeId: null,
+  plannedTasks: null,
+  lastBrainDump: "",
+  planApplied: false,
+};
+
+const FALLBACK_CONTEXT = {
+  route: DEFAULT_ROUTE,
+  state: INITIAL_STATE,
+  history: [],
+  navigate: () => {},
+  updateState: () => {},
+  undo: () => {},
 };
 
 export function PrototypeProvider({ children, initialRoute = DEFAULT_ROUTE }) {
@@ -43,6 +55,5 @@ export function PrototypeProvider({ children, initialRoute = DEFAULT_ROUTE }) {
 
 export function usePrototype() {
   const value = useContext(PrototypeContext);
-  if (!value) throw new Error("usePrototype must be used inside PrototypeProvider");
-  return value;
+  return value ?? FALLBACK_CONTEXT;
 }
