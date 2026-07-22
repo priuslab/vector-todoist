@@ -33,6 +33,17 @@ describe('Brain Dump → Today vertical slice', () => {
     const repeated = await service.apply(user, preview.changeSetId, {}); expect(repeated.changeSet.id).toBe(preview.changeSetId); expect(r.tasks).toHaveLength(1); expect(r.ideas).toHaveLength(1);
     expect((await service.inbox(user)).ideas).toHaveLength(1);
   });
+  it('previews classified analysis even when non-critical clarification questions remain', async () => {
+    const r = repos();
+    r.analysisService.result = vi.fn(async () => ({ ...analysis, analysis: { ...analysis.analysis, questions: [{ id: 'q1', prompt: 'Коли це робити?' }] } }));
+    const service = createPlanService(r);
+
+    const preview = await service.preview(user, 'dump-1', { now: '2026-07-18T08:00:00+02:00', idempotencyKey: 'plan-questions-123' });
+
+    expect(preview.tasks).toHaveLength(1);
+    expect(preview.ideas).toHaveLength(1);
+    expect(r.changes).toHaveLength(1);
+  });
   it('replays the persisted proposals and blocks when a preview response is lost', async () => {
     const r = repos(); const service = createPlanService(r);
     const firstPreview = await service.preview(user, 'dump-1', { now: '2026-07-18T08:00:00+02:00', idempotencyKey: 'plan-response-loss' });

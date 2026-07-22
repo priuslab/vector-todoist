@@ -77,7 +77,7 @@ export function createPlanService(deps: {
     const goal = body.goalId && goalGraphRepository ? await goalGraphRepository.goals.get(user, body.goalId) : null;
     if (body.goalId && (!goal || goal.user !== user.userId || goal.status !== 'active')) throw new PlanValidationError();
     const result = await analysisService.result(user, dumpId);
-    if (!result || result.status !== 'classified' || result.analysis.questions.length > 0) throw new PlanValidationError();
+    if (!result || result.status !== 'classified') throw new PlanValidationError();
     const analysis = result.analysis;
     const idempotencyKey = body.idempotencyKey ?? `plan:${user.userId}:${dumpId}:${result.id}`;
     const existing = (await changeSetRepository.list(user)).find((record) => record.idempotencyKey === idempotencyKey);
